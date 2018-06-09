@@ -1,1 +1,1 @@
-**Notes in Markdown language.**
+**Notes in using Markdown language.**
