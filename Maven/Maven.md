@@ -47,11 +47,50 @@ Maven只要求添加M2_HOME变量，但某些项目仍然引用MAVEN_HOME，因�
 
 出现上述信息，代表Maven已经安装成功。
 
+**设置JDK信息：**
+
+Maven默认使用的JDK还是1.5版本，这里修改为1.8。
+
+修改conf\settings.xml，在profiles标签内增加以下内容：
+
+```xml
+<profile>    
+    <id>jdk-1.8</id>    
+    <activation>    
+        <activeByDefault>true</activeByDefault>    
+        <jdk>1.8</jdk>    
+    </activation>    
+    <properties>    
+        <maven.compiler.source>1.8</maven.compiler.source>    
+        <maven.compiler.target>1.8</maven.compiler.target>    
+        <maven.compiler.compilerVersion>1.8</maven.compiler.compilerVersion>
+    </properties>    
+</profile>
+```
+
+上述设置是全局设置，我们也可以对某一个项目指定JDK的版本，修改该项目的pom.xml，对编译插件进行修改：
+
+```xml
+<plugins>
+    <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.7.0</version>
+        <configuration>
+            <source>1.7</source>
+            <target>1.7</target>
+        </configuration>
+    </plugin>
+</plugins>
+```
+
+上述代码指定了编译时使用1.7版本的JDK。
+
 **Maven启用代理：**
 
 如果你的公司正在建立一个防火墙，并使用HTTP代理服务器来阻止用户直接连接到互联网。如果您使用代理，Maven将无法下载任何依赖。为了使它工作，你必须声明在Maven的配置文件中设置代理服务器。
 
-打开apache-maven-3.5.3\conf\setting.xml，找到proxies标签：
+打开apache-maven-3.5.3\conf\settings.xml，找到proxies标签：
 
 ```xml
 <!-- proxies
@@ -104,7 +143,7 @@ Maven的本地资源库是用来存储所有项目的依赖关系(插件jar和�
 
 默认情况下，Maven的本地资源库默认为.m2目录文件夹：C:\Users\\{your-username}\\.m2
 
-我们可以更改本地库的位置，同样在setting中进行修改：
+我们可以更改本地库的位置，同样在settings.xml中进行修改：
 
 ```xml
 <!-- localRepository
@@ -127,8 +166,6 @@ Maven的本地资源库是用来存储所有项目的依赖关系(插件jar和�
 <localRepository>D:\Program Files\apache-maven-3.5.3\repository</localRepository>
 ```
 
-保存文件即可。
-
 ### Maven中央存储库
 
 当我们建立一个Maven项目时，Maven会检查pom.xml，以确定哪些依赖需要下载。首先Maven将从本地资源库查找依赖资源，如果没有找到，Maven会默认从[中央资源库](http://repo1.maven.org/maven2/){:target="_blank"}查找下载。Maven中央存储库是由Maven社区提供的资源库。它包含了大量的常用程序库。
@@ -137,7 +174,7 @@ Maven的本地资源库是用来存储所有项目的依赖关系(插件jar和�
 
 常用的Maven中央库镜像：
 
-（如果需要使用镜像，同样在setting.xml中进行配置）
+（如果需要使用镜像，同样在settings.xml中进行配置）
 
 阿里云：
 
@@ -324,7 +361,7 @@ Maven就能在本地存储库中找到2.1.0版的dom4j了。
 
 ### Maven项目标准目录结构
 
-举例，目录结构如下：
+以一个Maven构建的JavaWeb项目为例，目录结构如下：
 
 - Maven-helloworld：项目名称
     + .setting
@@ -340,3 +377,577 @@ Maven就能在本地存储库中找到2.1.0版的dom4j了。
     + .classpath
     + .project
     + pom.xml：Maven项目核心配置文件
+
+JavaWeb项目
+
+### 使用Maven创建项目
+
+根据项目的不同，通常情况下我们只需要在以下两个模板中选择一个并创建项目即可：
+
+- maven-archetype-webapp （Java Web Project (WAR)）
+- maven-archetype-quickstart （Java Project (JAR)）
+
+例如在myCode下使用maven-archetype-quickstart模板创建一个Java项目：
+
+    E:\myCode>mvn archetype:generate -DgroupId=pers.tavish -DartifactId=MavenJavaProject -DarchetypeArtifactId=maven-archetype-quickstart -DinteractiveMode=false
+
+创建一个JavaWeb项目：
+
+    E:\myCode>mvn archetype:generate -DgroupId=pers.tavish -DartifactId=MavenJavaWebProject -DarchetypeArtifactId=maven-archetype-webapp -DinteractiveMode=false
+
+Maven总计提供了2000+的模板，我们可以手动进行选择：
+
+    mvn archetype:generate
+
+选择674号Spring+Hibernate的模板（ ml.rugal.archetype:springmvc-spring-hibernate (A pretty useful JavaEE application archetype based on springmvc spring and hibernate)）：
+
+    Choose a number or apply filter (format: [groupId:]artifactId, case sensitive contains): 1291: 674
+
+然后选择版本：
+
+    Choose ml.rugal.archetype:springmvc-spring-hibernate version:
+    1: 0.1
+    2: 0.2
+    3: 0.3
+    4: 0.4
+    5: 0.5
+    6: 0.6
+    7: 0.7
+    8: 1.0
+    Choose a number: 8: 8
+
+填写groupId、artifactId、version和package：
+
+    Define value for property 'groupId': pers.tavish
+    Define value for property 'artifactId': MavenSSHibernate
+    Define value for property 'version' 1.0-SNAPSHOT: : 0.1
+    Define value for property 'package' pers.tavish: : pers.tavish
+
+确定：
+
+    Confirm properties configuration:
+    groupId: pers.tavish
+    artifactId: MavenSSHibernate
+    version: 0.1
+    package: pers.tavish
+     Y: : Y
+
+构建成功：
+
+    [INFO] ----------------------------------------------------------------------------
+    [INFO] Using following parameters for creating project from Archetype: springmvc-spring-hibernate:1.0
+    [INFO] ----------------------------------------------------------------------------
+    [INFO] Parameter: groupId, Value: pers.tavish
+    [INFO] Parameter: artifactId, Value: MavenSSHibernate
+    [INFO] Parameter: version, Value: 0.1
+    [INFO] Parameter: package, Value: pers.tavish
+    [INFO] Parameter: packageInPathFormat, Value: pers/tavish
+    [INFO] Parameter: package, Value: pers.tavish
+    [INFO] Parameter: version, Value: 0.1
+    [INFO] Parameter: groupId, Value: pers.tavish
+    [INFO] Parameter: artifactId, Value: MavenSSHibernate
+    [INFO] Project created from Archetype in dir: E:\myCode\MavenSSHibernate
+    [INFO] ------------------------------------------------------------------------
+    [INFO] BUILD SUCCESS
+    [INFO] ------------------------------------------------------------------------
+    [INFO] Total time: 02:31 min
+    [INFO] Finished at: 2018-06-11T10:36:21+08:00
+    [INFO] ------------------------------------------------------------------------
+
+#### 将Maven项目导入Eclipse
+
+导入项目前需要设置Eclipse，在Preferences-Maven-User Settings中设置User Settings为Maven\conf下的settings.xml。
+
+可以通过命令`mvn eclipse:eclipse`将Maven项目变为可被Eclipse导入的项目：
+
+将MavenTest项目导入Eclipse：
+
+    mvn eclipse:eclipse
+
+    [INFO] Using Eclipse Workspace: null
+    [INFO] Adding default classpath container: org.eclipse.jdt.launching.JRE_CONTAINER
+    [INFO] Not writing settings - defaults suffice
+    [INFO] Wrote Eclipse project for "MavenTest" to E:\myCode\MavenTest.
+    [INFO]
+    [INFO] ------------------------------------------------------------------------
+    [INFO] BUILD SUCCESS
+    [INFO] ------------------------------------------------------------------------
+    [INFO] Total time: 02:57 min
+    [INFO] Finished at: 2018-06-11T10:45:59+08:00
+    [INFO] ------------------------------------------------------------------------
+
+之后使用eclipse导入（Existing Projects into Workspace）这个项目就可以了。
+
+另一种方法，不使用命令，直接导入（Existing Maven Projects）项目。
+
+### 使用Eclipse创建Maven项目
+
+我们同样可以直接使用Eclipse创建Maven项目。
+
+在New Project中选择Maven Project，根据向导设置相关Maven属性即可。
+
+### 使用Eclipse将Java项目转为Maven
+
+右键项目，在configure菜单中选择convert to Maven Project，根据向导设置相关Maven属性即可。
+
+### 示例：Maven整合Struts2
+
+以Maven整合Struts2为例。
+
+创建Maven工程：
+
+![create_maven_project](images\create_maven_project.PNG)
+
+跳过原型选择：
+
+![skip_archetype_selection](images\skip_archetype_selection.PNG)
+
+填写项目信息，父工程为空：
+
+![configure_project](images\configure_project.PNG)
+
+工程刚刚创建完毕会报错，web.xml缺失：
+
+![webxml_missing](images\webxml_missing.PNG)
+
+生成一个web.xml即可。由于我们要使用Struts2，所以配置Struts2的核心过滤器：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns="http://xmlns.jcp.org/xml/ns/javaee"
+    xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/javaee http://xmlns.jcp.org/xml/ns/javaee/web-app_3_1.xsd"
+    id="WebApp_ID"
+    version="3.1">
+    <display-name>maven_struts2</display-name>
+    <!-- 通过filter启动Struts2 -->
+    <filter>
+        <filter-name>struts2</filter-name>
+        <filter-class>org.apache.struts2.dispatcher.filter.StrutsPrepareAndExecuteFilter</filter-class>
+    </filter>
+    <filter-mapping>
+        <filter-name>struts2</filter-name>
+        <url-pattern>/*</url-pattern>
+    </filter-mapping>
+</web-app>
+```
+
+整合Struts2，添加Struts2的依赖：
+
+![add_dependency](images\add_dependency.PNG)
+
+添加了Struts2核心包后，其核心包的依赖包会被自动添加：
+
+![maven_dependencies](images\maven_dependencies.PNG)
+
+添加
+
+
+创建Struts2配置文件struts.xml：
+
+Struts2的配置文件应被放在main\resources下：
+
+![struts.xml](images\struts.xml.PNG)
+
+创建Action类，Action类应该被放在main\java下：
+
+![CreateAction](images\CreateAction.PNG)
+
+配置struts.xml：
+
+```xml
+<struts>
+    <package
+        name="demo"
+        namespace="/"
+        extends="struts-default">
+        <global-allowed-methods>regex:.*</global-allowed-methods>
+        <action
+            name="customerAction_*"
+            class="pers.tavish.action.CustomerAction"
+            method="{1}">
+            <result name="success">/index.jsp</result>
+        </action>
+    </package>
+</struts>
+```
+
+配置success视图：
+
+（在编写jsp页面或使用Servlet时，可能会发生找不到servlet-api的问题，这是因为我们的maven项目没有添加Apache Tomcat的库。在项目的build path中添加这个library就可以了。）
+
+![success](images\success.PNG)
+
+在tomcat上运行项目，项目右键Run as选择Maven build...，Goals命令填写：tomcat:run。填写完毕后点击Run运行项目。
+
+成功的话，根据上述配置，访问 http://localhost:8080/maven_struts2/customerAction_execute 会在页面上显示Hello World，同时控制台输出Call CustomerAction.execute()。
+
+### 常用的Maven命令
+
+- **clean**：删除项目根目录下的.class文件，通常会直接删掉根目录下的target文件夹
+```
+E:\myCode\Maven\EclipseMavenJavaProject>mvn clean
+[INFO] Scanning for projects...
+[INFO]
+[INFO] ----------------< pers.tavish:EclipseMavenJavaProject >-----------------
+[INFO] Building EclipseMavenJavaProject 0.0.1-SNAPSHOT
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ EclipseMavenJavaProject ---
+[INFO] Deleting E:\myCode\Maven\EclipseMavenJavaProject\target
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time: 0.190 s
+[INFO] Finished at: 2018-06-11T14:52:51+08:00
+[INFO] ------------------------------------------------------------------------
+```
+- **compile**：编译项目中的.java文件，生成.class文件。
+```
+E:\myCode\Maven\EclipseMavenJavaProject>mvn compile
+[INFO] Scanning for projects...
+[INFO]
+[INFO] ----------------< pers.tavish:EclipseMavenJavaProject >-----------------
+[INFO] Building EclipseMavenJavaProject 0.0.1-SNAPSHOT
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ EclipseMavenJavaProject ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory E:\myCode\Maven\EclipseMavenJavaProject\src\main\resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.1:compile (default-compile) @ EclipseMavenJavaProject ---
+[INFO] Changes detected - recompiling the module!
+[INFO] Compiling 1 source file to E:\myCode\Maven\EclipseMavenJavaProject\target\classes
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time: 1.092 s
+[INFO] Finished at: 2018-06-11T14:56:31+08:00
+[INFO] ------------------------------------------------------------------------
+```
+- **test**：执行项目根目录中src\test\java下的单元测试。单元测试类的类名必须为XxxTest.java。
+```
+E:\myCode\Maven\EclipseMavenJavaProject>mvn test
+[INFO] Scanning for projects...
+[INFO]
+[INFO] ----------------< pers.tavish:EclipseMavenJavaProject >-----------------
+[INFO] Building EclipseMavenJavaProject 0.0.1-SNAPSHOT
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ EclipseMavenJavaProject ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory E:\myCode\Maven\EclipseMavenJavaProject\src\main\resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.1:compile (default-compile) @ EclipseMavenJavaProject ---
+[INFO] Nothing to compile - all classes are up to date
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:testResources (default-testResources) @ EclipseMavenJavaProject ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory E:\myCode\Maven\EclipseMavenJavaProject\src\test\resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.1:testCompile (default-testCompile) @ EclipseMavenJavaProject ---
+[INFO] Nothing to compile - all classes are up to date
+[INFO]
+[INFO] --- maven-surefire-plugin:2.12.4:test (default-test) @ EclipseMavenJavaProject ---
+[INFO] Surefire report directory: E:\myCode\Maven\EclipseMavenJavaProject\target\surefire-reports
+
+-------------------------------------------------------
+ T E S T S
+-------------------------------------------------------
+Running pers.tavish.AppTest
+Hello World!
+Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.043 sec
+
+Results :
+
+Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
+
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time: 1.091 s
+[INFO] Finished at: 2018-06-11T15:06:06+08:00
+[INFO] ------------------------------------------------------------------------
+```
+- **package**：将项目编译、测试并按照pom.xml中的package标签对项目进行打包，输出至target目录。
+```
+E:\myCode\Maven\EclipseMavenJavaProject>mvn package
+[INFO] Scanning for projects...
+[INFO]
+[INFO] ----------------< pers.tavish:EclipseMavenJavaProject >-----------------
+[INFO] Building EclipseMavenJavaProject 0.0.1-SNAPSHOT
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ EclipseMavenJavaProject ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory E:\myCode\Maven\EclipseMavenJavaProject\src\main\resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.1:compile (default-compile) @ EclipseMavenJavaProject ---
+[INFO] Nothing to compile - all classes are up to date
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:testResources (default-testResources) @ EclipseMavenJavaProject ---
+[INFO] Using 'UTF-8' encoding to copy filtered resources.
+[INFO] skip non existing resourceDirectory E:\myCode\Maven\EclipseMavenJavaProject\src\test\resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.1:testCompile (default-testCompile) @ EclipseMavenJavaProject ---
+[INFO] Nothing to compile - all classes are up to date
+[INFO]
+[INFO] --- maven-surefire-plugin:2.12.4:test (default-test) @ EclipseMavenJavaProject ---
+[INFO] Surefire report directory: E:\myCode\Maven\EclipseMavenJavaProject\target\surefire-reports
+
+-------------------------------------------------------
+ T E S T S
+-------------------------------------------------------
+Running pers.tavish.AppTest
+Hello World!
+Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.044 sec
+
+Results :
+
+Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
+
+[INFO]
+[INFO] --- maven-jar-plugin:2.4:jar (default-jar) @ EclipseMavenJavaProject ---
+[INFO] Building jar: E:\myCode\Maven\EclipseMavenJavaProject\target\EclipseMavenJavaProject-0.0.1-SNAPSHOT.jar
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time: 1.306 s
+[INFO] Finished at: 2018-06-11T15:15:36+08:00
+[INFO] ------------------------------------------------------------------------
+```
+- **install**：将本地项目编译、测试并打包后安装到本地资源库中。
+```
+E:\myCode\Maven\MavenJavaProject>mvn install
+[INFO] Scanning for projects...
+[INFO]
+[INFO] --------------------< pers.tavish:MavenJavaProject >--------------------
+[INFO] Building MavenJavaProject 1.0-SNAPSHOT
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ MavenJavaProject ---
+[WARNING] Using platform encoding (GBK actually) to copy filtered resources, i.e. build is platform dependent!
+[INFO] skip non existing resourceDirectory E:\myCode\Maven\MavenJavaProject\src\main\resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.1:compile (default-compile) @ MavenJavaProject ---
+[INFO] Changes detected - recompiling the module!
+[WARNING] File encoding has not been set, using platform encoding GBK, i.e. build is platform dependent!
+[INFO] Compiling 1 source file to E:\myCode\Maven\MavenJavaProject\target\classes
+[INFO]
+[INFO] --- maven-resources-plugin:2.6:testResources (default-testResources) @ MavenJavaProject ---
+[WARNING] Using platform encoding (GBK actually) to copy filtered resources, i.e. build is platform dependent!
+[INFO] skip non existing resourceDirectory E:\myCode\Maven\MavenJavaProject\src\test\resources
+[INFO]
+[INFO] --- maven-compiler-plugin:3.1:testCompile (default-testCompile) @ MavenJavaProject ---
+[INFO] Changes detected - recompiling the module!
+[WARNING] File encoding has not been set, using platform encoding GBK, i.e. build is platform dependent!
+[INFO] Compiling 1 source file to E:\myCode\Maven\MavenJavaProject\target\test-classes
+[INFO]
+[INFO] --- maven-surefire-plugin:2.12.4:test (default-test) @ MavenJavaProject ---
+[INFO] Surefire report directory: E:\myCode\Maven\MavenJavaProject\target\surefire-reports
+
+-------------------------------------------------------
+ T E S T S
+-------------------------------------------------------
+Running pers.tavish.AppTest
+Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.031 sec
+
+Results :
+
+Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
+
+[INFO]
+[INFO] --- maven-jar-plugin:2.4:jar (default-jar) @ MavenJavaProject ---
+[INFO] Building jar: E:\myCode\Maven\MavenJavaProject\target\MavenJavaProject-1.0-SNAPSHOT.jar
+[INFO]
+[INFO] --- maven-install-plugin:2.4:install (default-install) @ MavenJavaProject ---
+[INFO] Installing E:\myCode\Maven\MavenJavaProject\target\MavenJavaProject-1.0-SNAPSHOT.jar to D:\Program Files\apache-maven-3.5.3\repository\pers\tavish\MavenJavaProject\1.0-SNAPSHOT\MavenJavaProject-1.0-SNAPSHOT.jar
+[INFO] Installing E:\myCode\Maven\MavenJavaProject\pom.xml to D:\Program Files\apache-maven-3.5.3\repository\pers\tavish\MavenJavaProject\1.0-SNAPSHOT\MavenJavaProject-1.0-SNAPSHOT.pom
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time: 1.816 s
+[INFO] Finished at: 2018-06-11T15:33:52+08:00
+[INFO] ------------------------------------------------------------------------
+```
+
+如果在install的过程中出现以下警告：
+
+```
+[WARNING] Using platform encoding (GBK actually) to copy filtered resources, i.e. build is platform dependent!
+[WARNING] File encoding has not been set, using platform encoding GBK, i.e. build is platform dependent!
+[WARNING] Using platform encoding (GBK actually) to copy filtered resources, i.e. build is platform dependent!
+[WARNING] File encoding has not been set, using platform encoding GBK, i.e. build is platform dependent!
+```
+
+则说明没有对插件compiler和resources的编码进行配置，需要修改项目的pom.xml，对插件进行配置，指定utf-8编码：
+
+```xml
+<build>
+    <plugins>
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <version>3.7.0</version>
+            <configuration>
+                <encoding>utf-8</encoding>
+            </configuration>
+        </plugin>
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-resources-plugin</artifactId>
+            <version>3.0.1</version>
+            <configuration>
+                <encoding>utf-8</encoding>
+            </configuration>
+        </plugin>
+    </plugins>
+</build>
+```
+
+### Maven项目的生命周期
+
+Maven存在“三套”生命周期，每一套生命周期相互独立，互不影响。在一套生命周期内，执行后面的命令，前面的命令会自动执行。
+
+- CleanLifeCycle：清理生命周期，包含命令：
+    + clean
+- defaultLifeCycle：默认生命周期，包含命令：
+    + compile
+    + test
+    + package
+    + install
+    + deploy
+- siteLifeCycle：站点生命周期，包含命令：
+    + site
+
+## Maven依赖及依赖冲突
+
+**直接依赖与传递依赖：**
+
+假设现在A依赖B，B依赖C。那么有：
+
+- B是A的直接依赖。
+- C是A的传递依赖。
+
+**什么是冲突？**
+
+假设现在项目A（项目其实也是一个jar包或war包）依赖于jar包B，B依赖于jar包C，这里C的版本为1.1；现在我们向项目A中添加jar包D，D也依赖于jar包C，但这里C的版本是1.2。
+现在问题出现了，jar包C在我们的项目中出现了两次，且版本不同，这时就出现了冲突（版本冲突）。
+
+### Maven对冲突的调解原则
+
+**1.第一声明者优先原则**
+
+在这个原则下，当多个jar包导致了相同的传递依赖时，哪个jar包先在pom.xml中声明，Maven就使用谁的传递依赖。
+
+假设我们在项目中依次添加了struts2-spring-plugin-2.3.24和spring-context-4.2.4两个jar包，它们的依赖层级关系如下：
+
+![dependencies_conflict](images\dependencies_conflict.PNG)
+
+我们可以发现现在出现冲突了：
+
+比如spring-beans这个包分别被二者依赖，其中一个的版本是3.0.5，另一个版本是4.2.4。从图中我们也可以看到，当出现两个版本时，由于spring-context-4.2.4是后声明者，随意它依赖的spring-beans被忽略了（omitted for conflict with 3.0.5.RELEASE）。
+
+**2.路径近者优先原则**
+
+在这个原则下，直接依赖优先于作为传递依赖。
+
+![dependencies_conflict](images\dependencies_conflict.PNG)
+
+同样在这个层级关系中，我们可以发现struts2-spring-plugin依赖于spring-context，所以它引入版本为3.0.5的jar包。但由于我们直接声明了一个不同版本（4.2.4）的spring-context，所以struts2-spring-plugin依赖的spring-context-3.0.5.RELEASE就被忽略了（omitted for conflict with 3.0.5.RELEASE）。这是因为4.2.4的jar包是直接依赖，而3.0.5的jar包是传递依赖。
+
+### 手工排除依赖
+
+![dependencies_conflict](images\dependencies_conflict.PNG)
+
+我们也可以手动排除依赖，只要选择要排除的版本将其exclude就可以了：
+
+![exclude_dependency](images\exclude_dependency.PNG)
+
+这样在pom.xml中会自动生成将其排除的代码：
+
+```xml
+<dependency>
+    <groupId>org.apache.struts</groupId>
+    <artifactId>struts2-spring-plugin</artifactId>
+    <version>2.3.24</version>
+    <exclusions>
+        <!-- 对spring-beans进行了排除 -->
+        <exclusion>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-beans</artifactId>
+        </exclusion>
+    </exclusions>
+</dependency>
+<dependency>
+    <groupId>org.springframework</groupId>
+    <artifactId>spring-context</artifactId>
+    <version>4.2.4.RELEASE</version>
+    <!-- 对spring-beans进行了排除 -->
+    <exclusions>
+        <exclusion>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-beans</artifactId>
+        </exclusion>
+    </exclusions>
+</dependency>
+```
+
+但上述代码同时屏蔽了两个版本的spring-beans传递依赖，我们这里选择版本高的jar包，删除第二个依赖中的exclusions标签：
+
+```xml
+<dependency>
+    <groupId>org.apache.struts</groupId>
+    <artifactId>struts2-spring-plugin</artifactId>
+    <version>2.3.24</version>
+    <exclusions>
+        <!-- 对spring-beans进行了排除 -->
+        <exclusion>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-beans</artifactId>
+        </exclusion>
+    </exclusions>
+</dependency>
+<dependency>
+    <groupId>org.springframework</groupId>
+    <artifactId>spring-context</artifactId>
+    <version>4.2.4.RELEASE</version>
+</dependency>
+```
+
+即我们可以通过exclusions标签，将不需要的传递依赖手工排除。
+
+### 版本锁定
+
+版本锁定是指我们人工确定项目中依赖的jar包的版本。通过标签dependencyManagement实现。
+
+现在我们要把所有有关于spring的jar包的版本均设定为4.2.4：
+
+```xml
+<dependencyManagement>
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-core</artifactId>
+            <version>4.2.4.RELEASE</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-beans</artifactId>
+            <version>4.2.4.RELEASE</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-web</artifactId>
+            <version>4.2.4.RELEASE</version>
+        </dependency>
+    </dependencies>
+</dependencyManagement>
+```
+
+经过这样的设定以后，spring的所有相关包就都使用4.2.4版本了：
+
+![spring4.2.4](images\spring4.2.4.PNG)
+
+但要注意的是dependencyManagement标签只用于对版本进行锁定，这个标签并不会导入依赖。
