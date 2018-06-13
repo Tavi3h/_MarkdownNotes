@@ -377,6 +377,137 @@ system | Y | Y | - | 本地的Maven仓库之外的类库
 
 对于servlet-api来说，如果我们将其范围设置为compile，就意味着当我们将项目打包成war时，servlet-api会被打包到WEB-INF\lib目录下。但是由于tomcat自身的lib就具有servlet-api这个jar包，所以这个时候会发生冲突。所以对于servlet-api这类jar包，我们应该设置其范围为provided。
 
+## Maven依赖及依赖冲突
+
+**直接依赖与传递依赖：**
+
+假设现在A依赖B，B依赖C。那么有：
+
+- B是A的直接依赖。
+- C是A的传递依赖。
+
+**什么是冲突？**
+
+假设现在项目A（项目其实也是一个jar包或war包）依赖于jar包B，B依赖于jar包C，这里C的版本为1.1；现在我们向项目A中添加jar包D，D也依赖于jar包C，但这里C的版本是1.2。
+现在问题出现了，jar包C在我们的项目中出现了两次，且版本不同，这时就出现了冲突（版本冲突）。
+
+### Maven对冲突的调解原则
+
+**1.第一声明者优先原则**
+
+在这个原则下，当多个jar包导致了相同的传递依赖时，哪个jar包先在pom.xml中声明，Maven就使用谁的传递依赖。
+
+假设我们在项目中依次添加了struts2-spring-plugin-2.3.24和spring-context-4.2.4两个jar包，它们的依赖层级关系如下：
+
+![dependencies_conflict](images\dependencies_conflict.PNG)
+
+我们可以发现现在出现冲突了：
+
+比如spring-beans这个包分别被二者依赖，其中一个的版本是3.0.5，另一个版本是4.2.4。从图中我们也可以看到，当出现两个版本时，由于spring-context-4.2.4是后声明者，随意它依赖的spring-beans被忽略了（omitted for conflict with 3.0.5.RELEASE）。
+
+**2.路径近者优先原则**
+
+在这个原则下，直接依赖优先于作为传递依赖。
+
+![dependencies_conflict](images\dependencies_conflict.PNG)
+
+同样在这个层级关系中，我们可以发现struts2-spring-plugin依赖于spring-context，所以它引入版本为3.0.5的jar包。但由于我们直接声明了一个不同版本（4.2.4）的spring-context，所以struts2-spring-plugin依赖的spring-context-3.0.5.RELEASE就被忽略了（omitted for conflict with 3.0.5.RELEASE）。这是因为4.2.4的jar包是直接依赖，而3.0.5的jar包是传递依赖。
+
+### 手工排除依赖
+
+![dependencies_conflict](images\dependencies_conflict.PNG)
+
+我们也可以手动排除依赖，只要选择要排除的版本将其exclude就可以了：
+
+![exclude_dependency](images\exclude_dependency.PNG)
+
+这样在pom.xml中会自动生成将其排除的代码：
+
+```xml
+<dependency>
+    <groupId>org.apache.struts</groupId>
+    <artifactId>struts2-spring-plugin</artifactId>
+    <version>2.3.24</version>
+    <exclusions>
+        <!-- 对spring-beans进行了排除 -->
+        <exclusion>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-beans</artifactId>
+        </exclusion>
+    </exclusions>
+</dependency>
+<dependency>
+    <groupId>org.springframework</groupId>
+    <artifactId>spring-context</artifactId>
+    <version>4.2.4.RELEASE</version>
+    <!-- 对spring-beans进行了排除 -->
+    <exclusions>
+        <exclusion>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-beans</artifactId>
+        </exclusion>
+    </exclusions>
+</dependency>
+```
+
+但上述代码同时屏蔽了两个版本的spring-beans传递依赖，我们这里选择版本高的jar包，删除第二个依赖中的exclusions标签：
+
+```xml
+<dependency>
+    <groupId>org.apache.struts</groupId>
+    <artifactId>struts2-spring-plugin</artifactId>
+    <version>2.3.24</version>
+    <exclusions>
+        <!-- 对spring-beans进行了排除 -->
+        <exclusion>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-beans</artifactId>
+        </exclusion>
+    </exclusions>
+</dependency>
+<dependency>
+    <groupId>org.springframework</groupId>
+    <artifactId>spring-context</artifactId>
+    <version>4.2.4.RELEASE</version>
+</dependency>
+```
+
+即我们可以通过exclusions标签，将不需要的传递依赖手工排除。
+
+### 版本锁定
+
+版本锁定是指我们人工确定项目中依赖的jar包的版本。通过标签dependencyManagement实现。
+
+现在我们要把所有有关于spring的jar包的版本均设定为4.2.4：
+
+```xml
+<dependencyManagement>
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-core</artifactId>
+            <version>4.2.4.RELEASE</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-beans</artifactId>
+            <version>4.2.4.RELEASE</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-web</artifactId>
+            <version>4.2.4.RELEASE</version>
+        </dependency>
+    </dependencies>
+</dependencyManagement>
+```
+
+经过这样的设定以后，spring的所有相关包就都使用4.2.4版本了：
+
+![spring4.2.4](images\spring4.2.4.PNG)
+
+但要注意的是dependencyManagement标签只用于对版本进行锁定，这个标签并不会导入依赖。
+
 ## Maven项目构建
 
 ### Maven项目标准目录结构
@@ -1358,133 +1489,354 @@ Maven存在“三套”生命周期，每一套生命周期相互独立，互不
 - siteLifeCycle：站点生命周期，包含命令：
     + site
 
-## Maven依赖及依赖冲突
+## Maven项目的拆分、聚合
 
-**直接依赖与传递依赖：**
+对maven_ssh项目进行拆分。将service、action、dao层以及它们的配置文件提取到一个表观上独立的工程中。拆分后对项目进行聚合。
+最终形成这样的工程结构：
 
-假设现在A依赖B，B依赖C。那么有：
+- maven_ssh_parent （父工程）
+    + maven_ssh_web （含有action层以及jsp、js等web素材的工程）
+    + maven_ssh_service （含有service层的工程）
+    + maven_ssh_dao （含有dao层的工程）
 
-- B是A的直接依赖。
-- C是A的传递依赖。
+### 创建父工程
 
-**什么是冲突？**
+在Eclipse中选择创建Maven Project进行父工程的创建。
 
-假设现在项目A（项目其实也是一个jar包或war包）依赖于jar包B，B依赖于jar包C，这里C的版本为1.1；现在我们向项目A中添加jar包D，D也依赖于jar包C，但这里C的版本是1.2。
-现在问题出现了，jar包C在我们的项目中出现了两次，且版本不同，这时就出现了冲突（版本冲突）。
+父工程用于定义项目所需的依赖信息，及聚合子模块。
 
-### Maven对冲突的调解原则
+注意打包类型应该选择pom：
 
-**1.第一声明者优先原则**
+![create_parent_project](images\create_parent_project.PNG)
 
-在这个原则下，当多个jar包导致了相同的传递依赖时，哪个jar包先在pom.xml中声明，Maven就使用谁的传递依赖。
+父工程的目录结构：
 
-假设我们在项目中依次添加了struts2-spring-plugin-2.3.24和spring-context-4.2.4两个jar包，它们的依赖层级关系如下：
+![parent_project_structure](images\parent_project_structure.PNG)
 
-![dependencies_conflict](images\dependencies_conflict.PNG)
+将工程maven_ssh的pom.xml中的依赖及插件信息复制到maven_ssh_parent
+的pom.xml中。
 
-我们可以发现现在出现冲突了：
+完成上述工作后，将父工程发布到**本地仓库**：
 
-比如spring-beans这个包分别被二者依赖，其中一个的版本是3.0.5，另一个版本是4.2.4。从图中我们也可以看到，当出现两个版本时，由于spring-context-4.2.4是后声明者，随意它依赖的spring-beans被忽略了（omitted for conflict with 3.0.5.RELEASE）。
+选中父工程，选择maven install：
 
-**2.路径近者优先原则**
+```text
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] --------------------< pers.tavish:maven_ssh_parent >--------------------
+[INFO] Building maven_ssh_parent 0.0.1-SNAPSHOT
+[INFO] --------------------------------[ pom ]---------------------------------
+[INFO] 
+[INFO] --- maven-install-plugin:2.4:install (default-install) @ maven_ssh_parent ---
+[INFO] Installing E:\myCode\Maven\maven_ssh_parent\pom.xml to D:\Program Files\apache-maven-3.5.3\repository\pers\tavish\maven_ssh_parent\0.0.1-SNAPSHOT\maven_ssh_parent-0.0.1-SNAPSHOT.pom
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time: 0.444 s
+[INFO] Finished at: 2018-06-13T12:58:58+08:00
+[INFO] ------------------------------------------------------------------------
+```
 
-在这个原则下，直接依赖优先于作为传递依赖。
+### 创建子模块
 
-![dependencies_conflict](images\dependencies_conflict.PNG)
+#### maven_ssh_dao
 
-同样在这个层级关系中，我们可以发现struts2-spring-plugin依赖于spring-context，所以它引入版本为3.0.5的jar包。但由于我们直接声明了一个不同版本（4.2.4）的spring-context，所以struts2-spring-plugin依赖的spring-context-3.0.5.RELEASE就被忽略了（omitted for conflict with 3.0.5.RELEASE）。这是因为4.2.4的jar包是直接依赖，而3.0.5的jar包是传递依赖。
+该模块负责数据访问，包含dao相关代码及配置文件。
 
-### 手工排除依赖
+选中父工程，New Project，选择Maven Module：
 
-![dependencies_conflict](images\dependencies_conflict.PNG)
+![create_new_maven_module](images\create_new_maven_module.PNG)
 
-我们也可以手动排除依赖，只要选择要排除的版本将其exclude就可以了：
+填写必要的信息：
 
-![exclude_dependency](images\exclude_dependency.PNG)
+![maven_module_information](images\maven_module_information.PNG)
 
-这样在pom.xml中会自动生成将其排除的代码：
+对于dao模块，打包类型为jar：
+
+![create_new_maven_module2](images\create_new_maven_module2.PNG)
+
+创建完毕，此时子模块已经继承父工程的相关Maven设置以及依赖信息：
+
+![maven_ssh_dao](images\maven_ssh_dao.PNG)
+
+提取dao层的相关代码以及配置文件：
+
+![dao_code_config](images\dao_code_config.PNG)
+
+这里我们对Spring的配置文件进行了拆分，并放在目录spring中：
+
+基础的Spring配置文件applicationContext-basic.xml：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:context="http://www.springframework.org/schema/context"
+    xmlns:aop="http://www.springframework.org/schema/aop" xmlns:tx="http://www.springframework.org/schema/tx"
+    xsi:schemaLocation="
+        http://www.springframework.org/schema/beans 
+        http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/context 
+        http://www.springframework.org/schema/context/spring-context.xsd
+        http://www.springframework.org/schema/tx 
+        http://www.springframework.org/schema/tx/spring-tx.xsd
+        http://www.springframework.org/schema/aop 
+        http://www.springframework.org/schema/aop/spring-aop.xsd">
+
+    <!-- 加载属性文件 -->
+    <context:property-placeholder location="classpath:db.properties" />
+
+    <!-- 配置数据源 -->
+    <bean id="c3p0DataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource">
+        <!-- 配置数据库链接四要素 -->
+        <property name="driverClass" value="${c3p0.driverClass}" />
+        <property name="jdbcUrl" value="${c3p0.jdbcUrl}" />
+        <property name="user" value="${c3p0.user}" />
+        <property name="password" value="${c3p0.password}" />
+    </bean>
+
+    <!-- 配置SessionFactory -->
+    <bean id="sessionFactory" class="org.springframework.orm.hibernate5.LocalSessionFactoryBean">
+        <!-- 注入数据源 -->
+        <property name="dataSource" ref="c3p0DataSource" />
+        <!-- 设置Hibernate配置文件的位置 -->
+        <property name="configLocations" value="classpath:hibernate.cfg.xml" />
+    </bean>
+
+    <!-- 配置事务管理器 -->
+    <bean id="transactionManager" class="org.springframework.orm.hibernate5.HibernateTransactionManager">
+        <property name="sessionFactory" ref="sessionFactory" />
+    </bean>
+
+    <!-- 配置通知：具体增强逻辑 -->
+    <tx:advice id="txAdvice" transaction-manager="transactionManager">
+        <tx:attributes>
+            <!-- 匹配业务类中方法名称 -->
+            <tx:method name="save*" isolation="DEFAULT" propagation="REQUIRED" />
+            <tx:method name="update*" isolation="DEFAULT" propagation="REQUIRED" />
+            <tx:method name="delete*" isolation="DEFAULT" propagation="REQUIRED" />
+            <tx:method name="find*" isolation="DEFAULT" propagation="REQUIRED" read-only="true" />
+            <tx:method name="*" />
+        </tx:attributes>
+    </tx:advice>
+
+    <!-- 配置AOP -->
+    <aop:config>
+        <!-- 配置切点：具体哪些方法要增强（真正被增强的方法） -->
+        <aop:pointcut expression="execution(* pers.tavish.service.*.*(..))" id="cut" />
+        <!-- 配置切面：将增强的逻辑作用到切点（通知+切点） -->
+        <aop:advisor advice-ref="txAdvice" pointcut-ref="cut" />
+    </aop:config>
+</beans>
+```
+
+dao层的Spring配置文件，applicationContext-dao.xml：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:context="http://www.springframework.org/schema/context"
+    xmlns:aop="http://www.springframework.org/schema/aop" xmlns:tx="http://www.springframework.org/schema/tx"
+    xsi:schemaLocation="
+        http://www.springframework.org/schema/beans 
+        http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/context 
+        http://www.springframework.org/schema/context/spring-context.xsd
+        http://www.springframework.org/schema/tx 
+        http://www.springframework.org/schema/tx/spring-tx.xsd
+        http://www.springframework.org/schema/aop 
+        http://www.springframework.org/schema/aop/spring-aop.xsd">
+    <!-- 配置Dao对象 -->
+    <bean id="customerDao" class="pers.tavish.dao.impl.CustomerDaoImpl">
+        <!-- 注入SessionFactory -->
+        <property name="sessionFactory" ref="sessionFactory" />
+    </bean>
+</beans>
+```
+
+#### maven_ssh_service
+
+同样地，我们创建service层的子模块，这里注意打包模式同样是jar包。
+
+提取service层的相关代码及配置文件：
+
+![service_code_config](images\service_code_config.PNG)
+
+由于Spring的基础配置文件我们已经在dao层子模块中配置了，所以service层的Spring配置文件就只需要service层的相关配置了：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:context="http://www.springframework.org/schema/context"
+    xmlns:aop="http://www.springframework.org/schema/aop" xmlns:tx="http://www.springframework.org/schema/tx"
+    xsi:schemaLocation="
+        http://www.springframework.org/schema/beans 
+        http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/context 
+        http://www.springframework.org/schema/context/spring-context.xsd
+        http://www.springframework.org/schema/tx 
+        http://www.springframework.org/schema/tx/spring-tx.xsd
+        http://www.springframework.org/schema/aop 
+        http://www.springframework.org/schema/aop/spring-aop.xsd">
+
+    <!-- 配置Service -->
+    <bean id="customerService" class="pers.tavish.service.impl.CustomerServiceImpl">
+        <!-- 注入Dao -->
+        <property name="customerDao" ref="customerDao" />
+    </bean>
+</beans>
+```
+
+代码提取后会出现报错，因为找不到Customer类和CustomerDao类，这里我们要把maven_ssh_dao添加到maven_ssh_service的依赖中：
+
+![service_add_dao_denpendency](images\service_add_dao_denpendency.PNG)
+
+添加后，报错消失。
+
+上述的添加是添加的maven_ssh_dao项目，但如果该项目被关闭则仍然会发生报错，这里我们应该把maven_ssh_dao打包成jar。
+
+#### maven_ssh_web
+
+同样地，我们创建action层及其他web素材的子模块，这里注意打包模式是war包。
+
+提取action层及其他web素材的相关代码及配置文件并添加service依赖：
+
+![web_code_config](images\web_code_config.PNG)
+
+Spring配置文件：
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:context="http://www.springframework.org/schema/context"
+    xmlns:aop="http://www.springframework.org/schema/aop" xmlns:tx="http://www.springframework.org/schema/tx"
+    xsi:schemaLocation="
+        http://www.springframework.org/schema/beans 
+        http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/context 
+        http://www.springframework.org/schema/context/spring-context.xsd
+        http://www.springframework.org/schema/tx 
+        http://www.springframework.org/schema/tx/spring-tx.xsd
+        http://www.springframework.org/schema/aop 
+        http://www.springframework.org/schema/aop/spring-aop.xsd">
+
+    <!-- 配置Action对象 -->
+    <bean id="customerAction" class="pers.tavish.action.CustomerAction" scope="prototype">
+        <!-- 注入Service -->
+        <property name="customerService" ref="customerService" />
+    </bean>
+</beans>
+```
+
+在上述工作完成后，mave_ssh_web工程的Maven依赖中就会包含dao、service的jar包。但这时会出现问题，在web.xml中我们要读取Spring的配置文件，但如何读取jar包中的配置文件？
+
+由于我们的Spring配置文件命名为applicationContext-basic/dao/service/web.xml，所以使用通配符：
+
+```xml
+<!-- 通过上下文参数指定Spring配置文件的路径 -->
+<context-param>
+    <param-name>contextConfigLocation</param-name>
+    <param-value>classpath*:spring/applicationContext-*.xml</param-value>
+</context-param>
+
+<!-- 配置Spring监听器 -->
+<listener>
+    <listener-class>org.springframework.web.context.ContextLoaderListener</listener-class>
+</listener>
+```
+
+### 对子模块分别进行测试
+
+#### 测试 maven_ssh_dao子模块
+
+由于我们的父工程中没有junit相关包，所以在dao子模块的pom.xml中添加依赖：
 
 ```xml
 <dependency>
-    <groupId>org.apache.struts</groupId>
-    <artifactId>struts2-spring-plugin</artifactId>
-    <version>2.3.24</version>
-    <exclusions>
-        <!-- 对spring-beans进行了排除 -->
-        <exclusion>
-            <groupId>org.springframework</groupId>
-            <artifactId>spring-beans</artifactId>
-        </exclusion>
-    </exclusions>
+    <groupId>junit</groupId>
+    <artifactId>junit</artifactId>
+    <version>4.12</version>
 </dependency>
 <dependency>
     <groupId>org.springframework</groupId>
-    <artifactId>spring-context</artifactId>
-    <version>4.2.4.RELEASE</version>
-    <!-- 对spring-beans进行了排除 -->
-    <exclusions>
-        <exclusion>
-            <groupId>org.springframework</groupId>
-            <artifactId>spring-beans</artifactId>
-        </exclusion>
-    </exclusions>
+    <artifactId>spring-test</artifactId>
+    <version>4.3.9.RELEASE</version>
 </dependency>
 ```
 
-但上述代码同时屏蔽了两个版本的spring-beans传递依赖，我们这里选择版本高的jar包，删除第二个依赖中的exclusions标签：
+在src\test\java下编写测试类，由于我们有两个Spring配置文件，所以要使用通配符加载配置文件。
 
-```xml
-<dependency>
-    <groupId>org.apache.struts</groupId>
-    <artifactId>struts2-spring-plugin</artifactId>
-    <version>2.3.24</version>
-    <exclusions>
-        <!-- 对spring-beans进行了排除 -->
-        <exclusion>
-            <groupId>org.springframework</groupId>
-            <artifactId>spring-beans</artifactId>
-        </exclusion>
-    </exclusions>
-</dependency>
-<dependency>
-    <groupId>org.springframework</groupId>
-    <artifactId>spring-context</artifactId>
-    <version>4.2.4.RELEASE</version>
-</dependency>
+```java
+@RunWith(SpringJUnit4ClassRunner.class)
+@ContextConfiguration("classpath:spring/applicationContext-*.xml")
+public class CustomerDaoTest {
+
+    @Autowired
+    private CustomerDao dao;
+    
+    @Test
+    public void testFindOne() {
+        dao.findOne("1");
+    }
+}
 ```
 
-即我们可以通过exclusions标签，将不需要的传递依赖手工排除。
+测试成功，控制台发出sql语句。
 
-### 版本锁定
+#### 测试 maven_ssh_service子模块
 
-版本锁定是指我们人工确定项目中依赖的jar包的版本。通过标签dependencyManagement实现。
+由于service子模块在依赖中添加了dao子模块，所以不必再添加junit以及Spring-test。
 
-现在我们要把所有有关于spring的jar包的版本均设定为4.2.4：
+编写测试类，这里由于我们除了要加载本项目类路径下的配置文件，同时还要加载jar包中类路径下的配置文件，所以classpath后也要使用通配符：
 
-```xml
-<dependencyManagement>
-    <dependencies>
-        <dependency>
-            <groupId>org.springframework</groupId>
-            <artifactId>spring-core</artifactId>
-            <version>4.2.4.RELEASE</version>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework</groupId>
-            <artifactId>spring-beans</artifactId>
-            <version>4.2.4.RELEASE</version>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework</groupId>
-            <artifactId>spring-web</artifactId>
-            <version>4.2.4.RELEASE</version>
-        </dependency>
-    </dependencies>
-</dependencyManagement>
+```java
+@RunWith(SpringJUnit4ClassRunner.class)
+@ContextConfiguration("classpath*:spring/applicationContext-*.xml")
+public class CustomerServiceTest {
+
+    @Autowired
+    private CustomerService service;
+    
+    @Test
+    public void testFindOne() {
+        service.findOne("1");
+    }
+}
 ```
 
-经过这样的设定以后，spring的所有相关包就都使用4.2.4版本了：
+测试成功，控制台发出sql语句。
 
-![spring4.2.4](images\spring4.2.4.PNG)
+### 运行项目
 
-但要注意的是dependencyManagement标签只用于对版本进行锁定，这个标签并不会导入依赖。
+- Maven的方式：
+    + **运行父工程：**父工程会将各个子模块聚合到一起，最终将maven_ssh_web打成war包发布到tomcat。选择父工程使用命令tomcat:run。
+    + **运行web工程：**运行web子模块，因为web子模块已经添加了service、dao的依赖，所以可以直接使用。选择mave_ssh_web子模块使用命令tomcat:run。
+- 直接部署到tomcat方式：虽然这个项目是一个Maven项目，但同时也是一个web项目，所以可以直接添加到tomcat，然后发布。
+
+### 传递依赖的范围
+
+在进行测试时会有一个传递依赖范围的问题。
+
+场景如下：
+
+我们要分别测试maven_ssh_dao和maven_ssh_service。再测试前者时我们向其pom.xml中添加了junit和spring-test的依赖，其中scope默认为compile。
+
+由于maven_ssh_service添加了maven_ssh_dao作为依赖，所以junit和spring-test作为maven_ssh_service的传递依赖也被添加了进来，所以在测试maven_ssh_service时我们不用重新添加junit和spring-test。
+
+**但是，这是因为junit和spring-test的scope是compile。**
+
+如果在maven_ssh_dao中添加junit和spring-test的scope是test，那么在maven_ssh_service中就不会出现传递依赖junit和spring-test，这将导致我们在maven_ssh_service中的测试代码报错。因为传递依赖不是无限传递的。
+
+具体规则如下：
+
+假设我们有A依赖B，B依赖C：
+
+- 第一列表示A依赖B时，B的scope
+- 第一行表示B依赖C时，C的scope
+- 中间内容为此时A与C的依赖关系中，C的scope
+
+依赖关系|compile|provided|runtime|test
+-----|-----|-----|-----|-----
+**complile** | compile | - | runtime | -
+**provided** | provided | provided | provided | -
+**runtime** | runtime | - | runtime | -
+**test** | test | - | test | -
+
+举例来说，A为maven_ssh_service，B为maven_ssh_dao，c为junit。此时A添加B时，设置B的scope为compile。
+
+- 当B添加C，并设置C的scope为compile时，根据上表，A与C的依赖关系中C的scope是compile，所以我们可以在编译、测试、运行中使用junit。
+- 当B添加C，并设置C的scope为test时，根据上表，A与C的依赖关系中C的scope是“-”，代表A并没有实际添加C依赖，所以我们无法在编译中使用junit，即发生报错。
