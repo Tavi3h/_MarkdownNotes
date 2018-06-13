@@ -1,3 +1,3 @@
 **Notes in using Markdown language.**
 
-                              -- Tavish
+@Author Tavish
