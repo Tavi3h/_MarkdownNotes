@@ -27116,3 +27116,658 @@ public class SparseMatrix {
 #### 练习题
 
 ***
+**4.1.1 一副含有V个顶点且不含平行边的图中至少含有多少条边？一副含有V个顶点的连通图中至少含有多少条边。**
+
+*Answer：*
+
+1. 由于不要求连通，所以V个结点可以是彼此不相连的，所以可以为0条边。
+2. $V-1$
+
+***
+**4.1.2 按照正文中示意图的样式（请见图4.1.9）画出Graph的构造函数在处理图4.1.25的tinyGex2.txt时构造的邻接表。**
+
+tinyGex2.txt数据如下：
+
+```text
+12
+16
+8 4
+2 3
+1 11
+0 6 
+3 6
+10 3
+7 11
+7 8
+11 8
+2 0
+6 2
+5 2
+5 10
+5 0
+8 1
+4 1
+```
+
+生成的图如下：
+
+![tinyGex2.txt](images\chapter04\tinyGex2.txt.png)
+
+*Answer：*
+
+```text
+0  --->             5 2 6
+1  --->             4 8 1
+2  --->           5 6 0 3
+3  --->            10 6 2
+4  --->               1 8
+5  --->            0 10 2
+6  --->             2 3 0
+7  --->              8 11
+8  --->          1 11 7 4
+9  --->     
+10 --->               5 3
+11 --->             8 7 1
+```
+
+***
+**4.1.3 为Graph添加一个复制构造函数，它接受一幅图G然后创建并初始化这幅图的一个副本。G的用例对它作出任何改动都不应该影响到它的副本。**
+
+*Answer：*
+
+```java
+public Graph(Graph G) {
+
+    this(G.V());
+    this.E = G.E();
+
+    for (int v = 0; v < G.V(); v++) {
+        // reverse so that adjacency list is in same order as original
+        Stack<Integer> reverse = new Stack<>();
+        for (int w : G.adj[v]) {
+            reverse.push(w);
+        }
+        for (int w : reverse) {
+            adj[v].add(w);
+        }
+    }
+}
+```
+
+***
+**4.1.4 为Graph添加一个方法hasEdge()，他接受两个整型参数v和w，如果图含有边v-w，方法返回true，否则返回false。**
+
+*Answer：*
+
+```java
+public boolean hasEdge(int v, int w) {
+    validateVertex(v);
+    validateVertex(w);
+
+    for (Integer i : adj(v)) {
+        if (i == w) {
+            return true;
+        }
+    }
+    return false;
+}
+```
+
+***
+**4.1.5 修改Graph，不允许存在平行边和自环。**
+
+*Answer：*
+
+修改addEdge方法：
+
+```java
+public void addEdge(int v, int w) {
+    validateVertex(v);
+    validateVertex(w);
+    
+    // 防止自环
+    if (v == w) {
+        throw new IllegalArgumentException("Self Ring is not permitted.");
+    }
+    
+    // 防止平行边
+    if (hasEdge(v, w)) {
+        throw new IllegalArgumentException("Parallel Edge is not permitted.");
+    }
+    
+    E++;
+    adj[v].add(w);
+    adj[w].add(v);
+}
+```
+
+***
+**4.1.6 有一张含有四个顶点的图，其中边为0-1、1-2、2-3和3-0.给出一种邻接表数组，无论以任何顺序调用addEdge()来添加这些边都无法创建它。**
+
+*Answer：*
+
+```text
+0  ---> 3 1
+1  ---> 0 2
+2  ---> 1 3
+3  ---> 2 0
+```
+
+上述邻接表中元素的出现顺序互相冲突。
+假设上述邻接表可以通过addEdge()构造，那么如果要0号中元素的顺序为3、1，则说明先添加0-1，再添加0-3；如果在添加0-1时要保证1号中元素顺序为0、2，则意味着在添加0-1前应该先添加1-2；以此类推，在添加1-2前应该先添加2-3，而添加2-3之前则要先添加3-0。先添加3-0与开头先添加0-1冲突，所以这个邻接表不能通过addEdge()构造。
+
+***
+**4.1.7 为Graph编写一个测试用例，接受用命令行参数指定输入流构造的一幅图，然后用toString()方法将其打印出来。**
+
+*Answer：*
+
+读取tinyCG.txt，构造图：
+
+```java
+public static void main(String[] args) {
+    Graph G = new Graph(new In(args[0]));
+    System.out.println(G);
+}
+```
+
+```text
+6 vertices, 8 edges 
+0: 2 1 5 
+1: 0 2 
+2: 0 1 3 4 
+3: 5 4 2 
+4: 3 2 
+5: 3 0
+```
+
+***
+**4.1.8 按照正文中的要求，用union-find算法实现4.1.2.3中的搜索的API。**
+
+```java
+public class UnionFindSearch {
+
+    private QuickUnionUF uf; // union-find算法实现
+    private int count; // 与起点连接的顶点的数量（含起点自己）
+    private int s; // 起点
+    private int N; // 图G的顶点总数
+
+    public UnionFindSearch(Graph G, int s) {
+        
+        this.N = G.V();
+        validateVertex(s);
+        this.s = s;
+        
+        uf = new QuickUnionUF(N);
+        dfs(G, s);
+    }
+
+    /*
+     * 顶点v是否与起点s连通
+     */
+    public boolean marked(int v) {
+        validateVertex(v);
+        return uf.connected(v, s);
+    }
+
+    /*
+     * 与起点s连通的顶点总数（包含起点s自己）
+     */
+    public int count() {
+        return count;
+    }
+
+    // 使用union-find实现dfs算法
+    private void dfs(Graph G, int v) {
+        count++;
+        for (int w : G.adj(v)) {
+            if (!uf.connected(v, w)) {
+                uf.union(v, w);
+                dfs(G, w);
+            } 
+        }
+    }
+
+    private void validateVertex(int v) {
+        if (v < 0 || v >= N) {
+            throw new IllegalArgumentException("vertex " + v + " is not between 0 and " + (N - 1));
+        }
+    }
+    
+    public static void main(String[] args) {
+        Graph G = new Graph(5);
+        G.addEdge(0, 1);
+        G.addEdge(0, 2);
+        G.addEdge(0, 3);
+        G.addEdge(1, 2);
+        G.addEdge(1, 3);
+        G.addEdge(3, 4);
+        UnionFindSearch ufs = new UnionFindSearch(G, 0);
+        System.out.println(ufs.count()); // 5
+        System.out.println(ufs.marked(4)); // true
+    }
+}
+```
+
+***
+**4.1.9 使用dfs(0)处理由Graph的构造函数从tinyGex2.txt得到的图并按照4.1.3.5节的图4.1.14的样式给出详细的轨迹。同时画出edgeTo[]所表示的树。**
+
+*Answer：*
+
+0所在连通分量的邻接表：
+
+```text
+0  --->             5 2 6
+2  --->           5 6 0 3
+3  --->            10 6 2
+5  --->            0 10 2
+6  --->             2 3 0
+10 --->               5 3
+```
+
+由于DepthFirstSearch没有edgeTo[]数组，使用DepthFirstPaths的dfs()方法：
+
+```java
+public static void main(String[] args) {
+    
+    Graph G = new Graph(12);
+    G.addEdge(8, 4);
+    G.addEdge(2, 3);
+    G.addEdge(1, 11);
+    G.addEdge(0, 6);
+    G.addEdge(3, 6);
+    G.addEdge(10, 3);
+    G.addEdge(7, 11);
+    G.addEdge(7, 8);
+    G.addEdge(11, 8);
+    G.addEdge(2, 0);
+    G.addEdge(6, 2);
+    G.addEdge(5, 2);
+    G.addEdge(5, 10);
+    G.addEdge(5, 0);
+    G.addEdge(8, 1);
+    G.addEdge(4, 1);
+    
+    DepthFirstPaths search = new DepthFirstPaths(G, 0);
+    
+    for (int v = 0; v < G.V(); v++) {
+        System.out.print(0 + " to " + v + ": ");
+        if (search.hasPathTo(v)) {
+            for (int  x : search.pathTo(v)) {
+                if (x == 0) {
+                    System.out.print(x);
+                } else {
+                    System.out.print("-" + x);
+                }
+            }
+        }
+        System.out.println();
+    }
+}
+```
+
+详细轨迹略。
+
+edgeTo[]数组：
+```text
+0   2   3   5   6   10
+    6   10  0   3   5
+```
+树的形状为一条直线，图略。
+
+***
+**4.1.10 证明在任意一幅连通图中都存在一个顶点，删去它（以及和它相连的所有边）不会影响到图的连通性，编写一个深度优先搜索的方法找出这样一个顶点。**
+
+*Answer：*
+
+***
+**4.1.11 使用算法4.2中的bfs(G, 0)处理由Graph的构造函数从tinyGex2.txt得到的图并画出edgeTo[]所表示的树。**
+
+*Answer：*
+
+```java
+public static void main(String[] args) {
+
+    Graph G = new Graph(12);
+    G.addEdge(8, 4);
+    G.addEdge(2, 3);
+    G.addEdge(1, 11);
+    G.addEdge(0, 6);
+    G.addEdge(3, 6);
+    G.addEdge(10, 3);
+    G.addEdge(7, 11);
+    G.addEdge(7, 8);
+    G.addEdge(11, 8);
+    G.addEdge(2, 0);
+    G.addEdge(6, 2);
+    G.addEdge(5, 2);
+    G.addEdge(5, 10);
+    G.addEdge(5, 0);
+    G.addEdge(8, 1);
+    G.addEdge(4, 1);
+
+    BreadthFirstPaths bfp = new BreadthFirstPaths(G, 0);
+
+    for (int v = 0; v < G.V(); v++) {
+        System.out.print(0 + " to " + v + ": ");
+        if (bfp.hasPathTo(v)) {
+            for (int x : bfp.pathTo(v)) {
+                if (x == 0) {
+                    System.out.print(x);
+                } else {
+                    System.out.print("-" + x);
+                }
+            }
+        }
+        System.out.println();
+    }
+}
+```
+
+结果：
+
+```text
+0 to 0: 0
+0 to 1: 
+0 to 2: 0-2
+0 to 3: 0-2-3
+0 to 4: 
+0 to 5: 0-5
+0 to 6: 0-6
+0 to 7: 
+0 to 8: 
+0 to 9: 
+0 to 10: 0-5-10
+0 to 11: 
+
+edgeTo[]树：
+
+        0
+      / | \
+     2  5  6
+    /   |
+   3    10
+```
+
+***
+**4.1.12 如果v和w都不是根结点，能够由广度优先搜索得到的树中计算它们之间的距离吗？**
+
+*Answer：*
+
+不能。例如，由tinyGex2.txt构造的图中3和10之间的距离是1，3和6之间的距离是1.但是当以0为起点进行广度优先搜索时，得到的树如下所示：
+
+```text
+        0
+      / | \
+     2  5  6
+    /   |
+   3    10
+```
+
+在这颗树中我们不能得到3和10或3和6之间的距离。
+
+***
+**4.1.13 为BreadthFirstPaths的API添加并实现一个方法distTo()，返回从起点到给定的顶点的最短路径的长度，它所需的时间应该为常数。**
+
+*Answer：*
+
+```java
+public class BreadthFirstPaths {
+    
+    private static final int INFINITY = Integer.MAX_VALUE; // initial distance between s and v
+    private boolean[] marked; // marked[v] = is there an s-v path
+    private int[] edgeTo; // edgeTo[v] = previous edge on shortest s-v path
+    private int[] distTo; // distTo[v] = number of edges shortest s-v path
+
+    /*
+     * 构造函数：计算起始点s与图G中每个顶点的最短路径
+     */
+    public BreadthFirstPaths(Graph G, int s) {
+        marked = new boolean[G.V()];
+        distTo = new int[G.V()];
+        edgeTo = new int[G.V()];
+        validateVertex(s);
+        bfs(G, s);
+    }
+
+    /*
+     * 判断起始点与v之间是否存在路径
+     */
+    public boolean hasPathTo(int v) {
+        validateVertex(v);
+        return marked[v];
+    }
+
+    /*
+     * 返回起始点与v之间最短路径的边数
+     */
+    public int distTo(int v) {
+        validateVertex(v);
+        return distTo[v];
+    }
+
+    /*
+     * 返回起始点与v之间的最短路径
+     */
+    public Iterable<Integer> pathTo(int v) {
+        validateVertex(v);
+        if (!hasPathTo(v)) {
+            return null;
+        }
+        Stack<Integer> path = new Stack<>();
+        int x;
+        for (x = v; distTo[x] != 0; x = edgeTo[x]) {
+            path.push(x);
+        }
+        path.push(x);
+        return path;
+    }
+
+    // 广度优先搜索查找图中的路径
+    private void bfs(Graph G, int s) {
+        Queue<Integer> q = new Queue<>();
+        for (int v = 0; v < G.V(); v++) {
+            distTo[v] = INFINITY;
+        }
+        distTo[s] = 0;
+        marked[s] = true;
+        q.enqueue(s);
+
+        while (!q.isEmpty()) {
+            int v = q.dequeue();
+            for (int w : G.adj(v)) {
+                if (!marked[w]) {
+                    edgeTo[w] = v;
+                    distTo[w] = distTo[v] + 1;
+                    marked[w] = true;
+                    q.enqueue(w);
+                }
+            }
+        }
+    }
+
+    // throw an IllegalArgumentException unless {@code 0 <= v < V}
+    private void validateVertex(int v) {
+        int V = marked.length;
+        if (v < 0 || v >= V)
+            throw new IllegalArgumentException("vertex " + v + " is not between 0 and " + (V - 1));
+    }
+
+    public static void main(String[] args) {
+
+        Graph G = new Graph(12);
+        G.addEdge(8, 4);
+        G.addEdge(2, 3);
+        G.addEdge(1, 11);
+        G.addEdge(0, 6);
+        G.addEdge(3, 6);
+        G.addEdge(10, 3);
+        G.addEdge(7, 11);
+        G.addEdge(7, 8);
+        G.addEdge(11, 8);
+        G.addEdge(2, 0);
+        G.addEdge(6, 2);
+        G.addEdge(5, 2);
+        G.addEdge(5, 10);
+        G.addEdge(5, 0);
+        G.addEdge(8, 1);
+        G.addEdge(4, 1);
+
+        BreadthFirstPaths bfp = new BreadthFirstPaths(G, 0);
+
+        for (int v = 0; v < G.V(); v++) {
+            System.out.print(0 + " to " + v + ": ");
+            if (bfp.hasPathTo(v)) {
+                for (int x : bfp.pathTo(v)) {
+                    if (x == 0) {
+                        System.out.print(x);
+                    } else {
+                        System.out.print("-" + x);
+                    }
+                }
+                System.out.print(" dist " + bfp.distTo(v));
+            }
+            System.out.println();
+        }
+    }
+}
+```
+
+结果：
+```text
+0 to 0: 0 dist 0
+0 to 1: 
+0 to 2: 0-2 dist 1
+0 to 3: 0-2-3 dist 2
+0 to 4: 
+0 to 5: 0-5 dist 1
+0 to 6: 0-6 dist 1
+0 to 7: 
+0 to 8: 
+0 to 9: 
+0 to 10: 0-5-10 dist 2
+0 to 11: 
+```
+
+***
+**4.1.14 如果用栈代替队列来实现广度优先搜索，我们还能得到最短路径吗？**
+
+*Answer：*
+
+>
+在广度优先搜索中，我们希望按照与起点的距离的顺序来遍历所有顶点，看起来这种顺序很容易实现：使用（FIFO，先进先出）队列来替代栈（LIFO，后进先出）即可。我们将从有待搜索的通道中选择最早遇到的那条。-- p345
+
+由上述论述可知，如果换回栈，我们将不能得到最短路径。
+
+
+***
+**4.1.15 修改Graph的输入流构造函数，允许从标准输入流读入图的邻接表，如图4.1.26的tinyGadj.txt所示。在顶点和边的总数之后，每一行由一个顶点和 它的所有相邻顶点组成。**
+
+tinyGadj.txt：
+
+```text
+13 vertices, 13 edges
+0: 6 5 2 1
+1: 0
+2: 0
+3: 5 4
+4: 6 5 3
+5: 4 3 0
+6: 4 0
+7: 8
+8: 7
+9: 12 11 10
+10: 9
+11: 12 9
+12: 11 9
+```
+
+构成的图如下：
+
+![tinyGadj.txt](images\tinyGadj.txt.png)
+
+*Answer：*
+
+```java
+// isAdjFile只是为了与原构造函数Graph(In in)进行取分。
+@SuppressWarnings("unchecked")
+public Graph(In in, boolean isAdjFile) {
+
+    if (!isAdjFile) {
+        throw new IllegalArgumentException("Argument isAdjFile must be true.");
+    }
+
+    try {
+
+        /*
+         * 读取第一行：13 vertices, 13 edges 得到V = 13, E = 13
+         */
+        String[] ve = in.readLine().split(", ");
+        this.V = Integer.parseInt(ve[0].substring(0, ve[0].indexOf(" ")));
+        this.E = Integer.parseInt(ve[1].substring(0, ve[1].indexOf(" ")));
+
+        // 根据V创建邻接表数组
+        adj = (Bag<Integer>[]) new Bag[V];
+        for (int v = 0; v < V; v++) {
+            adj[v] = new Bag<>();
+        }
+
+        // 遍历每一个元素
+        for (int i = 0; i < V; i++) {
+
+            /*
+             * 读取行：0: 6 5 2 1
+             */
+            String[] datas = in.readLine().split(": ");
+            if (datas.length == 1) {
+                // length = 1，说明该行的元素是孤立的，例如“12: ”，跳过该行
+                continue;
+            }
+
+            int v = Integer.parseInt(datas[0]); // 获取到元素，0
+            String[] adjs = datas[1].split(" "); // 获取其邻接元素，6、5、2、1
+            Stack<Integer> reverse = new Stack<>();
+            // 压入栈
+            for (int j = 0; j < adjs.length; j++) {
+                reverse.push(Integer.parseInt(adjs[j]));
+            }
+            // 从栈中取出，此时add的顺序为1、2、5、6
+            for (Integer w : reverse) {
+                adj[v].add(w);
+            }
+        }
+
+    } catch (NoSuchElementException e) {
+        throw new IllegalArgumentException("invalid input format in Graph constructor", e);
+    }
+}
+```
+
+读取tinyGadj.txt，使用toString()测试：
+
+```java
+public static void main(String[] args) {
+    Graph G = new Graph(new In(args[0]), true);
+    System.out.println(G);
+}
+```
+
+输出结果：
+
+（实际我们的toString()方法就是输出为tinyGadj.txt这类格式）
+
+```text
+13 vertices, 13 edges 
+0: 6 5 2 1 
+1: 0 
+2: 0 
+3: 5 4 
+4: 6 5 3 
+5: 4 3 0 
+6: 4 0 
+7: 8 
+8: 7 
+9: 12 11 10 
+10: 9 
+11: 12 9 
+12: 11 9 
+```
