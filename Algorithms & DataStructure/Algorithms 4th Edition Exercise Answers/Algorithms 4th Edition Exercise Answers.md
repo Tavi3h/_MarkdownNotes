@@ -27222,9 +27222,7 @@ public boolean hasEdge(int v, int w) {
 
 ```java
 public void addEdge(int v, int w) {
-    validateVertex(v);
-    validateVertex(w);
-    
+
     // 防止自环
     if (v == w) {
         throw new IllegalArgumentException("Self Ring is not permitted.");
@@ -27688,7 +27686,7 @@ tinyGadj.txt：
 *Answer：*
 
 ```java
-// isAdjFile只是为了与原构造函数Graph(In in)进行取分。
+// isAdjFile只是为了与原构造函数Graph(In in)进行区分。
 @SuppressWarnings("unchecked")
 public Graph(In in, boolean isAdjFile) {
 
@@ -27713,7 +27711,8 @@ public Graph(In in, boolean isAdjFile) {
 
         // 遍历每一个元素
         for (int i = 0; i < V; i++) {
-
+            
+            
             /*
              * 读取行：0: 6 5 2 1
              */
@@ -27724,18 +27723,31 @@ public Graph(In in, boolean isAdjFile) {
             }
 
             int v = Integer.parseInt(datas[0]); // 获取到元素，0
+            validateVertex(v); // 检查顶点v是否合法
+            
             String[] adjs = datas[1].split(" "); // 获取其邻接元素，6、5、2、1
             Stack<Integer> reverse = new Stack<>();
+            
             // 压入栈
             for (int j = 0; j < adjs.length; j++) {
-                reverse.push(Integer.parseInt(adjs[j]));
+                int w = Integer.parseInt(adjs[j]);
+                validateVertex(w); // 检查顶点w是否合法
+                reverse.push(w);
             }
             // 从栈中取出，此时add的顺序为1、2、5、6
             for (Integer w : reverse) {
+                // 防止自环
+                if (v == w) {
+                    throw new IllegalArgumentException("Self Edge is not permitted.");
+                }
+
+                // 防止平行边
+                if (hasEdge(v, w)) {
+                    throw new IllegalArgumentException("Parallel Edge is not permitted.");
+                }
                 adj[v].add(w);
             }
         }
-
     } catch (NoSuchElementException e) {
         throw new IllegalArgumentException("invalid input format in Graph constructor", e);
     }
@@ -27771,3 +27783,607 @@ public static void main(String[] args) {
 11: 12 9 
 12: 11 9 
 ```
+
+***
+**4.1.16 顶点v的离心率是它和离它最远的顶点的最短距离。图的直径即是所有顶点的最大离心率，半径为所有顶点的最小离心率，中点为离心率和半径相等的点。实现以下API，如表4.1.10所示：**
+
+- public class GraphProperties
+    + GraphProperties(Graph G)：构造函数，如果G不是连通的，抛出异常
+    + eccentricity(int v)：v的离心率
+    + int diameter()：G的直径
+    + int radius()：G的半径
+    + int center()：G的某个中点
+
+*Answer：*
+
+```java
+public class GraphProperties {
+    
+    private Graph G; // 保存图的引用
+    private int[] eccentricities; // 保存每一个顶点的离心率
+    private int diameter; // 保存图的直径
+    private int radius; // 保存图的半径
+    private List<Integer> centers; // 保存图的中点
+        
+    public GraphProperties(Graph G) {
+        // 测试图的连通性
+        DepthFirstSearch dfs = new DepthFirstSearch(G, 0); 
+        if (dfs.count() != G.V()) {
+            // 图不连通，抛出异常
+            throw new IllegalArgumentException("Graph G is not connected.");
+        }
+        this.G = G;
+        
+        calculateEcc(); // 计算每一点的离心率
+        calculateDR(); // 计算直径和半径
+        calculateCenter(); // 计算中点
+    }
+
+    /*
+     * v的离心率
+     */
+    public int eccentricity(int v) {
+        return eccentricities[v];
+    }
+    
+    /*
+     * 图的直径
+     */
+    public int diameter() {
+        return diameter;
+    }
+    
+    /*
+     * 图的半径
+     */
+    public int radius() {
+        return radius;
+    }
+    
+    /*
+     * 随机返回图的一个中点
+     */
+    public int center() {
+        return centers.get(StdRandom.uniform(centers.size()));
+    }
+    
+    /*
+     * 返回图G
+     */
+    public Graph G() {
+        return G;
+    }
+    
+    // 计算每个顶点的离心率、图的直径和半径
+    private void calculateEcc() {
+        
+        int V = G.V();
+        eccentricities = new int[V]; // 初始化离心率数组
+        BreadthFirstPaths bfp = null;
+        int ecc = 0; // 离心率
+        for (int i = 0; i < V; i++) { 
+            // 对每一个顶点进行一次广度优先搜索
+            bfp = new BreadthFirstPaths(G, i);
+            // 计算起点i与每一个点的距离
+            for (int j = 0; j < V; j++) {
+                if (i == j) {
+                    continue;
+                }
+                int dist = bfp.distTo(j);
+                // 遍历出距离的最大值即为起点i的离心率
+                if (dist > ecc) {
+                    ecc = dist;
+                }
+            }
+            eccentricities[i] = ecc;
+        }
+    }
+
+
+    // 计算图的直径和半径，即数组eccentricities[]的最大值和最小值
+    private void calculateDR() {
+        diameter = Integer.MIN_VALUE;
+        radius = Integer.MAX_VALUE;
+        for (int ecc : eccentricities) {
+            if (ecc > diameter) {
+                diameter = ecc;
+            }
+            if (ecc < radius) {
+                radius = ecc;
+            }
+        }
+    }
+    
+    // 计算图中点
+    private void calculateCenter() {
+        centers = new ArrayList<Integer>();
+        for (int i = 0; i < eccentricities.length; i++) {
+            if (eccentricities[i] == radius) {
+                centers.add(i);
+            }
+        }
+    }
+    
+    public static void main(String[] args) {
+        Graph G = new Graph(new In(args[0])); // mediumG.txt
+        GraphProperties gp = new GraphProperties(G); 
+        
+        System.out.println(gp.eccentricity(25)); // 14
+        System.out.println(gp.diameter()); // 14
+        System.out.println(gp.radius()); // 13
+        System.out.println(gp.center()); // 9
+    }
+}
+```
+
+***
+**4.1.17 图的周长为图中最短环的长度。如果是无环图，则它的周长为无穷大。为GraphProperties添加一个方法girth，返回图的周长。**
+
+*Answer：*
+
+***
+**4.1.18 使用CC找出由Graph的输入流从tinyGex2.txt得到的图中所有连通分量并按照图4.1.21的样式给出详细的轨迹。**
+
+*Answer：*
+
+轨迹略。
+
+```java
+public class Ex4118 {
+    public static void main(String[] args) {
+        Graph G = new Graph(new In(args[0])); // 读取tinyGex2.txt构造图
+        
+        CC cc = new CC(G);
+        int M = cc.count();
+
+        System.out.println(M + " components");
+
+        @SuppressWarnings("unchecked")
+        Bag<Integer>[] components = (Bag<Integer>[]) new Bag[M];
+
+        for (int i = 0; i < M; i++) {
+            components[i] = new Bag<>();
+        }
+
+        for (int v = 0; v < G.V(); v++) {
+            components[cc.id(v)].add(v);
+        }
+
+        for (int i = 0; i < M; i++) {
+            for (int v : components[i]) {
+                System.out.print(v + " ");
+            }
+            System.out.println();
+        }
+    }
+}
+```
+
+结果：
+```text
+3 components
+10 6 5 3 2 0 
+11 8 7 4 1 
+9 
+```
+
+***
+**4.1.19 使用Cycle在由Graph的输入流从tinyGex2.txt得到的图中找到一个环并按照本节示意图的样式给出详细的轨迹。在最坏情况下，Cycle构造函数的运行时间的增长数量级是多少？**
+
+*Answer：*
+
+轨迹略。
+
+```java
+public class Ex4119 {
+
+    public static void main(String[] args) {
+        Graph G = new Graph(new In(args[0])); // 读取tinyGex2.txt构造图
+        Cycle cycle = new Cycle(G);
+        for (int i : cycle.cycle()) {
+            System.out.print(i + " ");
+        }
+    }
+}
+```
+
+结果：
+```text
+2 5 10 3 6 2 
+```
+
+***
+**4.1.20 使用TwoColor给出由Graph的输入流从tinyGex2.txt得到的图的一个着色方案并按照本节示意图的样式给出详细的轨迹。在最坏情况下，TwoColor构造函数的运行时间的增长数量级是多少？**
+
+*Answer：*
+
+轨迹略。
+
+```java
+public class Ex4120 {
+    public static void main(String[] args) {
+        Graph G = new Graph(new In(args[0])); // 读取tinyGex2.txt构造图
+        TwoColor tw = new TwoColor(G);
+        for (boolean bool : tw.color()) {
+            System.out.print(bool + " ");
+        }
+    }
+}
+```
+
+结果：
+```text
+false false true true true true false false false false false true 
+```
+
+***
+**4.1.24 用SymbolGraph和movie.txt找到今年获得奥斯卡奖提名演员的Kevin Bacon数。**
+
+*Answer：*
+```java
+// 官方实现
+public class BaconHistogram {
+    public static void main(String[] args) {
+        String filename  = args[0];
+        String delimiter = args[1];
+        String source    = args[2];
+
+        SymbolGraph sg = new SymbolGraph(filename, delimiter);
+        Graph G = sg.graph();
+        if (!sg.contains(source)) {
+            StdOut.println(source + " not in database.");
+            return;
+        }
+
+        // run breadth-first search from s
+        int s = sg.indexOf(source);
+        BreadthFirstPaths bfs = new BreadthFirstPaths(G, s);
+
+
+        // compute histogram of Kevin Bacon numbers - 100 for infinity
+        int MAX_BACON = 100;
+        int[] hist = new int[MAX_BACON + 1];
+        for (int v = 0; v < G.V(); v++) {
+            int bacon = Math.min(MAX_BACON, bfs.distTo(v));
+            hist[bacon]++;
+
+            // to print actors and movies with large bacon numbers
+            if (bacon/2 >= 7 && bacon < MAX_BACON)
+                StdOut.printf("%d %s\n", bacon/2, sg.nameOf(v));
+        }
+
+        // print out histogram - even indices are actors
+        for (int i = 0; i < MAX_BACON; i += 2) {
+            if (hist[i] == 0) break;
+            StdOut.printf("%3d %8d\n", i/2, hist[i]);
+        }
+        StdOut.printf("Inf %8d\n", hist[MAX_BACON]);
+    }
+}
+```
+
+结果：
+
+```text
+Done reading datafiles\movies.txt
+  0        1
+  1     1324
+  2    70717
+  3    40862
+  4     1591
+  5      125
+Inf      655
+```
+
+***
+**4.1.22 编写一段程序BaconHistogram，打印一幅Kevin Bacon数的柱状图，显示movie.txt中Kevin Bacon 数为0、1、2、3...的演员分别有多少。将值为无穷大的人（不与Kevin Bacon连通）归为一类。**
+
+*Answer：*
+
+***
+**4.1.23 计算由movies.txt得到的图的连通分量的数量和包含的顶点数小于10的连通分量的数量。计算最大连通分量的离心率、直径、半径和中点。Kevin Bacon在最大的连通分量之中吗？**
+
+*Answer：*
+
+当前的CC实现会造成StackOverFlow。
+
+***
+**4.1.24 修改DegreesOfSeparation，从命令行接受一个整型参数y，忽略上映年数超过y的电影。**
+
+*Answer：*
+
+```java
+public class Ex4124 {
+    public static void main(String[] args) {
+        
+        // 构造符号图
+        SymbolGraph sg = new SymbolGraph(args[0], args[1]);
+
+        // 获取符号图中用整数表示的无向图
+        Graph G = sg.G();
+
+        // 获取起点
+        String source = args[2];
+        if (!sg.contains(source)) {
+            System.out.println(source + "not in database.");
+            return;
+        }
+
+        // 获取起点对应无向图的整数值，并使用该值进行广度优先搜索
+        int s = sg.index(source);
+        BreadthFirstPaths bfs = new BreadthFirstPaths(G, s);
+
+        System.out.println("输入年份：");
+        int y = Integer.parseInt(StdIn.readLine()); // 读取一个年份
+        
+        
+        while (!StdIn.isEmpty()) {
+            String sink = StdIn.readLine(); // 读取符号图的一个顶点
+            if (sg.contains(sink)) {
+                int t = sg.index(sink); // 将符号图顶点转为无向图顶点
+                if (bfs.hasPathTo(t)) {
+                    // 如果有从起点到该顶点的路径
+                    for (int v : bfs.pathTo(t)) {
+
+                        String name = sg.name(v);
+                        
+                        // 以")"结尾的name为电影
+                        if (name.endsWith(")")) {
+                            
+                            // 获取该电影的上映年份
+                            int year = Integer.parseInt(name.substring(name.indexOf("(") + 1, name.length() - 1));
+                            
+                            // 如果年份大于参数y，则跳过该电影
+                            if (year > y) {
+                                continue;
+                            }
+                        }
+
+                        // 打印路径
+                        System.out.println("   " + name);
+                    }
+                } else {
+                    System.out.println("Not connected");
+                }
+            } else {
+                System.out.println("Not in database.");
+            }
+        }
+    }
+}
+```
+
+***
+**4.1.25 编写一个类似于DegreesOfSeparation的SymbolGraph用例，使用深度优先搜索代替广度优先搜索来查找两个演员之间的路径。**
+
+*Answer：*
+
+将原实现中的广度优先搜索路径替换为深度优先搜索路径即可。（有栈溢出的风险，因为DepthFirstPaths的dfs算法的实现是递归，使用VM参数-Xss32m）
+
+```java
+public class DegreesOfSeparationDFS {
+    
+    public static void main(String[] args) {
+        // 构造符号图
+        SymbolGraph sg = new SymbolGraph(args[0], args[1]);
+
+        // 获取符号图中用整数表示的无向图
+        Graph G = sg.G();
+
+        // 获取起点
+        String source = args[2];
+        if (!sg.contains(source)) {
+            System.out.println(source + "not in database.");
+            return;
+        }
+
+        // 获取起点对应无向图的整数值，并使用该值进行广度优先搜索
+        int s = sg.index(source);
+        DepthFirstPaths bfp = new DepthFirstPaths(G, s);
+
+        while (!StdIn.isEmpty()) {
+            String sink = StdIn.readLine(); // 读取符号图的一个顶点
+            if (sg.contains(sink)) { 
+                int t = sg.index(sink); // 将符号图顶点转为无向图顶点
+                if (bfp.hasPathTo(t)) { 
+                    // 如果有从起点到该顶点的路径
+                    for (int v : bfp.pathTo(t)) {
+                        // 打印路径
+                        System.out.println("   " + sg.name(v));
+                    }
+                } else {
+                    System.out.println("Not connected");
+                }
+            } else {
+                System.out.println("Not in database.");
+            }
+        }
+    }
+}
+```
+
+***
+**4.1.26 使用1.4节中的内存使用模型评估用Graph表示一幅含有V个顶点和E条边的图所需的内存。**
+
+*Answer：*
+
+56 + 40V + 128E
+
+***
+**4.1.27 如果重命名一幅图中的顶点就能够使之变得和另一幅图完全相同，这两幅图就是同构的。画出含有2、3、4、5个顶点的所有非同构图。**
+
+*Answer：*
+
+***
+**4.1.28 修改Cycle，允许图含有自环和平行边。**
+
+*Answer：*
+
+***
+
+#### 提高题
+
+***
+**4.1.29 欧拉环和汉密尔顿环。考虑以下4组边定义的图：**
+
+- 0-1 0-2 0-3 1-3 1-4 2-5 2-9 3-6 4-7 4-8 5-8 5-9 6-7 6-9 7-8
+- 0-1 0-2 0-3 1-3 0-3 2-5 5-6 3-6 4-7 4-8 5-8 5-9 6-7 6-9 8-8
+- 0-1 1-2 1-3 0-3 0-4 2-5 2-9 3-6 4-7 4-8 5-8 5-9 6-7 6-9 7-8
+- 4-1 7-9 6-2 7-3 5-0 0-2 0-8 1-6 3-9 6-3 2-8 1-5 0-8 4-5 4-7
+
+**那几幅图含有欧拉环（恰好包含了所有的边且没有重复的环）？哪几幅图含有汉密尔顿环（恰好包含了所有的顶点且没有重复的环？）**
+
+*Answer：*
+
+构成图如下：
+
+![ex4129](images\chapter04\ex4129.png)
+
+b包含欧拉环，c、d包含汉密尔顿环。
+
+***
+**4.1.30 图的枚举。含有V个顶点和E条边（不含平行边）的不同的无向图共有多少种？**
+
+*Answer：*
+
+***
+**4.1.31 检测平行边。设计一个线性时间的算法来统计图中平行边的总数。**
+
+*Answer：*
+
+***
+**4.1.32 奇环。证明一幅图能够用两种颜色着色（二分图）当且仅当它不含有长度为奇数的环。**
+
+*Answer：*
+
+例如，三元图，二分着色时一定会有两个顶点的颜色相同，所以含有奇数长度的环不能使用两种颜色着色。
+
+***
+**4.1.33 符号图。实现一个SymbolGraph（不一定必须使用Graph），秩序遍历一遍图的定义数据。由于需要查找符号表，实现中图的各种操作时耗可能会变为原来的$logV$倍。**
+
+*Answer：*
+
+***
+**4.1.34 双向连通性。如果任意一对顶点都能由两条不同（没有重叠的边或顶点）的路径连通则图就是双向连通的。在一幅连通图中，如果一个顶点（以及和它相连的边）被删掉后不再连通，该顶点就被称为关节点。证明没有关节点的图是双向连通的。**
+
+*Answer：*
+
+***
+**4.1.35 边的连通性。在一幅连通图中，如果一条边被删除后图会被分为两个独立的连通分量，这条边就被称为桥。没有桥的图称为边连通图。开发一种基于深度优先搜算算法的数据类型，判断一个图是否是边连通图。**
+
+*Answer：*
+
+```java
+// 官方实现
+public class Bridge {
+    private int bridges;      // number of bridges
+    private int cnt;          // counter
+    private int[] pre;        // pre[v] = order in which dfs examines v
+    private int[] low;        // low[v] = lowest preorder of any vertex connected to v
+
+    public Bridge(Graph G) {
+        low = new int[G.V()];
+        pre = new int[G.V()];
+        for (int v = 0; v < G.V(); v++)
+            low[v] = -1;
+        for (int v = 0; v < G.V(); v++)
+            pre[v] = -1;
+        
+        for (int v = 0; v < G.V(); v++)
+            if (pre[v] == -1)
+                dfs(G, v, v);
+    }
+
+    public int components() { return bridges + 1; }
+
+    private void dfs(Graph G, int u, int v) {
+        pre[v] = cnt++;
+        low[v] = pre[v];
+        for (int w : G.adj(v)) {
+            if (pre[w] == -1) {
+                dfs(G, v, w);
+                low[v] = Math.min(low[v], low[w]);
+                if (low[w] == pre[w]) {
+                    StdOut.println(v + "-" + w + " is a bridge");
+                    bridges++;
+                }
+            }
+
+            // update low number - ignore reverse of edge leading to v
+            else if (w != u)
+                low[v] = Math.min(low[v], pre[w]);
+        }
+    }
+
+    // test client
+    public static void main(String[] args) {
+        int V = Integer.parseInt(args[0]);
+        int E = Integer.parseInt(args[1]);
+        Graph G = GraphGenerator.simple(V, E);
+        StdOut.println(G);
+
+        Bridge bridge = new Bridge(G);
+        StdOut.println("Edge connected components = " + bridge.components());
+    }
+}
+```
+
+***
+**4.1.36 欧几里得图。为平面上的图设计并实现一份叫做EuclideanGraph的API，其中图所有顶点均有坐标。实现一个show()方法，用StdDraw将图绘出。**
+
+*Answer：*
+
+***
+**4.1.37 图像处理。在一幅图像中将所有相邻的、颜色相同的点相连就可以得到一幅图，为这种隐式定义的图实现填充（flood fill）操作。**
+
+*Answer：*
+
+***
+
+#### 实验题
+
+***
+**4.1.38 随机图。编写一个程序ErdosRenyiGraph，从命令行接受整数V和E，随机生成E对0到V-1之间的整数来构造一幅图。注意：生成器可能会产生自环和平行边。**
+
+由于这个实现可能会产生自环和平行边，所以要求Graph的实现允许自环和平行边的存在。
+
+```java
+public class ErdosRenyiGraph {
+    public static void main(String[] args) {
+        int V = Integer.parseInt(args[0]);
+        int E = Integer.parseInt(args[1]);
+        
+        Graph G = new Graph(V);
+        
+        for (int i = 0; i < E; i++) {
+            int v = StdRandom.uniform(V);
+            int w = StdRandom.uniform(V);
+            G.addEdge(v, w);
+        }
+    }
+}
+```
+
+***
+**4.1.39 随机简单图。编写一个程序RandomSparseGraph，从命令行接受整数V和E，用均等的几率生成含有V个顶点和E条边的所有可能的简单图。**
+
+*Answer：*
+
+上题中的实现，如果uniform(V)方法是0-(v-1)均等分布的，那么就可以用均等的几率生成所有的图。
+
+***
+**4.1.40 随机稀疏图。编写一个程序RandomSparseGraph，根据精心选择的一组V和E的值生成随机的稀疏图，以便用它对由Erdos-Renyi模型得到的图进行有意义的经验性测试。**
+
+*Answer：*
+
+***
+
+（其余实验题暂略）
+
+### 4.2 有向图
+
+***
+
+#### 练习题
+
+***
