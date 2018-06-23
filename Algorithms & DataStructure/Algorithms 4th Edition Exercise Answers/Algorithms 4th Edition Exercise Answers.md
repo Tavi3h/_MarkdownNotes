@@ -28387,3 +28387,473 @@ public class ErdosRenyiGraph {
 #### 练习题
 
 ***
+**4.2.1 一幅含有V个顶点且没有平行边的有向图中最多可能含有多少条边？一幅含有V个顶点且没有孤立顶点的有向图中最少需要多少条边？**
+
+*Answer：*
+
+- 每一个顶点都与其他顶点连接，所以共有：$V(V-1)$条边
+- 一个顶点指向其余所有的顶点，所以共有：$V-1$条边
+
+***
+**4.2.2 按照正文中示意图的样式（图4.1.9）画出Digraph的构造函数再处理图4.2.19的tinyDGex2.txt时构造的邻接表。**
+
+tinyDGex2.txt：
+
+12
+16
+8 4
+2 3
+0 5
+0 6
+3 6
+10 3
+7 11
+7 8
+11 8
+2 0
+6 2
+5 2
+5 10
+3 10
+8 1
+4 1
+
+![tinyDGex2.txt](images\tinyDGex2.txt.PNG)
+
+*Answer：*
+
+邻接表：
+
+```text
+0  --->       6 5
+1  --->       
+2  --->       0 3
+3  --->      10 6
+4  --->         1
+5  --->      10 2 
+6  --->         2
+7  --->      8 11
+8  --->       1 4
+9  --->
+10 --->         3
+11 --->         8
+```
+
+***
+**4.2.3 为Digraph添加一个构造函数，它接受一幅有向图G然后创建并初始化这幅图的一个副本。G的用例对它做出的任何改动都不应该影响到它的副本。**
+
+*Answer：*
+
+```java
+public Digraph(Digraph G) {
+    this(G.V());
+    this.E = G.E();
+    for (int v = 0; v < V; v++) {
+        this.indegree[v] = G.indegree(v);
+    }
+    for (int v = 0; v < G.V(); v++) {
+        // reverse so that adjacency list is in same order as original
+        Stack<Integer> reverse = new Stack<>();
+        for (int w : G.adj[v]) {
+            reverse.push(w);
+        }
+        for (int w : reverse) {
+            adj[v].add(w);
+        }
+    }
+}
+```
+
+***
+**4.2.4 为Digraph添加一个方法hasEdge()，它接受两个整形参数v和w，如果图含有边v->w，方法返回true，否则返回false。**
+
+*Answer：*
+
+```java
+public boolean hasEdge(int v, int w) {
+    validateVertex(v);
+    validateVertex(w);
+    
+    for (int element : adj(v)) {
+        if (element == w) {
+            return true;
+        }
+    }
+    return false;
+}
+```
+
+***
+**4.2.5 修改Digraph，不允许存在平行边和自环。**
+
+*Answer：*
+
+```java
+public void addEdge(int v, int w) {
+
+    // 防止自环
+    if (v == w) {
+        throw new IllegalArgumentException("Self Edge is not permitted.");
+    }
+
+    // 防止平行边
+    if (hasEdge(v, w)) {
+        throw new IllegalArgumentException("Parallel Edge is not permitted.");
+    }
+    
+    adj[v].add(w);
+    indegree[w]++;
+    E++;
+}
+```
+
+***
+**4.2.6 为Digraph编写一个测试用例。**
+
+*Answer：*
+
+```java
+public class Ex426 {
+    public static void main(String[] args) {
+        // 读取tinyDGex2.txt
+        Digraph G = new Digraph(new In(args[0]));
+        
+        System.out.println(G.V()); // 12
+        System.out.println(G.E()); // 16
+        
+        System.out.println(G.hasEdge(2, 3)); // true
+        System.out.println(G.hasEdge(3, 2)); // false
+        
+        System.out.println(G.indegree(3)); // 2
+        
+//      G.addEdge(2, 3); //  java.lang.IllegalArgumentException: Parallel Edge is not permitted.
+        
+//      G.addEdge(2, 2); // java.lang.IllegalArgumentException: Self Edge is not permitted.
+        
+        System.out.println(G.outdegree(0)); // 2
+        
+        
+        /*
+            12 vertices, 16 edges 
+            0: 6 5 
+            1: 
+            2: 0 3 
+            3: 10 6 
+            4: 1 
+            5: 10 2 
+            6: 2 
+            7: 8 11 
+            8: 1 4 
+            9: 
+            10: 3 
+            11: 8 
+         */
+        System.out.println(G);
+        
+        G.addEdge(9, 1);
+        
+        /*
+            12 vertices, 16 edges 
+            0: 6 5 
+            1: 
+            2: 0 3 
+            3: 10 6 
+            4: 1 
+            5: 10 2 
+            6: 2 
+            7: 8 11 
+            8: 1 4 
+            9: 1
+            10: 3 
+            11: 8 
+         */
+        System.out.println(G);
+    }
+}
+```
+
+***
+**4.2.7 顶点的入度为指向该顶点的边的总数。顶点的出度为由该顶点指出的边的总数。从出度为0的顶点是不可能到达任何顶点的，这种顶点叫做终点；入度为0的顶点是不可能从任何顶点达到的，所以叫做起点。一幅允许出现资环且每个顶点的出度均为1的有向图叫做映射（从0到V-1之间的整数到它们自身的函数）。编写一段程序Degress.java，实现下面的API。**
+
+- public class Degress
+    + Degress(Digraph G)： 
+    + int indegree(int v)：
+    + int outdegree(int v)：
+    + Iterable<Integer> sources()：
+    + Iteravle<Integer> sinks()：
+    + boolean isMap()：
+
+*Answer：*
+
+```java
+public class Degress {
+    
+    private Digraph G;
+    
+    public Degress(Digraph G) {
+        this.G = G;
+    }
+    
+    public int indegree(int v) {
+        return G.indegree(v);
+    }
+    
+    public int outdegree(int v) {
+        return G.outdegree(v);
+    }
+    
+    public Iterable<Integer> sources() {
+        Bag<Integer> sources = new Bag<>();
+        
+        int V = G.V();
+        for (int i = 0; i < V; i++) {
+            if (G.indegree(i) == 0) {
+                sources.add(i);
+            }
+        }
+        
+        return sources;
+    }
+    
+    public Iterable<Integer> sinks() {
+        Bag<Integer> sinks = new Bag<>();
+        
+        int V = G.V();
+        for (int i = 0; i < V; i++) {
+            if (G.outdegree(i) == 0) {
+                sinks.add(i);
+            }
+        }
+        
+        return sinks;
+    }
+    
+    public boolean isMap() {
+        int V = G.V();
+        for (int i = 0; i < V; i++) {
+            if (G.outdegree(i) != 1) {
+                return false;
+            }
+        }
+        return true;
+    }
+}
+```
+
+***
+**4.2.8 画出所有含有2、3、4和5个顶点的非同构有向无环图。**
+
+*Answer：*
+
+***
+**4.2.9 编写一个方法，检查一幅有向无环图的顶点的给定排列是否就是该图顶点的拓扑排序。**
+
+*Answer：*
+
+```java
+public static boolean isTopoOrder(Digraph G, Iterable<Integer> order) {
+
+    // 获取图G的拓扑排序
+    Iterable<Integer> topoOrder = new Topological(G).order();
+
+    // 比较topoOrder、order
+    Iterator<Integer> topoIter = topoOrder.iterator();
+    Iterator<Integer> orderIter = order.iterator();
+
+    while (topoIter.hasNext()) {
+        if (!orderIter.hasNext()) {
+            return false;
+        }
+        int v = topoIter.next();
+        int w = orderIter.next();
+        if (v != w) {
+            return false;
+        }
+    }
+
+    return orderIter.hasNext() ? false : true;
+}
+```
+
+***
+**4.2.10 给定一幅有向无环图，是否存在一种无法用基于深度优先搜索算法得到的顶点的拓扑排序？顶点的相邻关系不限。证明你的结论。**
+
+*Answer：*
+
+***
+**4.2.11 描述一组稀疏有向图，其含有的有向环的个数随着顶点增加而呈指数级增长。**
+
+*Answer：*
+
+***
+**4.2.12 一幅含有V个顶点和V-1条边且为一条简单路径的有向图的传递闭包中含有多少条边？**
+
+*Answer：*
+
+$(V^2-V)/2$（没有计算自环）
+
+***
+**4.2.13 给出这幅图含有10个顶点和以下边的有向图的传递闭包：**
+
+3 -> 7
+1 -> 4
+7 -> 8
+0 -> 5
+5 -> 2
+3 -> 8
+2 -> 9
+0 -> 6
+4 -> 9
+2 -> 6
+6 -> 4
+
+*Answer：*
+
+```text
+    0   1   2   3   4   5   6   7   8    9
+0   T       T       T   T   T            T
+1       T           T                    T
+2           T       T       T            T
+3               T               T   T  
+4                   T                    T
+5           T       T   T   T            T
+6                   T       T            T
+7                               T   T   
+8                                   T
+9                                        T      
+```
+
+***
+**4.2.14 证明$G$和$G^R$中的强连通分量是相同的。**
+
+*Answer：*
+
+由定义可知，如果两个顶点v和w是强连通的，则存在一条由v到w的路径，也存在一条从w到v的路径。
+
+当对图G进行取反时，强连通的两个顶点间的路径全部反向，此时原来v到w的路径变为w到v的路径，w到v的路径变为v到w的路径，所以这两个顶点依旧强连通。
+
+本身不强连通的两个顶点v和w，在取反后自然也不是强连通的。
+
+所以取反前后强连通分量是相同的。
+
+***
+**4.2.15 一幅有向无环图的强连通分量是哪些？**
+
+*Answer：*
+
+V个顶点构成的向无环图中含有V个强连通分量，每一个分量由一个顶点组成。
+
+***
+**4.2.16 用Kosaraju算法处理一幅有向无环图的结果是什么？**
+
+*Answer：*
+
+```java
+public class Ex4216 {
+    @SuppressWarnings("unchecked")
+    public static void main(String[] args) {
+        
+        Digraph G = new Digraph(5);
+        G.addEdge(0, 1);
+        G.addEdge(0, 2);
+        G.addEdge(0, 3);
+        G.addEdge(0, 4);
+        
+        KosarajuSCC scc = new KosarajuSCC(G);
+
+        // number of connected components
+        int m = scc.count();
+        StdOut.println(m + " strong components");
+
+        // compute list of vertices in each strong component
+        Queue<Integer>[] components = (Queue<Integer>[]) new Queue[m];
+        for (int i = 0; i < m; i++) {
+            components[i] = new Queue<Integer>();
+        }
+        for (int v = 0; v < G.V(); v++) {
+            components[scc.id(v)].enqueue(v);
+        }
+
+        // print results
+        for (int i = 0; i < m; i++) {
+            for (int v : components[i]) {
+                StdOut.print(v + " ");
+            }
+            StdOut.println();
+        }
+    }
+}
+```
+
+结果：
+
+```text
+5 strong components
+4 
+3 
+2 
+1 
+0 
+```
+
+***
+**4.2.17 真假判断：一幅有向图的反向图的顶点的逆后序排列和该有向图的顶点的后序排列相同。**
+
+*Answer：*
+
+假。
+
+```java
+public class Ex4217 {
+    public static void main(String[] args) {
+        
+        Digraph G = new Digraph(6);
+        G.addEdge(0, 1);
+        G.addEdge(0, 2);
+        G.addEdge(2, 3);
+        G.addEdge(2, 4);
+        G.addEdge(4, 5);
+        G.addEdge(5, 2);
+        
+        // G的反向图的逆后序排列
+        Iterable<Integer> grrp = new DepthFirstOrder(G.reverse()).reversePost();
+        
+        // G的后序排列
+        Iterable<Integer> gp = new DepthFirstOrder(G).post();
+        
+        
+        for (int i : grrp) {
+            System.out.print(i + " ");
+        }
+        System.out.println();
+        for (int i : gp) {
+            System.out.print(i + " ");
+        }
+    }
+}
+```
+
+结果：
+
+```text
+3 2 5 4 1 0 
+5 4 3 2 1 0 
+```
+
+***
+**4.2.18 使用1.4节中的内存使用模型评估含有V个顶点和E条边的Digraph的内存使用情况。**
+
+*Answer：*
+
+***
+
+#### 提高题
+
+***
+**4.2.19 拓扑排序与广度优先搜索。解释为何如下算法无法得到一组拓扑排序：运行广度优先搜索并按照所有顶点和起点的距离标记它们。**
+
+*Answer：*
+
+如果按上述思路来做，需要确保进行广度优先搜索时选取的起点入度为0，即在调度问题中优先级最高。而这一点需要在拿到图时检查各个顶点的入度。
+此外，在满足上述条件时，与起点距离相同的顶点之间的指向关系是没办法确定的。例如A-->B，B-->C，A-->C，在此情况下，B与C距离起点A的距离都是1，但是B指向C，这时如何排列B和C的顺序就会产生问题。如果按照距离进行标记，则B和C是并列的。但真实的拓扑排序中B要优先于C。
+所以不能使用广度优先搜索标记距离法得到拓扑排序。
