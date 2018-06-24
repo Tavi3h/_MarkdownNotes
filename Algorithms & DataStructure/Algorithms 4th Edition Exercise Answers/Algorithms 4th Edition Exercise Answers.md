@@ -28651,27 +28651,31 @@ public class Degress {
 *Answer：*
 
 ```java
-public static boolean isTopoOrder(Digraph G, Iterable<Integer> order) {
+public class Ex429 {
+    
+    // 判断order是否是G的拓扑排序
+    public static boolean isTopOrder(Digraph G, Iterable<Integer> order) {
 
-    // 获取图G的拓扑排序
-    Iterable<Integer> topoOrder = new Topological(G).order();
+        // 获取图G的拓扑排序
+        Iterable<Integer> topOrder = new Topological(G).order();
 
-    // 比较topoOrder、order
-    Iterator<Integer> topoIter = topoOrder.iterator();
-    Iterator<Integer> orderIter = order.iterator();
+        // 比较topoOrder、order
+        Iterator<Integer> topIter = topOrder.iterator();
+        Iterator<Integer> orderIter = order.iterator();
 
-    while (topoIter.hasNext()) {
-        if (!orderIter.hasNext()) {
-            return false;
+        while (topIter.hasNext()) {
+            if (!orderIter.hasNext()) {
+                return false;
+            }
+            int v = topIter.next();
+            int w = orderIter.next();
+            if (v != w) {
+                return false;
+            }
         }
-        int v = topoIter.next();
-        int w = orderIter.next();
-        if (v != w) {
-            return false;
-        }
+
+        return orderIter.hasNext() ? false : true;
     }
-
-    return orderIter.hasNext() ? false : true;
 }
 ```
 
@@ -28845,6 +28849,8 @@ public class Ex4217 {
 
 *Answer：*
 
+56 + 40V + 64E.
+
 ***
 
 #### 提高题
@@ -28857,3 +28863,147 @@ public class Ex4217 {
 如果按上述思路来做，需要确保进行广度优先搜索时选取的起点入度为0，即在调度问题中优先级最高。而这一点需要在拿到图时检查各个顶点的入度。
 此外，在满足上述条件时，与起点距离相同的顶点之间的指向关系是没办法确定的。例如A-->B，B-->C，A-->C，在此情况下，B与C距离起点A的距离都是1，但是B指向C，这时如何排列B和C的顺序就会产生问题。如果按照距离进行标记，则B和C是并列的。但真实的拓扑排序中B要优先于C。
 所以不能使用广度优先搜索标记距离法得到拓扑排序。
+
+***
+**4.2.20 有向欧拉环。欧拉环是一条每条边恰好出现一次的有向环。编写一个程序Eular来找出有向图中的欧拉环或者说明它不存在。**
+
+*Answer：*
+
+```java
+public class Eular {
+    public static Iterable<Integer> eular(Digraph G) {
+        // 检查图G是否是连通的
+        if (new KosarajuSCC(G).count() != 1) {
+            throw new IllegalArgumentException("This directed graph is not strongly connected...");
+        }
+
+        int V = G.V();
+        boolean[] marked = new boolean[V];
+        Queue<Integer> pre = new Queue<>();
+        
+        for (int v = 0; v < V; v++) {
+            if (!marked[v]) {
+                dfs(G, v, marked, pre);
+            }
+        }
+        pre.enqueue(0);
+        return pre;
+    }
+
+    private static void dfs(Digraph G, int v, boolean[] marked, Queue<Integer> pre) {
+        // 检查每一个顶点的出度和入度
+        if (G.indegree(v) != G.outdegree(v)) {
+            throw new IllegalArgumentException("Indegree or outdegree of vertice " + v + " is not 1...");
+        }
+        pre.enqueue(v);
+        marked[v] = true;
+        for (int w : G.adj(v)) {
+            if (!marked[w]) {
+                dfs(G, w, marked, pre);
+            }
+        }
+    }
+
+    public static void main(String[] args) {
+        Digraph G = new Digraph(6);
+        G.addEdge(0, 2);
+        G.addEdge(2, 1);
+        G.addEdge(1, 5);
+        G.addEdge(5, 4);
+        G.addEdge(4, 3);
+        G.addEdge(3, 0);
+
+        for (int i : eular(G)) {
+            System.out.print(i + " "); // 0 2 1 5 4 3 0
+        }
+    }
+}
+```
+
+***
+**4.2.21 有向无环图中的LCA。给定一幅有向无环图和两个顶点v和w，找出v和w的LCA（Lowest Common Ancestor，最近共同祖先）。LCA的计算在实现编程语言的多重继承、分析家谱数据和其他一些应用中很有用。**
+
+*Answer：*
+
+***
+**4.2.22 最短先导路径。给定一幅有向无环图和两个顶点v和w，找出v和w的最短先导路径。设v和w的一个共同祖先顶点为x，先导路径为v到x的最短路径和w到x的最短路径。v和w之间的最短先导路径是所有先导路径中的最短者。**
+
+*Answer：*
+
+***
+**4.2.23 强连通分量。设计一种线性时间的算法来计算给定顶点v所在的强连通分量。在这个算法的基础上设计一种平方时间的算法来计算有向图的所有强连通分量。**
+
+*Answer：*
+
+>
+Partial solution: To compute the strong component containing s
+>
+- Find the set of vertices reachable from s
+- Find the set of vertices that can reach s
+- Take the intersection of the two sets
+>
+Using this as a subroutine, you can find all strong components in time proportional to $t(E+V)$, where $t$ is the number of strong components.
+
+***
+**4.2.24 有向无环图中的汉密尔顿路径。设计一种线性时间的算法来判定给定的有向无环图中是否存在一条能够正好只访问每个顶点一次的有向路径。**
+
+*Answer：*
+
+>
+Compute a topological sort and check if there is an edge between each consecutive pair of vertices in the topological order.
+
+```java
+public class Ex4224 {
+
+    public static boolean hasHamiltonianPath(Digraph G) {
+        Topological top = new Topological(G);
+        if (!top.isDAG()) {
+            return false;
+        }
+
+        TransitiveClosure tc = new TransitiveClosure(G);
+
+        Iterator<Integer> iterator = top.order().iterator();
+
+        Integer v = null;
+        Integer w = null;
+        
+        while (iterator.hasNext()) {
+            v = v == null ? iterator.next() : w;
+            if (iterator.hasNext()) {
+                w = iterator.next();
+            }
+            if (!tc.reachable(v, w)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public static void main(String[] args) {
+        Digraph G = new Digraph(6);
+        G.addEdge(0, 2);
+        G.addEdge(2, 3);
+        G.addEdge(2, 5);
+        G.addEdge(3, 1);
+        G.addEdge(5, 4);
+        G.addEdge(4, 1);
+        
+        System.out.println(hasHamiltonianPath(G)); // false
+        
+        G.addEdge(3, 5);
+        
+        System.out.println(hasHamiltonianPath(G)); // true
+    }
+}
+```
+
+***
+**4.2.25 唯一的拓扑排序。设计一个算法来判定一幅有向图的拓扑排序是否是唯一的。**
+
+*Answer：*
+
+>
+当且仅当拓扑排序中每一对相邻的顶点之间都存在一条有向边（即有向图中含有一条汉密尔顿路径）时它的拓扑排序才是唯一的。
+如果一幅有向图的拓扑排序不唯一，另一种拓扑排序可以由交换拓扑排序中的某一对相邻的顶点得到。
+
