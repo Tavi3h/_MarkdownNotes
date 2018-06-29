@@ -28418,7 +28418,7 @@ tinyDGex2.txt：
 8 1
 4 1
 
-![tinyDGex2.txt](images\tinyDGex2.txt.PNG)
+![tinyDGex2.txt](images\chapter04\tinyDGex2.txt.PNG)
 
 *Answer：*
 
@@ -29007,3 +29007,586 @@ public class Ex4224 {
 当且仅当拓扑排序中每一对相邻的顶点之间都存在一条有向边（即有向图中含有一条汉密尔顿路径）时它的拓扑排序才是唯一的。
 如果一幅有向图的拓扑排序不唯一，另一种拓扑排序可以由交换拓扑排序中的某一对相邻的顶点得到。
 
+***
+**4.2.26 2-可满足性。给定一个由M个子句和N个变量组成的以合取范式形式给出的布尔逻辑明体，每个子句都正好含有两个变量，找到一组使布尔表达式为真的变量赋值（如果存在）。**
+
+*Answer：*
+
+***
+**4.2.27 有向图的枚举。证明所有不同的含有V个顶点且不包含平行边的有相图的总数为$2^{V^2}$个。**
+
+*Answer：*
+
+***
+**4.2.28 有向无环图的枚举。给出一个公式，计算含有V个顶点和E条边的所有有向图的数量。**
+
+*Answer：*
+
+***
+**4.2.29 算术表达式。编写一个类来计算由有向无环图表示的算术表达式。使用一个由顶点索引的数组来保存每个顶点所对应的值。假设叶子节点中的值是常数。描述一组算术表达式，使得它所对应的表达式树的大小是相应的有向无环图的大小的指数级别。**
+
+*Answer：*
+
+***
+**4.2.30 基于队列的拓扑排序。实现一种拓扑排序，使用由顶点索引的数组来保存每个顶点的入度。遍历一遍所有的边并使用练习4.2.7给出的Degrees类来初始化数组以及一条含有所有起点的队列。然后重复一下操作直到起点队列为空：**
+
+- 从队列中删去一个起点并将其标记。
+- 遍历由被删除顶点指出的所有边，将所有被指向的顶点的入度减一。
+- 如果顶点的入度变为0，将它插入起点队列。
+
+*Answer：*
+
+```java
+// 官方实现
+public class TopologicalX {
+    private Queue<Integer> order;     // vertices in topological order
+    private int[] ranks;              // ranks[v] = order where vertex v appears in order
+
+    /**
+     * Determines whether the digraph {@code G} has a topological order and, if so,
+     * finds such a topological order.
+     * @param G the digraph
+     */
+    public TopologicalX(Digraph G) {
+
+        // indegrees of remaining vertices
+        int[] indegree = new int[G.V()];
+        for (int v = 0; v < G.V(); v++) {
+            indegree[v] = G.indegree(v);
+        }
+
+        // initialize 
+        ranks = new int[G.V()]; 
+        order = new Queue<>();
+        int count = 0;
+
+        // initialize queue to contain all vertices with indegree = 0
+        Queue<Integer> queue = new Queue<>();
+        for (int v = 0; v < G.V(); v++) {
+            if (indegree[v] == 0) {
+                queue.enqueue(v);
+            }
+        }
+
+        while (!queue.isEmpty()) {
+            int v = queue.dequeue();
+            order.enqueue(v);
+            ranks[v] = count++;
+            for (int w : G.adj(v)) {
+                indegree[w]--;
+                if (indegree[w] == 0) {
+                    queue.enqueue(w);
+                }
+            }
+        }
+
+        // there is a directed cycle in subgraph of vertices with indegree >= 1.
+        if (count != G.V()) {
+            order = null;
+        }
+
+    }
+
+    /**
+     * Returns a topological order if the digraph has a topologial order,
+     * and {@code null} otherwise.
+     * @return a topological order of the vertices (as an interable) if the
+     *    digraph has a topological order (or equivalently, if the digraph is a DAG),
+     *    and {@code null} otherwise
+     */
+    public Iterable<Integer> order() {
+        return order;
+    }
+
+    /**
+     * Does the digraph have a topological order?
+     * @return {@code true} if the digraph has a topological order (or equivalently,
+     *    if the digraph is a DAG), and {@code false} otherwise
+     */
+    public boolean hasOrder() {
+        return order != null;
+    }
+
+    /**
+     * The the rank of vertex {@code v} in the topological order;
+     * -1 if the digraph is not a DAG
+     *
+     * @param v vertex
+     * @return the position of vertex {@code v} in a topological order
+     *    of the digraph; -1 if the digraph is not a DAG
+     * @throws IllegalArgumentException unless {@code 0 <= v < V}
+     */
+    public int rank(int v) {
+        validateVertex(v);
+        return hasOrder() ? ranks[v] : -1;
+    }
+    
+    private void validateVertex(int v) {
+        int V = ranks.length;
+        if (v < 0 || v >= V) {
+            throw new IllegalArgumentException("vertex " + v + " is not between 0 and " + (V-1));
+        }
+    }
+}
+```
+
+***
+**4.2.31 有向欧几里得图。修改你为4.1.36给出的解答，为平面图设计一份API名为Euclidean-Digraph，这样你就能够处理用图形表示的图了。**
+
+*Answer：*
+
+***
+
+#### 实验题
+
+***
+
+暂略。
+
+### 4.3 最小生成树
+
+***
+
+#### 练习题
+
+***
+**4.3.1 证明可以将图中的所有边的权重都加上一个正常数或是都乘以一个正常数，图的最小生成树不会受到影响。**
+
+*Answer：*
+
+由题意，$W=kw+T (k>0, T>0)$，其中w是原权重，W是现权重。当$k$和$T$都大于0时（事实上只要$k>0$即可），函数$W(w)$是单调递增的，所以变换前后各个边权重的大小顺序是不变的，所以图的最小生成树也不会受到影响。
+
+***
+**4.3.2 画出图4.3.16中的所有最小生成树（所有边的权重均相等）。**
+
+![ex432](images\chapter04\ex432.png)
+
+*Answer：*
+
+由于所有边的权重均相等，所以此时问题就变为了在该图中找到所有连接全部顶点的无环图。
+
+***
+**4.3.3 证明当所有边的权重均不相同时的最小生成树是唯一的。**
+
+*Answer：*
+
+>
+For the sake of contradiction, suppose there are two different MSTs of G, say T1 and T2. Let e = v-w be the min weight edge of G that is in one of T1 or T2, but not both. Let's suppose e is in T1. Adding e to T2 creates a cycle C. There is at least one edge, say f, in C that is not in T1 (otherwise T1 would be cyclic). By our choice of e, w(e) ≤ w(f). Since all of the edge weights are distinct, w(e) < w(f). Now, replacing f with e in T2 yields a new spanning tree with weight less than that of T2 (contradicting the minimality of T2).
+
+***
+**4.3.4 证明或给出反例：仅当加权无向图中所有边的权重均不相同时图的最小生成树是唯一的。**
+
+*Answer：*
+
+反例为有相同边时，最小生成树是不唯一的。参照4.3.2题。
+
+***
+**4.3.5 证明即使存在权重相同的边贪心算法仍然有效。**
+
+*Answer：*
+
+***
+**4.3.6 从tinyEWG.txt中山区顶点7并给出加权图的最小生成树。**
+
+*Answer：*
+
+```java
+public class Ex436 {
+    public static void main(String[] args) {
+        
+        EdgeWeightedGraph G = new EdgeWeightedGraph(7);
+        /*  去掉含有顶点7的边及权重
+         *  4 5 0.35
+            1 5 0.32
+            0 4 0.38
+            2 3 0.17
+            0 2 0.26
+            1 2 0.36
+            1 3 0.29
+            6 2 0.40
+            3 6 0.52
+            6 0 0.58
+            6 4 0.93
+         */
+        G.addEdge(new Edge(4, 5, 0.35));
+        G.addEdge(new Edge(1, 5, 0.32));
+        G.addEdge(new Edge(0, 4, 0.38));
+        G.addEdge(new Edge(2, 3, 0.17));
+        G.addEdge(new Edge(0, 2, 0.26));
+        G.addEdge(new Edge(1, 2, 0.36));
+        G.addEdge(new Edge(1, 3, 0.29));
+        G.addEdge(new Edge(6, 2, 0.40));
+        G.addEdge(new Edge(3, 6, 0.52));
+        G.addEdge(new Edge(6, 0, 0.58));
+        G.addEdge(new Edge(6, 4, 0.93));
+        
+        LazyPrimMST lpm = new LazyPrimMST(G);
+        for (Edge e : lpm.edges()) {
+            System.out.println(e);
+        }
+        System.out.printf("%.5f\n", lpm.weight());
+    }
+}
+```
+
+结果：
+
+```text
+0-2 0.26000
+2-3 0.17000
+1-3 0.29000
+1-5 0.32000
+4-5 0.35000
+6-2 0.40000
+1.79000
+```
+
+***
+**4.3.7 如何得到一幅加权图的最大生成树？**
+
+*Answer：*
+
+优先队列使用MaxPQ，或对Edge的compareTo()方法的逻辑取反。
+
+***
+**4.3.8 证明环的性质：任意一幅加权图中的一个环（边的权重各不相同），环中权重最大的边必然不属于图的最小生成树。**
+
+*Answer：*
+
+***
+**4.3.9 根据Graph中的构造函数为EdgeWeightedGraph实现一个相应的构造函数，从输入流中读取一幅图。**
+
+*Answer：*
+
+```java
+public EdgeWeightedGraph(In in) {
+    this(in.readInt());
+    int E = in.readInt();
+    if (E < 0) {
+        throw new IllegalArgumentException("Number of edges must be nonnegative");
+    }
+
+    for (int i = 0; i < E; i++) {
+        int v = in.readInt();
+        int w = in.readInt();
+        validateVertex(v);
+        validateVertex(w);
+        double weight = in.readDouble();
+        addEdge(new Edge(v, w, weight));
+    }
+}
+```
+
+***
+**4.3.10 为稠密图实现EdgeWeightedGraph，使用邻接矩阵（存储权重的二维数组），不允许存在平行边。**
+
+*Answer：*
+
+***
+**4.3.11 使用1.4节中的内存使用模型评估用EdgeWeightedGraph表示一幅含有V个顶点和E条边的图所需的内存。**
+
+*Answer：*
+
+56 + 40V + 112E.
+
+***
+**4.3.12 假设加权图中的所有边权重都不相同，其中权重最小的边一定属于图的最小生成树吗？权重最大的边可能属于图的最小生成树吗？任意环中的权重最小边都属于图的最小生成树吗？证明你的每个回答或者给出相应的反例。**
+
+*Answer：*
+
+- 是
+- 不可能
+- 不一定，tinyEWG.txt生成的最小生成树中不包含环0-4-6-0中的任意一条边。
+
+***
+**4.3.13 给出一个反例证明以下策略不一定能够找到图的最小生成树：首先以任意顶点作为图的最小生成树，然后向树中添加$V-1$条边，每次总是添加依附于最近加入最小生成树的顶点的所有边中的权重最小者。**
+
+*Answer：*
+
+反例：以tinyEWG.txt为例，首先加入顶点0，此时与0相连的权重最小边为(0,7,0.16)；加入顶点7，此时与7相连的权重最小边为(1,7,0.19)；加入顶点1，此时与1相连的权重最小边为(1,3,0.29)。但是边(1,3,0.29)实际上不属于该图的最小生成树。
+所以该策略不一定能够找到图的最小生成树。
+
+***
+**4.3.14 给出一幅加权图G以及它的最小生成树。从G中删去一条边且G仍然是连通的，如何在与E成正比的时间内找到新图的最小生成树。**
+
+*Answer：*
+
+>
+If the edge in not in the MST, then the old MST is an MST of the updated graph. Otherwise, deleting the edge from the MST leaves two connected components. Add the minimum weight edge with one vertex in each component.
+
+***
+**4.3.15 给定一幅加权图G以及它的最小生成树。从G中添加一条边e，如何在与V成正比的时间内找到新图的最小生成树。**
+
+*Answer：*
+
+>
+Add edge e to the MST creates a unique cycle. Delete the maximum weight edge on this cycle.
+
+***
+**4.3.16 给定一幅加权图G以及它的最小生成树。从G中添加一条边e，编写一段程序找到e的权重在什么范围之内才会被加入最小生成树。**
+
+*Answer：*
+
+***
+**4.3.17 为EdgeWeightedGraph类实现toString()方法。**
+
+*Answer：*
+
+```java
+private static final String NEWLINE = System.getProperty("line.separator");
+// ...
+public String toString() {
+    StringBuilder s = new StringBuilder();
+    s.append(V + " " + E + NEWLINE);
+    for (int v = 0; v < V; v++) {
+        s.append(v + ": ");
+        for (Edge e : adj[v]) {
+            s.append(e + "  ");
+        }
+        s.append(NEWLINE);
+    }
+    return s.toString();
+}
+```
+
+***
+**4.3.18 给出延时Prim算法、即时Prim算法和Kruskal算法在计算练习4.3.6中的图的最小生成树过程中的轨迹。**
+
+*Answer：*
+
+略。
+
+***
+**4.3.19 假设你使用的优先队列会维护一条有序链表。在最坏情况下Prim算法分Kruskal算法处理一幅含有V个顶点和E条边的加权图的时间增长数量级是多少？这种方法适用于什么情况？
+
+*Answer：*
+
+有序链表实现的优先队列在每次插入新元素时都需要遍历所有元素以确定正确的插入位置，所以：
+
+- 延时的Prim算法：$E^2$
+- 即时的Prim算法：$EV$
+- Kruskal：$EV$
+
+***
+**4.3.20 真假判断：在Kruskal算法的执行过程中，最小生成树中的每个顶点到它的子树中的某个顶点的距离比到非子树中的任意顶点都近。证明你的结论。**
+
+*Answer：*
+
+***
+**4.3.21 为PrimMST类实现edges()方法。**
+
+*Answer：*
+
+```java
+public Iterable<Edge> edges() {
+    Queue<Edge> mst = new Queue<>();
+    for (int v = 0; v < edgeTo.length; v++) {
+        Edge e = edgeTo[v];
+        if (e != null) {
+            mst.enqueue(e);
+        }
+    }
+    return mst;
+}
+```
+
+***
+
+#### 提高题
+
+***
+**4.3.22 最小生成森林。开发新版本的Prim算法和Kruskal算法来计算一幅加权图的最小生成森林，图不一定是连通的。**
+
+*Answer：*
+
+Prim中使用循环检查每一个顶点。Kruskal算法已经实现了计算最小生成森林。
+
+```java
+public LazyPrimMST(EdgeWeightedGraph G) {
+    mst = new Queue<>();
+    pq = new MinPQ<>();
+    marked = new boolean[G.V()];
+    for (int v = 0; v < G.V(); v++) { // run Prim from all vertices to
+        if (!marked[v]) {
+            prim(G, v); // get a minimum spanning forest
+        }
+    }
+}
+
+public PrimMST(EdgeWeightedGraph G) {
+    edgeTo = new Edge[G.V()];
+    distTo = new double[G.V()];
+    marked = new boolean[G.V()];
+    pq = new IndexMinPQ<>(G.V());
+    for (int v = 0; v < G.V(); v++) {
+        distTo[v] = Double.POSITIVE_INFINITY;
+    }
+
+    // run from each vertex to find minimum spanning forest
+    for (int v = 0; v < G.V(); v++) {
+        if (!marked[v]) {
+            prim(G, v);
+        }
+    }
+}
+```
+
+***
+**4.3.23 Vyssotsky算法。开发一种不断使用环的性质来计算最小生成树的算法：每次将一条边添加到假设的最小生成树中，如果形成了一个环则删去环中权重最大的边。**
+
+*Answer：*
+
+***
+**4.3.24 逆向删除算法。实现以下计算最小生成树的算法：开始时图含有原图的所有的边，然后按照权重大小的降序排列所有的边。对于每条边，如果删除它图仍然是连通的，那就删掉它。证明这种方法可以得到图的最小生成树。**
+
+*Answer：*
+
+***
+**4.3.24 最坏情况生成器。开发一个加权图生成器，图中含有V个顶点和E条边，使得延时的Prim算法所需的运行时间是非线性的。对于即时的Prim算法回答相同的问题。**
+
+*Answer：*
+
+***
+**4.3.26 关键边。关键边指的是图的最小生成树中的某一条边，如果删除它，新图的最小生成树的总权重将会大于原最小生成树的总权重。找到在$ElogE$时间内找出图的关键边的算法。**
+
+*Answer：*
+
+***
+**4.3.27 动画。编写一段程序将最小生成树算法用动画表现出来。用程序处理mediumEWG.txt来产生类似于图4.3.12和图4.3.14的示意图。**
+
+*Answer：*
+
+***
+**4.3.28 空间最优的数据结构。实现另一个版本的延时Prim算法，在EdgeWeightedGraph和MinPQ中使用低级数据结构代替Bag和Edge来节省空间。**
+
+*Answer：*
+
+***
+**4.3.29 稠密图。实现另一个版本的Prim算法，即时（但不使用优先队列）且能够在$V^2$次加权边比较之内得到最小生成树。**
+
+*Answer：*
+
+***
+**4.3.30 欧几里得加权图。修改你为练习4.1.36给出的解答，为平面图创建一份API---EuclideanEdgeWeightedGraph。这样你就能够处理用图形表示的图了。**
+
+*Answer：*
+
+***
+**4.3.31 最小生成树的权重。为LazyPrimMST、PrimMST和KruskalMST实现weight()方法，使用延时策略，只在被调用时才便利最小生成树的所有边来计算总权重。然后用即时策略再次实现这个方法，在计算最小生成树的过程中维护一个动态的总权重。**
+
+*Answer：*
+
+LazyPrimMST：
+
+```java
+// ...
+private double weight; // 最小生成树的总权重
+
+// ...
+private void prim(EdgeWeightedGraph G, int s) {
+    visit(G, s);
+    while (!pq.isEmpty()) { // better to stop when mst has V-1 edges
+        Edge e = pq.delMin(); // 从pq中得到权重最小的边
+        int v = e.either(), w = e.other(v); // two endpoints
+        if (marked[v] && marked[w]) {
+            continue; // 跳过失效的边
+        }
+        mst.enqueue(e); // 将边添加到树中
+        weight += e.weight();
+        if (!marked[v]) {
+            visit(G, v); // v becomes part of tree
+        }
+        if (!marked[w]) {
+            visit(G, w); // w becomes part of tree
+        }
+    }
+}
+
+// ...
+public double weight() {
+    return weight;
+}
+```
+
+PrimMST：
+
+```java
+/*
+ * 返回最小生成树
+ */
+public Iterable<Edge> edges() {
+    Queue<Edge> mst = new Queue<>();
+    for (int v = 0; v < edgeTo.length; v++) {
+        Edge e = edgeTo[v];
+        if (e != null) {
+            mst.enqueue(e);
+        }
+    }
+    return mst;
+}
+
+/*
+ * 返回图的总权重
+ */
+public double weight() {
+    double weight = 0.0;
+    for (Edge e : edges()) {
+        weight += e.weight();
+    }
+    return weight;
+}
+```
+
+KruskalMST：
+
+```java
+// ...
+private double weight; // 图的总权重
+
+// ...
+public KruskalMST(EdgeWeightedGraph G) {
+
+    mst = new Queue<>();
+    MinPQ<Edge> pq = new MinPQ<>();
+    for (Edge e : G.edges()) {
+        pq.insert(e);
+    }
+
+    // run greedy algorithm
+    UF uf = new UF(G.V());
+    while (!pq.isEmpty() && mst.size() < G.V() - 1) {
+        Edge e = pq.delMin();
+        int v = e.either();
+        int w = e.other(v);
+        if (!uf.connected(v, w)) { // v-w does not create a cycle
+            uf.union(v, w); // merge v and w components
+            mst.enqueue(e); // add edge e to mst
+            weight += e.weight();
+        }
+    }
+}
+
+// ... 
+public double weight() {
+    return weight;
+}
+```
+
+***
+**4.3.32 指定的集合。给定一幅连通的加权图G和一个边的集合S（不含环），给出一种算法得到含有S中的所有边的最小生成树。**
+
+*Answer：*
+
+***
+**4.3.33 验证。编写一个使用最小生成树算法以及EdgeWeightedGraph类的check()，使用以下根据命题J得到的最优切分条件来验证给定的一组边就是一颗最小生成树：如果给定的一组边是一颗生成树，且删除树中的任意边得到的切分中权重最小的横切边正是被删除的那条便，则这组边就是图的最小生成树。**
+
+*Answer：*
+
+
+***
+
+#### 实验题
+
+***
+
+暂略。
