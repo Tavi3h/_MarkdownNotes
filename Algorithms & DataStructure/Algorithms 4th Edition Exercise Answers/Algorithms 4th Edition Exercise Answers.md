@@ -29590,3 +29590,595 @@ public double weight() {
 ***
 
 暂略。
+
+### 1.1 基础编程模型
+
+***
+
+#### 练习题
+
+***
+**4.4.1 真假判断：将每条边的权重都加上一个常数不会改变单点最短路径问题的答案。**
+
+*Answer：*
+
+假。
+
+***
+**4.4.2 为EdgeWeightedDigraph类实现toString()方法。**
+
+*Answer：*
+
+```java
+// ...
+private static final String NEWLINE = System.getProperty("line.separator");
+
+// ...
+public String toString() {
+    StringBuilder s = new StringBuilder();
+    s.append(V + " " + E + NEWLINE);
+    for (int v = 0; v < V; v++) {
+        s.append(v + ": ");
+        for (DirectedEdge e : adj[v]) {
+            s.append(e + "  ");
+        }
+        s.append(NEWLINE);
+    }
+    return s.toString();
+}
+```
+
+***
+**4.4.3 为稠密图实现一种使用邻接矩阵表示法的EdgeWeightedDigraph类。忽略平行边。**
+
+*Answer：*
+
+简易实现：
+
+```java
+public class EdgeWeightedDigraphEx433 {
+    
+    private final int V; // 顶点总数
+    private int E; // 边的总数
+    private Double[][] weight;
+    
+    public EdgeWeightedDigraphEx433(int V) {
+        if (V < 0) {
+            throw new IllegalArgumentException("Number of vertices in a Digraph must be nonnegative");
+        }
+        this.V = V;
+        this.weight = new Double[V][V];
+        this.E = 0;
+    }
+    
+    public void addEdge(DirectedEdge e) {
+        int v = e.from();
+        int w = e.to();
+        weight[v][w] = e.weight();
+        E++;
+    }
+
+    public int V() {
+        return V;
+    }
+
+    public int E() {
+        return E;
+    }
+}
+```
+
+***
+**4.4.44 在tinyEWD.txt中删去顶点7。画出加权有向图中以顶点0为起点的最短路径树，并使用父链接数组表示这棵树。将图中所有边的方向反转并回答相同的问题。**
+
+*Answer：*
+
+```java
+public class Ex444 {
+    public static void main(String[] args) {
+        // 删除顶点7后的图
+        /*
+            7
+            10
+            4 5 0.35
+            5 4 0.35
+            5 1 0.32
+            0 4 0.38
+            0 2 0.26
+            1 3 0.29
+            6 2 0.40
+            3 6 0.52
+            6 0 0.58
+            6 4 0.93
+         */
+        EdgeWeightedDigraph G = new EdgeWeightedDigraph(7);
+        G.addEdge(new DirectedEdge(4, 5, 0.35));
+        G.addEdge(new DirectedEdge(5, 4, 0.35));
+        G.addEdge(new DirectedEdge(5, 1, 0.32));
+        G.addEdge(new DirectedEdge(0, 4, 0.38));
+        G.addEdge(new DirectedEdge(0, 2, 0.26));
+        G.addEdge(new DirectedEdge(1, 3, 0.29));
+        G.addEdge(new DirectedEdge(6, 2, 0.40));
+        G.addEdge(new DirectedEdge(3, 6, 0.52));
+        G.addEdge(new DirectedEdge(6, 0, 0.58));
+        G.addEdge(new DirectedEdge(6, 4, 0.93));
+
+        int s = 0;
+        DijkstraSP dsp = new DijkstraSP(G, s);
+        for (int t = 0; t < G.V(); t++) {
+            if (dsp.hasPathTo(t)) {
+                System.out.printf("%d to %d (%.2f)  ", s, t, dsp.distTo(t));
+                for (DirectedEdge e : dsp.pathTo(t)) {
+                    System.out.print(e + "   ");
+                }
+                System.out.println();
+            } else {
+                System.out.printf("%d to %d         no path\n", s, t);
+            }
+        }
+    }
+}
+```
+
+结果：
+```text
+0 to 0 (0.00)  
+0 to 1 (1.05)  0->4  0.38   4->5  0.35   5->1  0.32   
+0 to 2 (0.26)  0->2  0.26   
+0 to 3 (1.34)  0->4  0.38   4->5  0.35   5->1  0.32   1->3  0.29   
+0 to 4 (0.38)  0->4  0.38   
+0 to 5 (0.73)  0->4  0.38   4->5  0.35   
+0 to 6 (1.86)  0->4  0.38   4->5  0.35   5->1  0.32   1->3  0.29   3->6  0.52   
+```
+
+父链接数组：
+
+```text
+0   1   2   3   4   5   6
+    5   0   1   0   4   3
+```
+
+***
+**4.4.5在tinyEWD.txt中改变0->2的方向。画出该加权图中以顶点2为起点的两棵不同的最短路径树。**
+
+*Answer：*
+
+```java
+public class Ex445 {
+    public static void main(String[] args) {
+        // 改变tinyEWD.txt中0->2的方向
+        /*
+            8
+            15
+            4 5 0.35
+            5 4 0.35
+            4 7 0.37
+            5 7 0.28
+            7 5 0.28
+            5 1 0.32
+            0 4 0.38
+            2 0 0.26
+            7 3 0.39
+            1 3 0.29
+            2 7 0.34
+            6 2 0.40
+            3 6 0.52
+            6 0 0.58
+            6 4 0.93
+         */
+        EdgeWeightedDigraph G = new EdgeWeightedDigraph(8);
+        G.addEdge(new DirectedEdge(4, 5, 0.35));
+        G.addEdge(new DirectedEdge(5, 4, 0.35));
+        G.addEdge(new DirectedEdge(4, 7, 0.37));
+        G.addEdge(new DirectedEdge(5, 7, 0.28));
+        G.addEdge(new DirectedEdge(7, 5, 0.28));
+        G.addEdge(new DirectedEdge(5, 1, 0.32));
+        G.addEdge(new DirectedEdge(0, 4, 0.38));
+        G.addEdge(new DirectedEdge(2, 0, 0.26));
+        G.addEdge(new DirectedEdge(7, 3, 0.39));
+        G.addEdge(new DirectedEdge(1, 3, 0.29));
+        G.addEdge(new DirectedEdge(2, 7, 0.34));
+        G.addEdge(new DirectedEdge(6, 2, 0.40));
+        G.addEdge(new DirectedEdge(3, 6, 0.52));
+        G.addEdge(new DirectedEdge(6, 0, 0.58));
+        G.addEdge(new DirectedEdge(6, 4, 0.93));
+        
+        int s = 2;
+        DijkstraSP dsp = new DijkstraSP(G, s);
+        for (int t = 0; t < G.V(); t++) {
+            if (dsp.hasPathTo(t)) {
+                System.out.printf("%d to %d (%.2f)  ", s, t, dsp.distTo(t));
+                for (DirectedEdge e : dsp.pathTo(t)) {
+                    System.out.print(e + "   ");
+                }
+                System.out.println();
+            } else {
+                System.out.printf("%d to %d         no path\n", s, t);
+            }
+        }
+    }
+}
+```
+
+结果：其中一个最短路径树
+```text
+2 to 0 (0.26)  2->0  0.26   
+2 to 1 (0.94)  2->7  0.34   7->5  0.28   5->1  0.32   
+2 to 2 (0.00)  
+2 to 3 (0.73)  2->7  0.34   7->3  0.39   
+2 to 4 (0.64)  2->0  0.26   0->4  0.38   
+2 to 5 (0.62)  2->7  0.34   7->5  0.28   
+2 to 6 (1.25)  2->7  0.34   7->3  0.39   3->6  0.52   
+2 to 7 (0.34)  2->7  0.34   
+```
+
+***
+**4.4.6 给出用即时版本的Dijkstra算法计算练习4.4.5所定义的图的最短路径树的轨迹。**
+
+*Answer：*
+
+略。
+
+***
+**4.4.7 实现DijkstraSP的另一个版本，支持一个方法来返回一幅加权有向图总从s到t的另一条最短路径。（如果从s到t的最短路径只有一条则返回null。）**
+
+*Answer：*
+
+***
+**4.4.8 一幅有向图的直径指的是链接任意两个顶点的所有最短路径中的最大长度。编写一个DijkstraSP的用例，找出边的权重非负的给定EdgeWeightedDigraph图的直径。**
+
+*Answer：*
+
+```java
+public class Ex448 {
+    public static void main(String[] args) {
+        EdgeWeightedDigraph G = new EdgeWeightedDigraph(new In(args[0])); 
+        DijkstraAllPairsSP dapsp = new DijkstraAllPairsSP(G);
+        
+        int V = G.V();
+        double d = Double.NEGATIVE_INFINITY;
+        for (int i = 0; i < V; i++) {
+            for (int j = 0; j < V; j++) {
+                double dist = dapsp.dist(i, j);
+                if (i == j || dist == Double.POSITIVE_INFINITY) {
+                    continue;
+                }
+                d = dist > d ? dist : d;
+            }
+        }
+        System.out.println(d);
+    }
+}
+```
+
+***
+**4.4.9 表4.4.10来自于一张很早以前出版的公路地图，它显示的是城市之间的最短路径的长度。这张表中有一个错误。改正这个错误并新建一张表来说明最短路径是哪条。**
+
+- |普罗维登斯|威斯特里|新伦敦|诺威治
+-----|-----|-----|-----|-----
+普罗维登斯 |-|53|54|48
+威斯特里 |53|-|18|101
+新伦敦 |54|18|-|12
+诺威治 |48|101|12|-
+
+
+*Answer：*
+
+威斯特里和诺威治之间的最短距离不对，应该是18（威斯特里-新伦敦）+12（新伦敦-诺威治）=30。
+
+***
+**4.4.10 将练习4.4.4中定义的有向图中的边看作无相边，即每条边对应加权有向图中的两条方向不同但权重相同的边。为对应的加权有向图回答4.4.6中的问题。**
+
+*Answer：*
+
+略。
+
+***
+**4.4.11 使用1.4节中的内存使用模型评估用EdgeWeigtedDigraph表示一幅含有V个顶点和E条边的图所需的内存。**
+
+*Answer：*
+
+56 + 40V + 72E.
+
+***
+**4.4.12 修改4.2节中的DirectedCycle类和Topological类，使之使用本节中的EdgeWeightedDigraph类和DirectedEdge类的API并实现EdgeWeightedCycleFinder类和EdgeWeightedTopological类。**
+
+*Answer：*
+
+```java
+// 对DirectedCycle进行调整
+public class EdgeWeightedDirectedCycle {
+    private boolean[] marked; // marked[v] = has vertex v been marked?
+    private DirectedEdge[] edgeTo; // edgeTo[v] = previous edge on path to v
+    private boolean[] onStack; // onStack[v] = is vertex on the stack?
+    private Stack<DirectedEdge> cycle; // directed cycle (or null if no such cycle)
+
+    public EdgeWeightedDirectedCycle(EdgeWeightedDigraph G) {
+        marked = new boolean[G.V()];
+        onStack = new boolean[G.V()];
+        edgeTo = new DirectedEdge[G.V()];
+        for (int v = 0; v < G.V(); v++) {
+            if (!marked[v]) {
+                dfs(G, v);
+            }
+        }
+    }
+
+    private void dfs(EdgeWeightedDigraph G, int v) {
+        onStack[v] = true;
+        marked[v] = true;
+        for (DirectedEdge e : G.adj(v)) {
+            int w = e.to();
+
+            // short circuit if directed cycle found
+            if (cycle != null)
+                return;
+
+            // found new vertex, so recur
+            else if (!marked[w]) {
+                edgeTo[w] = e;
+                dfs(G, w);
+            }
+
+            // trace back directed cycle
+            else if (onStack[w]) {
+                cycle = new Stack<DirectedEdge>();
+
+                DirectedEdge f = e;
+                while (f.from() != w) {
+                    cycle.push(f);
+                    f = edgeTo[f.from()];
+                }
+                cycle.push(f);
+
+                return;
+            }
+        }
+        onStack[v] = false;
+    }
+    
+    public boolean hasCycle() {
+        return cycle != null;
+    }
+    
+    public Iterable<DirectedEdge> cycle() {
+        return cycle;
+    }
+}
+// ...
+// 为Topological类添加一个可以接受加权有向图的构造函数
+
+public Topological(EdgeWeightedDigraph G) {
+    EdgeWeightedDirectedCycle finder = new EdgeWeightedDirectedCycle(G);
+    if (!finder.hasCycle()) {
+        DepthFirstOrder dfs = new DepthFirstOrder(G);
+        order = dfs.reversePost();
+    }
+}
+```
+
+***
+**4.4.13 为tinyEWD.txt删去边5->7，用Dijkstra算法计算所得的有向图的最短路径树并按照正文中的样式给出算法的轨迹。**
+
+*Answer：*
+
+略。
+
+***
+**4.4.14 给出使用4.4.6.1节和4.4.6.2节的两种尝试处理图4.4.19的tinyEWDn.txt所得到的路径。**
+
+*Answer：*
+
+尝试1：
+```java
+public class Ex4414a {
+    public static void main(String[] args) {
+        /*
+            8
+            15
+            4 5  0.35
+            5 4  0.35
+            4 7  0.37
+            5 7  0.28
+            7 5  0.28
+            5 1  0.32
+            0 4  0.38
+            0 2  0.26
+            7 3  0.39
+            1 3  0.29
+            2 7  0.34
+            6 2 -1.20
+            3 6  0.52
+            6 0 -1.40
+            6 4 -1.25
+         */
+        EdgeWeightedDigraph G = new EdgeWeightedDigraph(8);
+        // 对所有权重增加1.50
+        G.addEdge(new DirectedEdge(4, 5, 1.85));
+        G.addEdge(new DirectedEdge(5, 4, 1.85));
+        G.addEdge(new DirectedEdge(4, 7, 1.87));
+        G.addEdge(new DirectedEdge(5, 7, 1.78));
+        G.addEdge(new DirectedEdge(7, 5, 1.78));
+        G.addEdge(new DirectedEdge(5, 1, 1.82));
+        G.addEdge(new DirectedEdge(0, 4, 1.88));
+        G.addEdge(new DirectedEdge(2, 0, 1.76));
+        G.addEdge(new DirectedEdge(7, 3, 1.89));
+        G.addEdge(new DirectedEdge(1, 3, 1.79));
+        G.addEdge(new DirectedEdge(2, 7, 1.84));
+        G.addEdge(new DirectedEdge(6, 2, 0.30));
+        G.addEdge(new DirectedEdge(3, 6, 2.02));
+        G.addEdge(new DirectedEdge(6, 0, 0.10));
+        G.addEdge(new DirectedEdge(6, 4, 0.25));
+        
+        // 使用Dijkstra算法
+        int s = 0;
+        DijkstraSP dsp = new DijkstraSP(G, s);
+        for (int t = 0; t < G.V(); t++) {
+            if (dsp.hasPathTo(t)) {
+                System.out.printf("%d to %d (%.2f)  ", s, t, dsp.distTo(t));
+                for (DirectedEdge e : dsp.pathTo(t)) {
+                    System.out.print(e + "   ");
+                }
+                System.out.println();
+            } else {
+                System.out.printf("%d to %d         no path\n", s, t);
+            }
+        }
+    }
+}
+```
+
+结果：
+```text
+0 to 0 (0.00)  
+0 to 1 (5.55)  0->4  1.88   4->5  1.85   5->1  1.82   
+0 to 2 (7.96)  0->4  1.88   4->7  1.87   7->3  1.89   3->6  2.02   6->2  0.30   
+0 to 3 (5.64)  0->4  1.88   4->7  1.87   7->3  1.89   
+0 to 4 (1.88)  0->4  1.88   
+0 to 5 (3.73)  0->4  1.88   4->5  1.85   
+0 to 6 (7.66)  0->4  1.88   4->7  1.87   7->3  1.89   3->6  2.02   
+0 to 7 (3.75)  0->4  1.88   4->7  1.87 
+```
+
+尝试2：取消了Dijkstra算法中对负权重的检测
+```java
+public class Ex4414b {
+    public static void main(String[] args) {
+
+        // 直接读取tinyEWDn.txt
+        EdgeWeightedDigraph G = new EdgeWeightedDigraph(new In(args[0]));
+        
+        // 使用Dijkstra算法
+        int s = 0;
+        DijkstraSP dsp = new DijkstraSP(G, s);
+        for (int t = 0; t < G.V(); t++) {
+            if (dsp.hasPathTo(t)) {
+                System.out.printf("%d to %d (%.2f)  ", s, t, dsp.distTo(t));
+                for (DirectedEdge e : dsp.pathTo(t)) {
+                    System.out.print(e + "   ");
+                }
+                System.out.println();
+            } else {
+                System.out.printf("%d to %d         no path\n", s, t);
+            }
+        }
+    }
+}
+```
+
+结果：
+```text
+0 to 0 (0.00)  
+0 to 1 (0.93)  0->2  0.26   2->7  0.34   7->3  0.39   3->6  0.52   6->4 -1.25   4->5  0.35   5->1  0.32   
+0 to 2 (0.26)  0->2  0.26   
+0 to 3 (0.99)  0->2  0.26   2->7  0.34   7->3  0.39   
+0 to 4 (0.26)  0->2  0.26   2->7  0.34   7->3  0.39   3->6  0.52   6->4 -1.25   
+0 to 5 (0.61)  0->2  0.26   2->7  0.34   7->3  0.39   3->6  0.52   6->4 -1.25   4->5  0.35   
+0 to 6 (1.51)  0->2  0.26   2->7  0.34   7->3  0.39   3->6  0.52   
+0 to 7 (0.60)  0->2  0.26   2->7  0.34
+```
+
+***
+**4.4.15 如果从顶点s到v的路径上存在一个负权重环，调用Bellman-Ford算法的pathTo(v)方法会发生什么？**
+
+*Answer：*
+
+```java
+public Iterable<DirectedEdge> pathTo(int v) {
+    validateVertex(v);
+    if (hasNegativeCycle()) {
+        throw new UnsupportedOperationException("Negative cost cycle exists");
+    }
+    if (!hasPathTo(v)) {
+        return null;
+    }
+    Stack<DirectedEdge> path = new Stack<>();
+    for (DirectedEdge e = edgeTo[v]; e != null; e = edgeTo[e.from()]) {
+        path.push(e);
+    }
+    return path;
+}
+```
+
+根据上述实现，如果存在负权重环，则调用pathTo()时抛出异常。
+
+***
+**4.4.16 假设用EdgeWeightedGraph中的每条边Edge都替换成为两条DirectedEdge的方式将EdgeWeightedGraph类转化为EdgeWeightedDigraph类，然后再使用Bellman-Ford算法处理它。说明为什么这种方法大错特错。**
+
+*Answer：*
+
+***
+**4.4.17 在Bellman-Ford算法中如果一个顶点在同一轮被两次加入队列会发生什么？**
+
+*Answer：*
+
+算法所需的运行时间会达到指数级。
+
+***
+**4.4.18 编写一个CPM用例来打印出所有的关键路径。**
+
+*Answer：*
+
+略。
+
+***
+**4.4.19 找出正文中的例子里权重最低的环（最佳套汇机会）。**
+
+*Answer：*
+
+略。
+
+***
+**4.4.20 从网上或者报纸上找到一张汇率表并用它构造一张套汇表。**
+
+*Answer：*
+
+略。
+
+***
+**4.4.21 用Bellman-Ford算法计算练习4.4.5中的加权有向图的最短路径树并按照正文中的样式给出算法的轨迹。**
+
+*Answer：*
+
+```java
+public class Ex4421 {
+    public static void main(String[] args) {
+        EdgeWeightedDigraph G = new EdgeWeightedDigraph(8);
+        G.addEdge(new DirectedEdge(4, 5, 0.35));
+        G.addEdge(new DirectedEdge(5, 4, 0.35));
+        G.addEdge(new DirectedEdge(4, 7, 0.37));
+        G.addEdge(new DirectedEdge(5, 7, 0.28));
+        G.addEdge(new DirectedEdge(7, 5, 0.28));
+        G.addEdge(new DirectedEdge(5, 1, 0.32));
+        G.addEdge(new DirectedEdge(0, 4, 0.38));
+        G.addEdge(new DirectedEdge(2, 0, 0.26));
+        G.addEdge(new DirectedEdge(7, 3, 0.39));
+        G.addEdge(new DirectedEdge(1, 3, 0.29));
+        G.addEdge(new DirectedEdge(2, 7, 0.34));
+        G.addEdge(new DirectedEdge(6, 2, 0.40));
+        G.addEdge(new DirectedEdge(3, 6, 0.52));
+        G.addEdge(new DirectedEdge(6, 0, 0.58));
+        G.addEdge(new DirectedEdge(6, 4, 0.93));
+
+        int s = 2;
+        BellmanFordSP bfsp = new BellmanFordSP(G, s);
+        for (int t = 0; t < G.V(); t++) {
+            if (bfsp.hasPathTo(t)) {
+                System.out.printf("%d to %d (%.2f)  ", s, t, bfsp.distTo(t));
+                for (DirectedEdge e : bfsp.pathTo(t)) {
+                    System.out.print(e + "   ");
+                }
+                System.out.println();
+            } else {
+                System.out.printf("%d to %d         no path\n", s, t);
+            }
+        }
+    }
+}
+```
+
+***
+
+#### 提高题
+
+***
