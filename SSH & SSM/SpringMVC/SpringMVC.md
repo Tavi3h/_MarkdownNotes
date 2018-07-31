@@ -530,7 +530,7 @@ springmvc.xml：
 
 **（3）后台路径特例**
 
-对于后台路径的参照路径有一个特例：**当代码中使用response.sendRedirect()方法进行重定向时，其参照路径不是Web应用的根路径，而是Web服务器的根路径。**
+对于后台路径的参照路径有一个特例：**当代码中使用`response.sendRedirect()`方法进行重定向时，其参照路径不是Web应用的根路径，而是Web服务器的根路径。**
 
 例如，执行`reponse.sendRedirect("/show.jsp");`将会发生404错误，因为其参照路径是Tomcat的根，而非当前项目的根，所以若要使用重定向：
 
@@ -639,7 +639,7 @@ b、不使用斜杠开头的请求路径
 
 所谓配置式开发是指，“处理器类是程序员手工定义的、实现了特定接口的类，然后再在SpringMVC配置文件中对该类进行显式的、明确的注册”的开发方式。
 
-### 2.1.1 处理器映射器HandlerMapping
+### 2.1 处理器映射器 HandlerMapping
 
 HandlerMapping接口负责根据request请求找到对应的Handler处理器及Interceptor拦截器，并将它们封装在HandlerExecutionChain对象中，返回给中央调度器。
 
@@ -648,7 +648,7 @@ HandlerMapping接口负责根据request请求找到对应的Handler处理器及I
 - BeanNameUrlHandlerMapping
 - SimpleUrlHandlerMapping
 
-#### 2.1.1.1 BeanNameUrlHandlerMapping
+#### 2.1.1 BeanNameUrlHandlerMapping
 
 BeanNameUrlHandlerMapping处理器映射器，会根据请求的Url与Spring容器中定义的处理器bean的name属性值进行匹配，从而在Spring容器中找到处理器bean示例。
 
@@ -678,7 +678,7 @@ protected String[] determineUrlsForHandler(String beanName) {
 
 由于BeanNameUrlHandlerMapping是默认使用的HandlerMapping实现类，所以不用注册。
 
-#### 2.1.1.2 SimpleUrlHandlerMapping
+#### 2.1.2 SimpleUrlHandlerMapping
 
 使用BeanNameUrlHandlerMapping映射器有两点明显的不足：
 
@@ -752,3 +752,466 @@ SimpleUrlHandlerMapping处理器映射器，会根据请求url与Spring容器中
     <entry key="/hello3.do" value-ref="myController" />
 </map>
 ```
+
+### 2.2 处理器适配器 HandlerAdapter
+
+处理器适配器使用适配器模式。适配器模式使得**原本由于接口不兼容而不能一起工作的那些类可以在一起工作。**所以处理器适配器所起到的作用是**将多种处理器（实现了不同接口的处理器），通过处理器适配器的适配，使它们可以进行统一标准的工作，对请求进行统一方式的处理。**
+
+前面的工程中只所以要将Handler定义为Controller接口的实现类，就是因为这里使用的处理器适配器是SimpleControllerHandlerAdapter。这个适配器会将Handler强转为Controller。
+
+HandlerAdapter接口会根据处理器所实现接口的不同，对处理器进行适配，适配后即可对处理器进行执行。通过扩展处理器适配器，可以执行多种类型的处理器。
+
+在得到请求时，中央调度器在`doDispatch()`方法中会遍历处理器适配器，并使用其`support()`方法，判断Handler是否与某个接口具有is-a关系。
+
+中央调度器判断Handler是否与某个接口具有is-a关系：
+
+```java
+protected HandlerAdapter getHandlerAdapter(Object handler) throws ServletException {
+    for (HandlerAdapter ha : this.handlerAdapters) {
+        if (logger.isTraceEnabled()) {
+            logger.trace("Testing handler adapter [" + ha + "]");
+        }
+        if (ha.supports(handler)) {
+            return ha;
+        }
+    }
+    throw new ServletException("No adapter for handler [" + handler +
+            "]: The DispatcherServlet configuration needs to include a HandlerAdapter that supports this handler");
+}
+```
+
+中央调度器得到ha后，会执行以下代码来执行处理器适配器的`handle()`方法：
+
+```java
+// Actually invoke the handler.
+mv = ha.handle(processedRequest, response, mappedHandler.getHandler());
+```
+
+常用的HandlerAdapter接口实现类有两种：
+
+- SimpleControllerHandlerAdapter
+- HttpReuqestHandlerAdapter
+
+#### 2.2.1 SimpleControllerHandlerAdapter
+
+**所有实现了Controller接口的处理器Bean，均是通过此适配器进行适配并执行的。**
+
+SimpleControllerHandlerAdapter的源码如下：
+
+```java
+public class SimpleControllerHandlerAdapter implements HandlerAdapter {
+
+    @Override
+    public boolean supports(Object handler) {
+        return (handler instanceof Controller);
+    }
+
+    @Override
+    public ModelAndView handle(HttpServletRequest request, HttpServletResponse response, Object handler)
+            throws Exception {
+
+        return ((Controller) handler).handleRequest(request, response);
+    }
+
+    @Override
+    public long getLastModified(HttpServletRequest request, Object handler) {
+        if (handler instanceof LastModified) {
+            return ((LastModified) handler).getLastModified(request);
+        }
+        return -1L;
+    }
+
+}
+```
+
+从上述代码可知，当中央调度器在执行`ha.handle()`方法时，这里就会强转后执行我们实现的`handlerRequest()`方法。
+
+该方法用于处理用户提交的请求。通过调用Service层代码，实现对用户请求的计算响应，并将最终计算所得数据及要响应的页面，封装为一个ModelAndView对象返回给中央调度器。
+
+#### 2.2.2 HttpRequestHandlerAdapter
+
+**所有实现了HttpRequestHandler接口的处理器Bean，均通过此适配器进行适配、执行。**
+
+HttpRequestHandler接口只有一个方法：
+
+```java
+void handleRequest(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException;
+```
+
+**该方法没有返回值，不能像ModelAndView一样将数据及目标视图封装为一个对象。但可以将数据直接放入到request、session等的域属性中，并由request或response完成到目标页面的跳转。**
+
+HttpRequestHandlerAdapter的源码：
+
+```java
+public class HttpRequestHandlerAdapter implements HandlerAdapter {
+
+    @Override
+    public boolean supports(Object handler) {
+        return (handler instanceof HttpRequestHandler);
+    }
+
+    @Override
+    public ModelAndView handle(HttpServletRequest request, HttpServletResponse response, Object handler)
+            throws Exception {
+
+        ((HttpRequestHandler) handler).handleRequest(request, response);
+        return null;
+    }
+
+    @Override
+    public long getLastModified(HttpServletRequest request, Object handler) {
+        if (handler instanceof LastModified) {
+            return ((LastModified) handler).getLastModified(request);
+        }
+        return -1L;
+    }
+
+}
+```
+
+从上述代码可知，当中央调度器在执行`ha.handle()`方法时，这里就会强转后执行我们实现的`handlerRequest()`方法。
+
+注意该适配器与SimpleControllerHandlerAdapter的`handle()`方法的不同，该适配器执行`handleRequest()`方法，但是返回null。
+
+*以下内容在工程SpringMVC-10-httpRequestHandlerAdapter中。*
+
+定义处理器，实现HttpRequestHandler接口：
+
+```java
+public class MyController implements HttpRequestHandler {
+
+    @Override
+    public void handleRequest(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        request.setAttribute("message", "Hello SpringMVC World!");
+        request.getRequestDispatcher("/WEB-INF/jsp/welcome.jsp").forward(request, response);
+    }
+
+}
+```
+
+当然，此时无需再配置前缀、后缀了，即再springmvc.xml中无需声明视图解析器的Bean了。
+
+注册处理器Bean：
+
+```xml
+<bean id="/hello.do" class="pers.tavish.handlers.MyController" />    
+```
+
+jsp页面：
+
+```html
+<body>
+
+${message}
+
+</body>
+```
+
+发布后访问hello.do，显示Hello SpringMVC World!
+
+### 2.3 处理器
+
+处理器除了可以实现Controller/HttpRequestHandler接口外，还可以继承自一些其它的类来完成一些特殊的功能。
+
+#### 2.3.1 继承AbstractController类
+
+该抽象类继承了WebContentGenerator并实现了Controller接口：
+
+```java
+public abstract class AbstractController extends WebContentGenerator implements Controller {
+    // ...
+}
+```
+
+**继承该类的类，需要实现抽象方法`handleRequestInternal()`**：
+
+```java
+@Override
+protected ModelAndView handleRequestInternal(HttpServletRequest request, HttpServletResponse response) throws Exception {
+    
+    return null;
+}
+```
+
+这个方法就是我们需要编写的方法。
+
+那么这个方法是在什么时候被调用执行的呢？
+
+AbstractController中定义的`handleRequest()`方法负责调用它：
+
+```java
+@Override
+public ModelAndView handleRequest(HttpServletRequest request, HttpServletResponse response)
+        throws Exception {
+
+    if (HttpMethod.OPTIONS.matches(request.getMethod())) {
+        response.setHeader("Allow", getAllowHeader());
+        return null;
+    }
+
+    // Delegate to WebContentGenerator for checking and preparing.
+    checkRequest(request);
+    prepareResponse(response);
+
+    // Execute handleRequestInternal in synchronized block if required.
+    if (this.synchronizeOnSession) {
+        HttpSession session = request.getSession(false);
+        if (session != null) {
+            Object mutex = WebUtils.getSessionMutex(session);
+            synchronized (mutex) {
+                return handleRequestInternal(request, response);
+            }
+        }
+    }
+
+    return handleRequestInternal(request, response);
+}
+```
+
+**限定请求提交方式：** 
+
+WebContentGenerator类具有supportedMethods属性，可以设置支持的HTTP数据提交方式。默认支持GET、POST。
+
+```java
+
+/** Set of supported HTTP methods */
+private Set<String> supportedMethods;
+
+// ...
+
+/**
+ * Set the HTTP methods that this content generator should support.
+ * <p>Default is GET, HEAD and POST for simple form controller types;
+ * unrestricted for general controllers and interceptors.
+ */
+public final void setSupportedMethods(String... methods) {
+    if (!ObjectUtils.isEmpty(methods)) {
+        this.supportedMethods = new LinkedHashSet<String>(Arrays.asList(methods));
+    }
+    else {
+        this.supportedMethods = null;
+    }
+    initAllowHeader();
+}
+```
+
+若处理器继承自AbstractController类，那么处理器就可以通过属性supportedMethods来限制HTTP请求提交方式了。例如，指定只支持POST的HTTP请求提交方式：
+
+```xml
+<bean id="/hello.do" class="pers.tavish.handlers.MyController">
+    <property name="supportedMethods" value="POST" />
+</bean>    
+```
+
+此时意味着该请求只能通过表单或AJAX请求方式进行提交，而不能通过地址栏、超链接、HTML标签中的src方式进行提交，因为这些提交方式都是GET请求。如果进行提交，则会发生请求方法不允许的405错误。
+
+客户端浏览器常用的请求方式及提交方式：
+
+请求方式|提交方式
+-----|-----
+表单请求 | 默认GET，可以指定POST
+AJAX请求 | 默认GET，可以指定POST
+地址栏请求 | GET请求
+超链接请求 | GET请求
+src资源路径请求 | GET请求
+
+*以下内容在工程SpringMVC-11-abstractController中。*
+
+定义处理器：
+
+```java
+public class MyController extends AbstractController {
+
+    @Override
+    protected ModelAndView handleRequestInternal(HttpServletRequest request, HttpServletResponse response) throws Exception {
+        ModelAndView mv = new ModelAndView();
+        mv.addObject("message", "Hello SpringMVC World!");
+        mv.setViewName("/WEB-INF/jsp/welcome.jsp");
+        return mv;
+    }
+}
+```
+
+注册处理器并限定只能使用POST方法：（如果不限定则GET、POST都支持）
+
+```xml
+<!-- 注册处理器 -->
+<bean id="/hello.do" class="pers.tavish.handlers.MyController" >
+    <property name="supportedMethods" value="POST" /> 
+</bean>  
+```
+
+此时发布程序，使用`http://localhost:8080/SpringMVC-11-abstractController/hello.do`进行请求就会报出405错误。
+
+#### 2.3.1 继承MultiActionController类
+
+MultiActionController类继承自AbstractController并实现了LastModified接口，所以继承MultiActionController的子类也可以设置HTTP请求提交方式。
+
+```java
+public class MultiActionController extends AbstractController implements LastModified {
+    // ...
+}
+```
+
+除此之外，继承自该类的处理器中可以定义任意多个处理方法。这些方法的方法名随意，访问修饰符为public，返回值为ModelAndView，包含参数HttpServletRequest个HttpServletResponse，并抛出Exception异常。
+
+**注意：MultiActionController类已经在4.3版本中被标注为@Deprecated：**
+
+>
+@deprecated as of 4.3, in favor of annotation-driven handler methods
+
+*以下内容在工程SpringMVC-12-multiActionController中。*
+
+修改处理器类：
+
+```java
+public class MyController extends MultiActionController {
+
+    public ModelAndView doFirst(HttpServletRequest request, HttpServletResponse response) throws Exception {
+        ModelAndView mv = new ModelAndView();
+        mv.addObject("message", "执行doFirst()方法");
+        mv.setViewName("/WEB-INF/jsp/welcome.jsp");
+        return mv;
+    }
+    
+    public ModelAndView doSecond(HttpServletRequest request, HttpServletResponse response) throws Exception {
+        ModelAndView mv = new ModelAndView();
+        mv.addObject("message", "执行doSecond()方法");
+        mv.setViewName("/WEB-INF/jsp/welcome.jsp");
+        return mv;
+    }
+}
+```
+
+修改springmvc.xml：
+
+这里需要配置处理器映射器SimpleUrlHandlerMapping，并且其中路径的写法要求必须以/xxx/\*的方式定义映射路径，其中\*为通配符，在访问时使用要访问的方法名代替。**这里的/xxx主要用于对访问路径进行限定。**
+
+```xml
+<!-- 注册处理器映射器 -->
+<bean class="org.springframework.web.servlet.handler.SimpleUrlHandlerMapping">
+    <property name="urlMap">
+        <map>
+            <entry key="/my/*.do" value-ref="myController" />
+        </map>
+    </property>
+</bean>
+
+<!-- 注册处理器 -->
+<bean id="myController" class="pers.tavish.handlers.MyController" />    
+```
+
+程序发布后，分别访问`http://localhost:8080/SpringMVC-12-multiActionController/my/doFirst.do`和`http://localhost:8080/SpringMVC-12-multiActionController/my/doSecond.do`，服务器会执行对应的方法并在页面上显示相关信息。
+
+只所以通过在请求URL中写上方法名就可以访问到指定方法，是因为在MultiActionController类中有一个专门处理方法名称的解析器MethodNameResolver。该解析器作为一个属性出现，具有get和set方法。MethodNameResolver是一个接口，不同的解析器实现类，其对方法名在URL中的写法要求也是不同的。
+
+**注意MethodNameResolver接口及其实现类也已被标记为@deprecated：**
+
+>
+@deprecated as of 4.3, in favor of annotation-driven handler methods
+
+##### 2.3.1.1 InternalPathMethodNameResolver 方法名解析器（默认）
+
+MultiAnctionController类具有一个默认的MethodNameResolver解析器：
+
+```java
+/** Delegate that knows how to determine method names from incoming requests */
+private MethodNameResolver methodNameResolver = new InternalPathMethodNameResolver();
+```
+
+当未显示配置方法名解析器时，该解析器将作为默认方法名解析器对方法名进行解析。
+
+该方法名解析器要求**方法名以URL中资源名称的身份出现**，即方法作为一种可以被请求的资源出现。要求写法为：**/xxx/方法名**。
+
+##### 2.3.1.2 PropertiesMethodNameResolver 方法名解析器
+
+该方法名解析器中的**方法名是作为URL资源名称中的一部分出现的**，即方法名并非单多作为一种资源名称。例如请求时写为/xxx_doFirst，则会访问xxx所映射的处理器的doFirst()方法。
+
+*以下内容在工程SpringMVC-13-multiActionController-2中。*
+
+保持处理器类不变，直接修改springmvc.xml：
+
+```xml
+<!-- 注册处理器映射器 -->
+<bean class="org.springframework.web.servlet.handler.SimpleUrlHandlerMapping">
+    <property name="urlMap">
+        <map>
+            <entry key="/my_*.do" value-ref="myController" />
+        </map>
+    </property>
+</bean>
+
+<!-- 配置方法名解析器 -->
+<bean id="propertiesMethodNameResolver" class="org.springframework.web.servlet.mvc.multiaction.PropertiesMethodNameResolver">
+    <property name="mappings">
+        <props>
+            <prop key="/my_First.do">doFirst</prop>
+            <prop key="/my_Second.do">doSecond</prop>
+        </props>
+    </property>
+</bean>
+
+<!-- 注册处理器 -->
+<bean id="myController" class="pers.tavish.handlers.MyController">
+    <!-- 将配置好的方法名解析器注入给处理器 -->
+    <property name="methodNameResolver" ref="propertiesMethodNameResolver" />
+</bean>
+```
+
+（下划线不是必须的，我们要定义的是映射关系。甚至可以定义/my/First.do与doFirst对应。）
+
+此时可以通过`http://localhost:8080/SpringMVC-13-multiActionController-2/my_First.do`访问`doFirst()`方法，通过`http://localhost:8080/SpringMVC-13-multiActionController-2/my_Second.do`访问doSecond()方法。
+
+##### 2.3.1.3 ParameterMethodNameResolver 方法名解析器
+
+该方法名解析中的**方法名作为请求参数的值出现。**例如请求时可以写为/foo?bar=doFirst，则会访问xxx所映射的处理器的doFirst()方法。其中bar为该请求所携带的参数名，而doFirst则作为其参数值出现。
+
+*以下内容在工程SpringMVC-14-multiActionController-3中。*
+
+直接修改springmvc.xml：
+
+```xml
+<!-- 注册处理器映射器 -->
+<bean class="org.springframework.web.servlet.handler.SimpleUrlHandlerMapping">
+    <property name="urlMap">
+        <map>
+            <entry key="/my.do" value-ref="myController" />
+        </map>
+    </property>
+</bean>
+
+<!-- 配置方法名解析器 -->
+<bean id="parameterMethodNameResolver" class="org.springframework.web.servlet.mvc.multiaction.ParameterMethodNameResolver">
+    <property name="paramName" value="method" />
+</bean>
+
+<!-- 注册处理器 -->
+<bean id="myController" class="pers.tavish.handlers.MyController">
+    <!-- 将配置好的方法名解析器注入给处理器 -->
+    <property name="methodNameResolver" ref="parameterMethodNameResolver" />
+</bean>
+```
+
+上述配置中，paramName属性的值即为请求所携带的方法名。
+
+经过上述配置，现在可以通过请求`http://localhost:8080/SpringMVC-14-multiActionController-3/my.do?method=doFirst`访问doFirst()方法，`http://localhost:8080/SpringMVC-14-multiActionController-3/my.do?method=doSecond`访问doSecond()方法。
+
+注意到ParameterMehodNameResolver类的源码中定义默认的参数名：
+
+```java
+@Deprecated
+public class ParameterMethodNameResolver implements MethodNameResolver {
+
+    /**
+     * Default name for the parameter whose value identifies the method to invoke:
+     * "action".
+     */
+    public static final String DEFAULT_PARAM_NAME = "action";
+
+    // ...
+}
+```
+
+也就是说，当我们配置方法名解析器时，如果不设置paramName属性，那么我们将以类似/my.do?action=doFirst的形式来对相应的方法进行访问。
+
