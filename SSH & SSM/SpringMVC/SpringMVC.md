@@ -140,9 +140,9 @@ springmvc.xml：
 java.io.FileNotFoundException: Could not open ServletContext resource [/WEB-INF/springmvc-servlet.xml]
 ```
 
-容器试图加载WEB-INF下的springmvc-servlet.xml（该文件名中的“springmvc”来自web.xml中servlet-name）但是没有找到该文件。
+容器试图加载`WEB-INF`下的springmvc-servlet.xml（该文件名中的“springmvc”来自web.xml中servlet-name）但是没有找到该文件。
 
-**所以，我们需要将springmvc.xml修改为springmvc-servlet.xml并将其放置于WEB-INF下。**
+**所以，我们需要将springmvc.xml修改为springmvc-servlet.xml并将其放置于`WEB-INF`下。**
 
 再次访问http://localhost:8080/SpringMVC-01-primary/my.do，没有报错，页面显示Hello SpringMVC World!
 
@@ -205,7 +205,7 @@ java.io.FileNotFoundException: Could not open ServletContext resource [/WEB-INF/
 
 #### 1.2.8 注册视图解析器
 
-*以下内容在工程SpringMVC-02-primary中*。
+*以下内容在工程SpringMVC-02-primary-2中*。
 
 由于`mv.setViewName("/WEB-INF/jsp/welcome.jsp");`中参数的写法很繁琐，所以我们注册视图解析器，分离视图的前缀和后缀：
 
@@ -2043,9 +2043,9 @@ protected void doFilterInternal(
 
 #### 3.3.3 校正请求参数名@RequestParam
 
-所谓校正请求参数名，是指若请求URL所携带的参数名称与处理方法中指定参数名不相同时，则需在处理方法参数前添加一个注解`@RequestParams`，指定请求URL所携带参数的名称。该注解加在方法参数上。
+所谓校正请求参数名，是指若请求URL所携带的参数名称与处理方法中指定参数名不相同时，则需在处理方法参数前添加一个注解`@RequestParam`，指定请求URL所携带参数的名称。该注解加在方法参数上。
 
-`@RequestParams`具有四个属性：
+`@RequestParam`具有四个属性：
 
 - **value**：指定请求参数的名称。
 - **name**：value的别名。
@@ -2381,7 +2381,7 @@ public class MyController {
 
 ##### 3.4.2.1 返回内部资源逻辑视图名
 
-若要跳转的资源为内部资源，则视图解析器可以使用`InternalResourceViewResolver`。此时处理器方法返回的字符串就是跳转页面的文件名去掉扩展名后的部分。这个字符串与视图解析器种的prefix、suffix相结合，即可形成要访问的URL。
+若要跳转的资源为内部资源，则视图解析器可以使用`InternalResourceViewResolver`。此时处理器方法返回的字符串就是跳转页面的文件名去掉扩展名后的部分。这个字符串与视图解析器中的`prefix`、`suffix`相结合，即可形成要访问的URL。
 
 *以下内容在工程SpringMVC-30-returnString-internal中。*
 
@@ -2554,7 +2554,7 @@ public class MyController {
 
 引入jQuery库：
 
-由于本工程要使用jQuery的ajax()方法提交Ajax请求，所以需要引入jQuery的库。在WebConten下新建一个Folder，命名为js，将jQuery库文件放入其中，这里使用jquery-3.3.1。
+由于本工程要使用jQuery的ajax()方法提交Ajax请求，所以需要引入jQuery的库。在WebContent下新建一个Folder，命名为js，将jQuery库文件放入其中，这里使用jquery-3.3.1。
 
 定义index页面：
 
@@ -2920,3 +2920,2218 @@ public class MyController {
     <button>提交Ajax请求</button>
 </body>
 ```
+
+## 第四章 SpringMVC核心技术
+
+### 4.1 请求转发与重定向
+
+当处理器对请求处理完毕后，向其它资源进行跳转时有两种方式：请求转发与重定向。而根据所要跳转的资源类型，又可分为两类：跳转到页面与跳转到其它处理器。
+
+**对于请求转发的页面，可以是`WEB-INF`下的页面，而重定向的页面不能为`WEB-INF`下的页面。因为对于重定向，相当于用户再次发出请求，而用户是不能直接访问`WEB-INF`中的资源的。**
+
+#### 4.1.1 返回ModelAndView时的请求转发
+
+默认情况下，当处理器返回`ModelAndView`时，跳转到指定的`View`使用的是请求转发。
+
+我们可以显式的指出，此时需要在`setCViewName()`中指定的视图前添加forward:，此时的视图不会再与视图解析器中的前缀与后缀进行拼接，即必须写出相对于根目录的路径。
+
+##### 4.1.1.1 请求转发到页面
+
+当通过请求转发跳转到目标资源（页面或`Controller`）时，若需要向下传递数据，除了可以使用`request`、`session`外，还可以将数据存放于`ModelAndView`的`ModelMap`中，页面通过EL表达式可直接访问该数据。
+
+*以下内容在工程SpringMVC-39-dispatch-modelAndView-page中。*
+
+修改处理器：
+
+```java
+@Controller  
+@RequestMapping("/test")  
+public class MyController {
+
+    @RequestMapping("/register.do")  
+    public ModelAndView register(Student student) {
+        ModelAndView mv = new ModelAndView();
+        mv.addObject("student", student);
+        mv.setViewName("forward:/WEB-INF/jsp/show.jsp");
+        return mv;
+    }
+}
+```
+
+配置文件：
+
+```xml
+<!-- 注册组件扫描器 -->
+<context:component-scan base-package="pers.tavish.handlers" />   
+```
+
+#####4.1.1.2 请求转发到Controller
+
+*以下内容在工程SpringMVC-40-dispatch-modelAndView-controller中。*
+
+修改处理器：
+
+这里`mv.setViewName("forward:other.do");`不能在other前加/。
+
+```java
+@Controller
+@RequestMapping("/test")
+public class MyController {
+
+    @RequestMapping("/register.do")
+    public ModelAndView register(Student student) {
+        ModelAndView mv = new ModelAndView();
+        mv.addObject("student", student);
+        mv.setViewName("forward:other.do");
+        return mv;
+    }
+
+    @RequestMapping("/other.do")
+    public ModelAndView doOther(Student student) {
+        System.out.println("student = " + student);
+        return new ModelAndView("forward:/WEB-INF/jsp/show.jsp");
+    }
+}
+```
+
+#### 4.1.2 返回ModelAndView时的重定向
+
+返回`ModelAndView`时的重定向，需要在`setViewName()`指定的视图前添加redirect:，此时的视图不会再与视图解析器中的前缀和后缀进行拼接。
+
+重定向的目标资源中，将无法访问用户提交请求`request`中的数据。
+
+##### 4.1.2.1 重定向到页面
+
+在重定向时，请求参数是无法通过`request`的属性向下一级资源中传递的。但可以通过以下方式将请求参数向下传递。
+
+**A. 通过ModelAndView的ModelMap携带参数**
+
+当`ModelAndView`中的`ModelMap`存入数据后，视图解析器`InternalResourceViewResolver`会将map中的key与value以请求参数的形式放到请求的URL后。
+
+需要注意以下几点：
+
+- 视图解析器会将map中的value放入到URL后作为请求参数传递出去，所以无论什么类型的value均会变为`String`。所以，**放入ModelMap中的value，只能是基本数据类型以及`String`类型，不能是自定义类型的对象数据。**
+- 重定向页面中是无法从`request`中读取数据的。但由于map中的key与value以请求参数的形式放到了请求的url后，所以页面可以通过EL表达式中的请求参数`param`读取（${param.xxx}底层执行的是`request.getParameter("xxx")`）。
+- 重定向的页面不能是`/WEB-INF`中的页面。
+
+*以下内容在工程SpringMVC-41-redirect-modelAndView-page中。*
+
+修改处理器：
+
+```java
+@Controller  
+@RequestMapping("/test")  
+public class MyController {
+
+    @RequestMapping("/register.do")  
+    public ModelAndView register(Student student) {
+        ModelAndView mv = new ModelAndView();
+        // 将数据存入ModelAndView
+        mv.addObject("pname", student.getName());
+        mv.addObject("page", student.getAge());
+        mv.setViewName("redirect:/show.jsp");
+        return mv;
+    }
+}
+```
+
+修改show页面的内容及位置：
+
+由于重定向不能访问`WEB-INF`下的资源，所以这里将页面放到项目根路径`WebContent`下。
+
+```html
+<body>
+    name = ${param.pname }
+    <br> 
+    age = ${param.page }
+    <br>
+</body>
+```
+
+**B. 使用HttpSession携带参数**
+
+*以下内容在工程SpringMVC-42-redirect-modelAndView-page-2中。*
+
+修改处理器：
+
+```java
+@Controller  
+@RequestMapping("/test")  
+public class MyController {
+
+    @RequestMapping("/register.do")  
+    public ModelAndView register(HttpSession session, Student student) {
+        // 将数据存入Session
+        session.setAttribute("myStudent", student);
+        return new ModelAndView("redirect:/show.jsp");
+    }
+}
+```
+
+修改show页面：
+
+```html
+<body>
+    student = ${sessionScope.myStudent}
+</body>
+```
+
+##### 4.1.2.2 重定向到Controller
+
+重定向到其它`Controller`时，若要携带参数，完全可以采用前面的方式。而对于目标Controller接收这些参数，则各不相同。
+
+**A. 通过ModelAndView的ModelMap携带参数**
+
+目标`Controller`在接收这些参数时，只要保证目标`Controller`的方法参数名称与发送`Controller`的参数名称相同即可接收。当然，目标`Controller`也可以进行参数的整体接收，只要保证参数名称与目标`Controller`接收参数类型的属性名相同即可。
+
+*以下内容在工程SpringMVC-43-redirect-modelAndView-controller中。*
+
+修改处理器：
+
+参数逐个接收，要保证`addObject()`存入时使用的名称与目标`Controller`的参数名相同。
+
+在从重定向到`Controller`时，路径不能加/。
+
+```java
+@Controller
+@RequestMapping("/test")
+public class MyController {
+
+    @RequestMapping("/register.do")
+    public ModelAndView register(Student student) {
+        ModelAndView mv = new ModelAndView();
+        mv.addObject("pname", student.getName());
+        mv.addObject("page", student.getAge());
+        mv.setViewName("redirect:other.do");
+        return mv;
+    }
+
+    @RequestMapping("/other.do")
+    public ModelAndView doOther(String pname, int page) {
+        ModelAndView mv = new ModelAndView();
+        mv.addObject("student", new Student(pname, page));
+        mv.setViewName("forward:/WEB-INF/jsp/show.jsp");
+        return mv;
+    }
+}
+```
+
+整体接收：
+
+```java
+@Controller
+@RequestMapping("/test")
+public class MyController {
+
+    @RequestMapping("/register.do")
+    public ModelAndView register(Student student) {
+        ModelAndView mv = new ModelAndView();
+        mv.addObject("name", student.getName());
+        mv.addObject("age", student.getAge());
+        mv.setViewName("redirect:other.do");
+        return mv;
+    }
+
+    @RequestMapping("/other.do")
+    public ModelAndView doOther(Student student) {
+        ModelAndView mv = new ModelAndView();
+        mv.addObject("student", student);
+        mv.setViewName("forward:/WEB-INF/jsp/show.jsp");
+        return mv;
+    }
+}
+```
+
+**B. 使用HttpSession携带参数**
+
+*以下内容在工程SpringMVC-44-redirect-modelAndView-controller-2中。*
+
+修改处理器：
+
+```java
+@Controller
+@RequestMapping("/test")
+public class MyController {
+
+    @RequestMapping("/register.do")
+    public ModelAndView register(HttpSession session, Student student) {
+        session.setAttribute("student", student);
+        return new ModelAndView("redirect:other.do");
+    }
+
+    @RequestMapping("/other.do")
+    public ModelAndView doOther(HttpSession session) {
+        Student student = (Student) session.getAttribute("student");
+        System.out.println(student);
+        return new ModelAndView("forward:/WEB-INF/jsp/show.jsp");
+    }
+}
+```
+
+show页面：
+
+```html
+<body>
+    student = ${sessionScope.student}
+</body>
+```
+
+#### 4.1.3 返回String时的请求转发
+
+当处理器方法返回`String`时，该`String`即为要跳转的视图。在其前面加上前缀forward:，即可显式指定跳转方式为请求转发。同样地，视图解析器此时不会对其进行前缀与后缀的拼接。请求转发的目标无论是一个页面还是一个`Controller`，用法相同。
+
+##### 4.1.3.1 请求转发到页面
+
+*以下内容在工程SpringMVC-45-dispatch-String-page中。*
+
+修改处理器：
+
+```java
+@Controller  
+@RequestMapping("/test")  
+public class MyController {
+
+    @RequestMapping("/register.do")  
+    public String register(Student student) {
+        // 对象已经被存放到了request域属性中
+        // 此时要单独取name和age的数据需要使用param
+        return "forward:/WEB-INF/jsp/show.jsp";
+    }
+}
+```
+
+show页面：
+
+```html
+<body>
+    name = ${param.name}<br>
+    age = ${param.age}<br>
+    student = ${requestScope.student}<br>
+</body>
+```
+
+##### 4.1.3.2 请求转发到Controller
+
+*以下内容在工程SpringMVC-46-dispatch-String-controller中。*
+
+修改处理器：
+
+```java
+@Controller
+@RequestMapping("/test")
+public class MyController {
+
+    @RequestMapping("/register.do")
+    public String register(Student student) {
+        return "forward:other.do";
+    }
+
+    @RequestMapping("/other.do")
+    public String doOther(Student student) {
+        System.out.println("student = " + student);
+        return "forward:/WEB-INF/jsp/show.jsp";
+    }
+}
+```
+
+show页面：
+
+```html
+<body>
+    student = ${student}
+</body>
+```
+
+#### 4.1.4 返回String时的重定向
+
+处理器方法返回的视图字符串的前面添加前缀redirect:，就可以实现重定向跳转。
+
+当重定向到目标资源时，若需要向下传递参数值，除了可以直接通过请求URL携带参数，通过`HttpSession`携带参数外，还可以使用其它方式。
+
+##### 4.1.4.1 重定向到页面
+
+**A. 通过`Model`携带参数**
+
+可以在`Controller`形参中添加`Model`参数，将要传递的数据放入`Model`中进行参数传递。该方式同样也是将参数拼接到了重定向请求的URL后，所以放入其中的数据只能是基本类型数据和`String`，不能是自定义类型。
+
+*以下内容在工程SpringMVC-47-redirect-String-page中。*
+
+修改处理器：
+
+```java
+@Controller  
+@RequestMapping("/test")  
+public class MyController {
+
+    @RequestMapping("/register.do")  
+    public String register(Student student, Model model) {
+        model.addAttribute("pname", student.getName());
+        model.addAttribute("page", student.getAge());
+        return "redirect:/show.jsp";
+    }
+}
+```
+
+show页面：
+
+```html
+<body>
+    name = ${param.pname }
+    <br> 
+    age = ${param.page }
+    <br>
+</body>
+```
+
+**B. 通过RedirectAttributes携带参数**
+
+`RedirectAttributes`是Spring3.1后新增的功能，专门是用于携带重定向参数的。它是一个继承了`Model`的接口：
+
+```java
+public interface RedirectAttributes extends Model {
+    // ...
+}
+```
+
+其实现类为`RedirectAttributesModelMap`，这个类继承了`ModelMap`：
+
+```java
+public class RedirectAttributesModelMap extends ModelMap implements RedirectAttributes {
+    // ...
+}
+```
+
+通过这个类的`addAttribute()`方法会将键值对存入map中，然后视图解析器会将其拼接到请求的URL之后，所以这种携带参数的方式也不能携带自定义对象。
+
+*以下内容在工程SpringMVC-48-redirect-String-page-2中。*
+
+修改处理器：
+
+```java
+@Controller  
+@RequestMapping("/test")  
+public class MyController {
+
+    @RequestMapping("/register.do")  
+    public String register(Student student, RedirectAttributes ra) {
+        ra.addAttribute("pname", student.getName());
+        ra.addAttribute("page", student.getAge());
+        return "redirect:/show.jsp";
+    }
+}
+```
+
+修改配置文件：
+
+由于`RedirectAttributes`是接口，而这个接口参数的实参是由mvc的注解驱动为其自动赋的值，所以要配置mvc注解驱动。
+
+```xml
+<!-- 注册组件扫描器 -->
+<context:component-scan base-package="pers.tavish.handlers" />   
+    
+<!-- 注册mvc注解驱动 -->
+<mvc:annotation-driven />
+```
+
+show页面：
+
+```html
+<body>
+    name = ${param.pname }
+    <br> 
+    age = ${param.page }
+    <br>
+</body>
+```
+
+##### 4.1.4.2 重定向到Controller
+
+重定向到`Controller`时，携带参数的方式除了可以使用请求URL后携带方式，`HttpSession`携带方式，`Model`携带方式以及`RedirectAttributes`的`addAttribute()`方式外，还可以使用`RedirectAttributes`的`addFlashAttribute()`携带方式。
+
+**A. 通过Model携带参数**
+
+*以下内容在工程SpringMVC-49-redirect-String-controller中。*
+
+修改处理器：
+
+```java
+@Controller
+@RequestMapping("/test")
+public class MyController {
+
+    @RequestMapping("/register.do")
+    public String register(Student student, Model model) {
+        model.addAttribute("pname", student.getName());
+        model.addAttribute("page", student.getAge());
+        return "redirect:other.do";
+    }
+
+    @RequestMapping("/other.do")
+    public String doOther(String pname, int page) {
+        return "forward:/WEB-INF/jsp/show.jsp";
+    }
+}
+```
+
+show页面：
+
+```html
+<body>
+    pname = ${param.pname}
+    <br>
+    page = ${param.page}
+    <br>
+</body>
+```
+
+**通过RedirectAttributes的addFlashAttribute()携带参数**
+
+`RedirectAttributes`的`addFlashAttribute()`携带方式不会将放入其中的属性值通过请求URL传递，所以可以存放**任意对象**。
+
+`addFlashAttribute()`方法的原理是将其中数据临时性的放入`HttpSession`中。一旦目标`Controller`接收到了这个数据，则系统会立即将这个放入到`HttpSession`中的数据删除。
+
+*以下内容在工程SpringMVC-50-redirect-String-controller-2中。*
+
+修改处理器：
+
+```java
+@Controller
+@RequestMapping("/test")
+public class MyController {
+
+    @RequestMapping("/register.do")
+    public String register(Student student, RedirectAttributes ra) {
+        ra.addFlashAttribute("student", student);
+        return "redirect:other.do";
+    }
+
+    @RequestMapping("/other.do")
+    public String doOther(Student student) {
+        System.out.println(student);
+        return "forward:/WEB-INF/jsp/show.jsp";
+    }
+}
+```
+
+show页面：
+
+```html
+<body>
+    name = ${student.name}
+    <br>
+    age = ${student.age}
+    <br>
+</body>
+```
+
+注册mvc注解驱动：
+
+```xml
+<!-- 注册组件扫描器 -->
+<context:component-scan base-package="pers.tavish.handlers" />
+   
+<!-- 注册mvc注解驱动 -->
+<mvc:annotation-driven />
+```
+
+发布运行后，在页面显示数据后，如果刷新，数据将消失。
+
+#### 4.1.5 返回void时的请求转发
+
+当处理器方法返回void时，若要实现请求转发，则需要使用`HttpServletRequest`的请求转发方法。无论下一级资源是页面还是`Controller`，用法相同。
+
+不过需要注意的是，若有数据需要向下一级资源传递，则需要将资源放入到`request`或`session`中。不能将数据放到`Model`、`RedirectAttributes`中。因为它们中的数据都是通过拼接到处理器方法的返回值中，作为请求的一部分向下传递的。这里没有返回值，所以不能这样使用。
+
+##### 4.1.5.1 请求转发到页面
+
+*以下内容在工程SpringMVC-51-dispatch-void-page中。*
+
+修改处理器：
+
+```java
+@Controller
+@RequestMapping("/test")
+public class MyController {
+
+    @RequestMapping("/register.do")
+    public void register(Student student, HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        request.setAttribute("student", student);
+        request.getRequestDispatcher("forward:/WEB-INF/jsp/show.jsp").forward(request, response);
+    }
+}
+```
+
+show页面：
+
+```html
+<body>
+    student = ${student}
+</body>
+```
+
+##### 4.1.5.2 请求转发到Controller
+
+*以下内容在工程SpringMVC-52-dispatch-void-controller中。*
+
+修改处理器：
+
+```java
+@Controller
+@RequestMapping("/test")
+public class MyController {
+
+    @RequestMapping("/register.do")
+    public void register(Student student, HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        
+        request.setAttribute("student", student);
+        request.getRequestDispatcher("other.do").forward(request, response);
+    }
+
+    @RequestMapping("/other.do")
+    public ModelAndView doOther(Student student) {
+        System.out.println("student = " + student);
+        return new ModelAndView("forward:/WEB-INF/jsp/show.jsp");
+    }
+}
+```
+
+show页面：
+
+```html
+<body>
+    student = ${student}
+</body>
+```
+
+#### 4.1.6 返回void时的重定向
+
+当处理器方法返回`void`时，若要实现重定向，则需要使用`HttpServletResponse`的重定向方法`sendRedirect()`。如果需要向下一级资源传递数据，则需要将数据放到`session`中。
+
+##### 4.1.6.1 重定向到页面
+
+*以下内容在工程SpringMVC-53-redirect-void-page中。*
+
+修改处理器：
+
+```java
+@Controller
+@RequestMapping("/test")
+public class MyController {
+
+    @RequestMapping("/register.do")
+    public void register(Student student, HttpSession session, HttpServletRequest request, HttpServletResponse response)
+            throws IOException {
+        session.setAttribute("student", student);
+        response.sendRedirect(request.getContextPath() + "/show.jsp");
+    }
+}
+```
+
+show页面：
+
+```html
+<body>
+    name = ${student.name}
+    <br> 
+    age = ${student.age}
+    <br>
+</body>
+```
+
+##### 4.1.6.2 重定向到Controller
+
+*以下内容在工程SpringMVC-54-redirect-void-controller中。*
+
+修改处理器：
+
+```java
+@Controller
+@RequestMapping("/test")
+public class MyController {
+
+    @RequestMapping("/register.do")
+    public void register(Student student, HttpSession session, HttpServletResponse response) throws IOException {
+        session.setAttribute("student", student);
+        response.sendRedirect("other.do");
+    }
+
+    @RequestMapping("/other.do")
+    public void doOther(Student student, HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        request.getRequestDispatcher("/WEB-INF/jsp/show.jsp").forward(request, response);
+    }
+}
+```
+
+show页面：
+
+```html
+<body>
+    student = ${student}
+</body>
+```
+
+### 4.2 异常处理
+
+常用的SpringMVC异常处理方式主要有3种：
+
+- 使用系统定义好的异常处理器`SimpleMappingExceptionResolver`
+- 使用自定义异常处理器
+- 使用异常处理注解
+
+#### 4.2.1 SimpleMappingExceptionResolver异常处理器
+
+该方式只需要在SpringMVC配置文件中注册该异常处理器bean即可。该bean没有id属性，无需显式调用或被注入给其它bean，当异常发生时会自动执行该类。
+
+*以下内容在工程SpringMVC-55-exception-simpleMappingExceptionResolver中。*
+
+定义三个自定义异常类：
+
+```java
+public class StudentException extends Exception {
+
+    private static final long serialVersionUID = 7489792731688316840L;
+
+    public StudentException() {
+        super();
+    }
+
+    public StudentException(String message) {
+        super(message);
+    }
+
+}
+```
+
+```java
+public class NameException extends StudentException {
+
+    private static final long serialVersionUID = 7153742242691952830L;
+
+    public NameException() {
+        super();
+    }
+
+    public NameException(String message) {
+        super(message);
+    }
+
+}
+```
+
+```java
+public class AgeException extends StudentException {
+
+    private static final long serialVersionUID = -1083469879979587173L;
+
+    public AgeException() {
+        super();
+    }
+
+    public AgeException(String message) {
+        super(message);
+    }
+
+}
+```
+
+修改处理器：
+
+```java
+@Controller  
+@RequestMapping("/test")  
+public class MyController {
+
+    @RequestMapping("/register.do")  
+    public ModelAndView register(String name, int age) throws StudentException {
+        
+        if (!"张三".equals(name)) {
+            throw new NameException("姓名不正确");
+        }
+        
+        if (age > 50) {
+            throw new AgeException("年龄太大");
+        }
+        
+        ModelAndView mv = new ModelAndView("/WEB-INF/jsp/show.jsp");
+        mv.addObject("name", name);
+        mv.addObject("age", age);
+        
+        return mv;
+    }
+}
+```
+
+注册异常处理器：
+
+```xml
+<!-- 注册组件扫描器 -->
+<context:component-scan base-package="pers.tavish.handlers" />
+
+<!-- 注册异常处理器 -->
+<bean class="org.springframework.web.servlet.handler.SimpleMappingExceptionResolver">
+    <property name="exceptionMappings">
+        <props>
+            <prop key="pers.tavish.exceptions.NameException">/errors/nameErrors.jsp</prop>
+            <prop key="pers.tavish.exceptions.AgeException">/errors/ageErrors.jsp</prop>
+        </props>
+    </property>
+    <property name="defaultErrorView" value="/errors/defaultErrors.jsp" />
+    <property name="exceptionAttribute" value="ex" />
+</bean>
+```
+
+- exceptionMappings：`Properties`类型属性，用于指定具体的不同类型的异常所对应的异常响应页面。key为异常类的全限定性类名，value为响应页面路径。
+- defaultErrorView：指定默认的异常响应页面。若发生的异常不是`exceptionMappings`中指定的异常，则使用默认异常响应页面。
+- exceptionAttribute：捕获到的异常对象，一般在异常响应页面中使用。
+
+定义异常响应页面：
+
+```html
+<body>
+    defaultErrors page
+    <br>
+    <hr>
+    ${ex.message}
+    <br>
+</body>
+```
+
+```html
+<body>
+    nameErrors page
+    <br>
+    <hr>
+    ${ex.message}
+    <br>
+</body>
+```
+
+```html
+<body>
+    ageErrors page
+    <br>
+    <hr>
+    ${ex.message}
+    <br>
+</body>
+```
+
+#### 4.2.2 自定义异常处理器
+
+使用SpringMVC定义的`SimpleMappingExceptionResolver`异常处理器可以实现发生指定异常后的跳转。但若要实现在捕获到指定异常时执行一些操作的目的，它时完成不了的。此时需要自定义异常处理器。
+
+自定义异常处理器需要实现`HandlerExceptionResolver`接口，并且在配置文件中进行注册。
+
+*以下内容在工程SpringMVC-56-exception-customExceptionResolver中。*
+
+定义异常处理器：
+
+```java
+public class MyExceptionResolver implements HandlerExceptionResolver {
+
+    @Override
+    public ModelAndView resolveException(HttpServletRequest request, HttpServletResponse reponse, Object handler,
+            Exception ex) {
+        
+        ModelAndView mv = new ModelAndView();
+        
+        // 将异常对象加入数据模型中
+        mv.addObject("ex", ex);
+        
+        // 设置默认错误响应页面
+        mv.setViewName("/errors/defaultErrors.jsp");
+        
+        // 设置NameException响应页面
+        if (ex instanceof NameException) {
+            mv.setViewName("/errors/nameErrors.jsp");
+        }
+        
+        // 设置AgeException响应页面
+        if (ex instanceof AgeException) {
+            mv.setViewName("/errors/ageErrors.jsp");
+        }
+        
+        return mv;
+    }
+
+}
+```
+
+注册异常处理器：
+
+```xml
+<!-- 注册组件扫描器 -->
+<context:component-scan base-package="pers.tavish.handlers" />
+
+<!-- 注册异常处理器 -->
+<bean class="pers.tavish.resolvers.MyExceptionResolver" />
+```
+
+#### 4.2.3 异常处理注解
+
+使用注解`@ExceptionHandler`可以将一个方法指定为异常处理方法。该注解只有一个属性`value`，为一个`Class<?>`数组，用于指定该注解的方法所要处理的异常类，即所要处理的异常。
+
+被注解的方法，器返回值可以是`ModelAndView`、`String`或`void`，方法名随意，方法参数可以是`Exception`及其子类对象、`HttpServletRequest`、`HttpServletResponse`等，系统会自动为这些方法赋值。
+
+对于异常处理注解的用法，也可以直接将异常处理方法注解于`Controller`之中。
+
+例如：
+
+```java
+@Controller  
+@RequestMapping("/test")  
+public class MyController {
+
+    @RequestMapping("/register.do")  
+    public String register(String name, int age) throws StudentException {
+        
+        if (!"张三".equals(name)) {
+            throw new NameException("姓名不正确");
+        }
+        
+        if (age > 50) {
+            throw new AgeException("年龄太大");
+        }
+        
+        return "/WEB-INF/jsp/show.jsp";
+    }
+    
+    // NameException异常处理
+    @ExceptionHandler(NameException.class)
+    public ModelAndView handleNameException(Exception ex) {
+        ModelAndView mv = new ModelAndView();
+        mv.addObject("ex", ex);
+        mv.setViewName("/errors/nameErrors");
+        return mv;
+    }
+    
+    // AgeException异常处理
+    // ...
+}
+```
+
+不过通常不这样使用。而是将异常处理方法专门定义在一个`Controller`中，让其它`Controller`继承该`Controller`即可。但是，这种用法的弊端也很明显。这个`Controller`将唯一一次的继承机会用掉了，使得它无法再继承其它类。
+
+*以下内容在工程SpringMVC-57-exception-annotationExceptionResolver中。*
+
+定义异常处理的处理器：
+
+```java
+@Controller
+public class MyExceptionResolver {
+
+    // NameException异常处理
+    @ExceptionHandler(NameException.class)
+    public ModelAndView handleNameException(Exception ex) {
+
+        ModelAndView mv = new ModelAndView();
+        mv.addObject("ex", ex);
+        mv.setViewName("/errors/nameErrors.jsp");
+
+        return mv;
+    }
+
+    // AgeException异常处理
+    @ExceptionHandler(AgeException.class)
+    public ModelAndView handleAgeException(Exception ex) {
+
+        ModelAndView mv = new ModelAndView();
+        mv.addObject("ex", ex);
+        mv.setViewName("/errors/nameErrors.jsp");
+
+        return mv;
+    }
+
+    // 其它异常处理
+    @ExceptionHandler
+    public ModelAndView handleOtherException(Exception ex) {
+        
+        ModelAndView mv = new ModelAndView();
+        mv.addObject("ex", ex);
+        mv.setViewName("/errors/defaultErrors.jsp");
+
+        return mv;
+    }
+}
+```
+
+修改处理器：
+
+```java
+@Controller  
+@RequestMapping("/test")  
+public class MyController extends MyExceptionResolver {
+
+    @RequestMapping("/register.do")  
+    public ModelAndView register(String name, int age) throws StudentException {
+        
+        if (!"张三".equals(name)) {
+            throw new NameException("姓名不正确");
+        }
+        
+        if (age > 50) {
+            throw new AgeException("年龄太大");
+        }
+        
+        ModelAndView mv = new ModelAndView("forward:/WEB-INF/jsp/show.jsp");
+        mv.addObject("name", name);
+        mv.addObject("age", age);
+        
+        return mv;
+    }
+}
+```
+
+这里无需对异常处理器进行注册。
+
+### 4.3 类型转换器
+
+在前面的程序中，表单提交的无论是`int`还是`double`类型的请求参数，用于处理该请求的处理器方法的形参均可直接接受到响应类型的相应数据，而非收到`String`再手工转换。这是因为在SpringMVC框架中有默认的类型转换器。这些默认的类型转换器，可以将`String`类型的数据自动转换为响应类型。
+
+但默认的类型转换器并不是可以将用户提交的`String`转换为用户所需的所有类型。此时就需要自定义类型转换器了。
+
+例如，在SpringMVC的默认类型转换器中，没有日期类型转换器，因为日期的格式太多。若要使表单中提交的日期字符串，被处理器方法形参直接接收为`java.util.Date`，则需要我们自定义类型转换器。
+
+#### 4.3.1 搭建测试环境
+
+以下内容在工程SpringMVC-58-typeConverter中。
+
+修改index页面：
+
+```html
+<body>
+    <form action="test/register.do" method="POST">
+        <label>
+            年龄：
+            <input type="text" name="age" />
+        </label>
+        <br>
+        <label>
+            生日：
+            <input type="text" name="birthday" />
+        </label>
+        <br>
+        <input type="submit" value="注册" />
+    </form>
+</body>
+```
+
+修改处理器：
+
+```java
+@Controller  
+@RequestMapping("/test")  
+public class MyController {
+
+    @RequestMapping("/register.do")  
+    public ModelAndView register(int age, Date birthday) {
+        System.out.println("age = " + age);
+        System.out.println("birthday = " + birthday);
+        ModelAndView mv = new ModelAndView("/WEB-INF/jsp/show.jsp");
+        mv.addObject("age", age);
+        mv.addObject("birthday", birthday);
+        return mv;
+    }
+}
+```
+
+修改show页面：
+
+```html
+<body>
+    <h1>Convert Success</h1>
+
+    age = ${age}
+    <br>
+    birthday = ${birthday}
+    <br>
+</body>
+```
+
+修改配置文件：
+
+```xml    
+<!-- 注册组件扫描器 -->
+<context:component-scan base-package="pers.tavish.handlers" />  
+```
+
+#### 4.3.2 自定义类型转换器
+
+若要定义类型转换器，则需要实现`Converter`接口。该接口有两个泛型：
+
+- 待转换类型
+- 目标类型
+
+接口方法为`convert()`，用于完成类型转换：
+
+```java
+public class MyDateConverter implements Converter<String, Date> {
+
+    @Override
+    public Date convert(String source) {
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd");
+        try {
+            return sdf.parse(source);
+        } catch (ParseException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+}
+```
+
+#### 4.3.3 对类型转换器的配置
+
+类型转换器定义完毕后，需要在SpringMVC的配置文件中对类型转换进行配置。首先要注册类型转换器，然后再注册一个转换服务bean，将类型转换器注入给该转换服务bean。最后由处理器适配器来使用该转换服务bean。
+
+##### 4.3.3.1 注册类型转换器
+
+```xml
+<!-- 注册类型转换器 -->
+<bean id="dataConverter" class="pers.tavish.converters.MyDateConverter"/>
+```
+
+##### 4.3.3.2 创建转换服务bean
+
+对于类型转换器，并不是直接使用的，而是通过转换服务bean来调用类型转换器。而转换服务bean的创建由转换服务工厂bean----ConversionServiceFactoryBean完成。
+
+该bean有一个Set集合属性`converters`，用于指定该转换服务可以完成的转换，即可以使用的转换器。
+
+```xml
+<!-- 注册转换服务bean -->
+<bean id="conversionService" class="org.springframework.context.support.ConversionServiceFactoryBean">
+    <property name="converters" ref="dataConverter" />
+</bean>
+```
+
+如果我们有多个转换器，则可以这样注册：
+
+```xml
+<bean id="conversionService" class="org.springframework.context.support.ConversionServiceFactoryBean">
+    <property name="converters">
+        <set>
+            <ref bean="converter1" />
+            <ref bean="converter2" />
+            <ref bean="converter3" />
+            <!-- other converter -->
+        </set>
+    </property>
+</bean>
+```
+
+##### 4.3.3.3 使用转换服务bean
+
+转换服务bean是由处理器适配器直接调用的。采用mvc的注解驱动注册方式，可以将转换服务直接注入给处理器适配器：
+
+```xml
+<!-- 注册mvc注解驱动 -->
+<mvc:annotation-driven conversion-service="conversionService" />
+```
+
+##### 4.3.3.4 总的配置情况
+
+```xml
+<!-- 注册组件扫描器 -->
+<context:component-scan base-package="pers.tavish.handlers" />   
+    
+<!-- 注册类型转换器 -->
+<bean id="dataConverter" class="pers.tavish.converters.MyDateConverter"/>
+    
+<!-- 注册转换服务bean -->
+<bean id="conversionService" class="org.springframework.context.support.ConversionServiceFactoryBean">
+    <property name="converters" ref="dataConverter" />
+</bean>
+    
+<!-- 注册mvc注解驱动 -->
+<mvc:annotation-driven conversion-service="conversionService" />
+```
+
+#### 4.3.4 接收多种日期格式的类型转换器
+
+*以下内容在工程SpringMVC-59-typeConverter-2中。*
+
+要求日期格式可以为“yyyy/MM/dd”、“yyyy-MM-dd”或“yyyyMMdd”。
+
+直接修改类型转换器：
+
+```java
+public class MyDateConverter implements Converter<String, Date> {
+
+    @Override
+    public Date convert(String source) {
+
+        SimpleDateFormat sdf = getSimpleDateFormat(source);
+        try {
+            return sdf.parse(source);
+        } catch (ParseException e) {
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+
+    private SimpleDateFormat getSimpleDateFormat(String source) {
+        SimpleDateFormat sdf = null;
+        if (Pattern.matches("^\\d{4}/\\d{2}/\\d{2}$", source)) {
+            sdf = new SimpleDateFormat("yyyy/MM/dd");
+        } else if (Pattern.matches("^\\d{4}-\\d{2}-\\d{2}$", source)) {
+            sdf = new SimpleDateFormat("yyyy-MM-dd");
+        } else if (Pattern.matches("^\\d{4}\\d{2}\\d{2}$", source)) {
+            sdf = new SimpleDateFormat("yyyyMMdd");
+        }
+        return sdf;
+    }
+
+}
+```
+
+#### 4.3.5 数据回显
+
+当数据类型转换发生异常时，需要返回到表单页面，让用户重新填写。但正常情况下发生类型转换异常，系统会自动跳转到400页面。所以，若要在发生类型转换异常后，跳转到指定页面，则需要将异常捕获，然后通过异常处理器跳转到指定页面。
+
+若仅仅是完成跳转，则使用系统定义的`SimpleMappingExceptionResolver`就可以了。但是当页面返回到表单页面后，还需要将用户原来填写的数据显式出来，让用户更正填错的数据。也就是还需要完成数据回显功能，此时就需要自定义异常处理器了。
+
+*以下内容在工程SpringMVC-60-typeConverter-3中。*
+
+##### 4.3.5.1 修改处理器
+
+数据回显原理：在异常处理器中，通过`request.getParameter()`获取用户输入的表单原始数据，然后存入`ModelAndView`中，之后使用EL表达式读出。
+
+这里异常处理器要处理的异常是`TypeMismatchException`。
+
+```java
+@Controller
+@RequestMapping("/test")
+public class MyController {
+
+    @RequestMapping("/register.do")
+    public ModelAndView register(int age, Date birthday) {
+        System.out.println("age = " + age);
+        System.out.println("birthday = " + birthday);
+        ModelAndView mv = new ModelAndView("/WEB-INF/jsp/show.jsp");
+        mv.addObject("age", age);
+        mv.addObject("birthday", birthday);
+        return mv;
+    }
+
+    @ExceptionHandler(TypeMismatchException.class)
+    public ModelAndView exceptionResolver(Exception ex, HttpServletRequest request) {
+        ModelAndView mv = new ModelAndView();
+        mv.addObject("ex", ex);
+
+        String age = request.getParameter("age");
+        String birthday = request.getParameter("birthday");
+
+        mv.addObject("age", age);
+        mv.addObject("birthday", birthday);
+
+        mv.setViewName("/index.jsp");
+
+        return mv;
+    }
+}
+```
+
+##### 4.3.5.2 修改页面表单
+
+```html
+<body>
+    ${ex.message}
+    <br>
+    <form action="test/register.do" method="POST">
+        <label>
+            年龄：
+            <input type="text" name="age" value="${age}" />
+        </label>
+        <br>
+        <label>
+            生日：
+            <input type="text" name="birthday" value="${birthday}" />
+        </label>
+        <br>
+        <input type="submit" value="注册" />
+    </form>
+</body>
+```
+
+##### 4.3.5.3 修改类型转换器
+
+以上代码只能解决当年龄输入有误，但日期输入正确的回显问题。但若日期输入有误，年龄输入正确，将无法实现回显。因为当日期格式输入有误时，`SimpleDateFormat`的`parse()`方法将抛出`ParseException`，而非`TypeMismatchException`。
+
+那么，让异常该处理器再捕获`ParseException`完成跳转不就可以了吗？很遗憾，转换器接口`Converter<S, T>`的`convert()`方法是没有抛出异常的，也就是说我们所实现的自定义类型转换器中的`convert()`方法不能抛出异常，对异常的处理方式必须为`try-catch`。这样的话，异常处理器也就无法捕获到`ParseException`了。
+
+解决的策略是当用户输入的日期格式不符合要求时，手工抛出一个类型匹配异常。
+
+```java
+public class MyDateConverter implements Converter<String, Date> {
+
+    @Override
+    public Date convert(String source) {
+
+        SimpleDateFormat sdf = getSimpleDateFormat(source);
+        try {
+            return sdf.parse(source);
+        } catch (ParseException e) {
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+
+    private SimpleDateFormat getSimpleDateFormat(String source) {
+        SimpleDateFormat sdf = null;
+        if (Pattern.matches("^\\d{4}/\\d{2}/\\d{2}$", source)) {
+            sdf = new SimpleDateFormat("yyyy/MM/dd");
+        } else if (Pattern.matches("^\\d{4}-\\d{2}-\\d{2}$", source)) {
+            sdf = new SimpleDateFormat("yyyy-MM-dd");
+        } else if (Pattern.matches("^\\d{4}\\d{2}\\d{2}$", source)) {
+            sdf = new SimpleDateFormat("yyyyMMdd");
+        } else {
+            throw new TypeMismatchException("", Date.class);
+        }
+        return sdf;
+    }
+}
+```
+
+不过，对于`TypeMismatchException`类，其没有无参构造器，这里使用了一个带有两个参数的构造器。
+
+- 第一个参数：要匹配的值
+- 第二个参数：要匹配的类型
+
+即当第一个参数的类型与第二个参数的类型没有is-a关系时，该异常发生。
+
+由于本例中要判断的值确定是`String`类型，而目标类型为`Date`类型，所以第一个参数可以写一个`String`类型常量。因为这里判断的与具体的数值无关，只与类型相关。
+
+#### 4.3.6 自定义类型转换失败后的提示信息
+
+SpringMVC没有专门用于自定义类型转换失败后提示信息的功能。需要我们自己实现。
+
+先来看一下`${ex.message}`输出的错误信息：
+
+- 年龄出错：Failed to convert value of type 'java.lang.String' to required type 'int'; nested exception is java.lang.NumberFormatException: For input string: "20T" 
+- 生日出错：Failed to convert value of type 'java.lang.String' to required type 'java.util.Date'; nested exception is org.springframework.core.convert.ConversionFailedException: Failed to convert from type [java.lang.String] to type [java.util.Date] for value '1990/01/17A'; nested exception is org.springframework.beans.TypeMismatchException: Failed to convert value of type 'java.lang.String' to required type 'java.util.Date' 
+
+这里我们可以看到，虽然输出的信息很多，但其中包含了用户所提交的错误数据。所以可以通过从系统提示信息中查找用户输入数据的方式来确定是那个数据出现了类型转换异常。一旦出问题的数据被确定，则异常信息就可以进行准确替换了。
+
+*以下内容在工程SpringMVC-61-typeConverter-4中。*
+
+##### 4.3.6.1 修改处理器
+
+定义一个方法，用于根据发生类型转换异常的数据的不同而生成不同提示信息：
+
+```java
+private String changeExceptionMessage(Exception ex, String arg, String paramName) {
+    String exMsg = ex.getMessage();
+    if (exMsg.contains(arg)) {
+        String newMsg = paramName + "[" + arg + "] is not correct";
+        return newMsg;
+    }
+    return null;
+}
+```
+
+修改异常处理方法：
+
+```java
+@ExceptionHandler(TypeMismatchException.class)
+public ModelAndView exceptionResolver(Exception ex, HttpServletRequest request) {
+    ModelAndView mv = new ModelAndView();
+
+    String age = request.getParameter("age");
+    String birthday = request.getParameter("birthday");
+
+    String ageMsg = changeExceptionMessage(ex, age, "年龄");
+    String birthdayMsg = changeExceptionMessage(ex, birthday, "生日");
+    
+    mv.addObject("age", age);
+    mv.addObject("birthday", birthday);
+     
+    if (ageMsg != null) {
+        mv.addObject("errMsg", ageMsg);
+    } 
+    
+    if (birthdayMsg != null) {
+        mv.addObject("errMsg", birthdayMsg);
+    }
+    
+    mv.setViewName("/index.jsp");
+
+    return mv;
+}
+```
+
+##### 4.3.6.2 修改index页面
+
+```html
+<body>
+    ${errMsg}
+    <br>
+    <form action="test/register.do" method="POST">
+        <label>
+            年龄：
+            <input type="text" name="age" value="${age}" />
+        </label>
+        <br>
+        <label>
+            生日：
+            <input type="text" name="birthday" value="${birthday}" />
+        </label>
+        <br>
+        <input type="submit" value="注册" />
+    </form>
+</body>
+```
+
+#### 4.3.7 初始化参数绑定
+
+除了上述的处理方法外，还可以使用另一种称为初始化参数绑定的方法来进行字符串到日期的转换。需要使用注解`@InitBinder`。
+
+##### 4.3.7.1 一种日期格式
+
+*以下内容在工程SpringMVC-62-initDataBinder中。*
+
+（该工程省略了数据的回显和异常的处理）
+
+删除converters包以及配置文件中对类型转换的相关注册信息。
+
+修改处理器：
+
+```java
+@Controller  
+@RequestMapping("/test")  
+public class MyController {
+
+    @RequestMapping("/register.do")  
+    public ModelAndView register(int age, Date birthday) {
+        System.out.println("age = " + age);
+        System.out.println("birthday = " + birthday);
+        ModelAndView mv = new ModelAndView("/WEB-INF/jsp/show.jsp");
+        mv.addObject("age", age);
+        mv.addObject("birthday", birthday);
+        return mv;
+    }
+    
+    @InitBinder
+    public void initBinder(WebDataBinder binder) {
+        DateFormat df = new SimpleDateFormat("yyyy-MM-dd");
+        binder.registerCustomEditor(Date.class, new CustomDateEditor(df, true));
+    }
+}
+```
+
+这里使用了方法`binder.registerCustomEditor()`将日期类型与自定义日期编辑器绑定在了一起。`CustomDateEditor`类的构造函数中的两个参数一个是我们要绑定的日期格式，一个是是否允许空字符串。在本例中，如果设置为`true`，那么表单在不填写生日时也可以完成到show页面的跳转而不报错，如果设置为false，则不填写生日栏（只填写年龄）就提交会发生400错误。
+
+##### 4.3.7.2 多种日期格式
+
+要对多种日期格式进行匹配需要我们自己定义`CustomDateEditor`。
+
+定义编辑器：
+
+要自定义`CustomDateEditor`需要继承类`PropertiesEditor`。
+
+```java
+public class MyDateEditor extends PropertiesEditor {
+
+}
+```
+
+这个类不是抽象类，所以不需要我们实现某个方法，但这里我们需要重写一个方法：
+
+这里的`setAsText()`方法中的`source`就是我们传来的参数。这里对三种日期格式进行匹配，匹配后使用`sdf`将`source`通过`parse()`方法转为`Date`类型，最后通过`setValue()`方法最终得到我们要的日期。
+
+```java
+public class MyDateEditor extends PropertiesEditor {
+
+    @Override
+    public void setAsText(String source) throws IllegalArgumentException {
+        
+        SimpleDateFormat sdf = getSimpleDateFormat(source);
+        
+        try {
+            setValue(sdf.parse(source));
+        } catch (ParseException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private SimpleDateFormat getSimpleDateFormat(String source) {
+        SimpleDateFormat sdf = null;
+        if (Pattern.matches("^\\d{4}/\\d{2}/\\d{2}$", source)) {
+            sdf = new SimpleDateFormat("yyyy/MM/dd");
+        } else if (Pattern.matches("^\\d{4}-\\d{2}-\\d{2}$", source)) {
+            sdf = new SimpleDateFormat("yyyy-MM-dd");
+        } else if (Pattern.matches("^\\d{4}\\d{2}\\d{2}$", source)) {
+            sdf = new SimpleDateFormat("yyyyMMdd");
+        } else {
+            throw new TypeMismatchException("", Date.class);
+        }
+        return sdf;
+    }
+    
+}
+```
+
+修改处理器：
+
+使用了我们自定义的日期编辑器后，如果表单没有填写生日就提交会发生400错误。
+
+```java
+@Controller  
+@RequestMapping("/test")  
+public class MyController {
+
+    @RequestMapping("/register.do")  
+    public ModelAndView register(int age, Date birthday) {
+        System.out.println("age = " + age);
+        System.out.println("birthday = " + birthday);
+        ModelAndView mv = new ModelAndView("/WEB-INF/jsp/show.jsp");
+        mv.addObject("age", age);
+        mv.addObject("birthday", birthday);
+        return mv;
+    }
+    
+    @InitBinder
+    public void initBinder(WebDataBinder binder) {
+        binder.registerCustomEditor(Date.class, new MyDateEditor());
+    }
+}
+```
+
+### 4.4 数据验证
+
+在Web应用程序中，为了防止客户端传来的数据引发程序的异常，常常需要对数据进行验证。输入验证分为两种：
+
+- 客户端验证：主要通过JavaScript脚本进行。
+- 服务端验证：主要通过Java代码进行。
+
+为了保证数据的安全性，一般情况下，客户端与服务端验证都是必要的。
+
+*以下内容在工程SpringMVC-64-validator中。*
+
+需求：要求用户输入的表单数据满足如下要求。
+
+- 姓名：非空，且长度3-6个字符
+- 成绩：0~100分
+- 手机号：非空，且必须符合手机号格式
+
+#### 4.4.1 搭建测试环境
+
+##### 4.4.1.1 导入Jar包
+
+SpringMVC支持JSR（Java Specification Requests，Java规范提案）303 - Bean Validation数据验证规范（**该规范验证的是对象，而不是基本数据类型**）。而规范的实现者很多，其中较为常用的是Hibernate Validator。这是与Hibernate ORM并列的Hibernate的产品之一。
+
+
+
+所以这里除了SpringMVC的Jar包外，我们还需要导入Hibernate Validator的Jar包。
+
+这里使用hibernate-validator-5.4.2.Final版本的validator及其相关依赖（依赖由maven确定）：
+
+- hibernate-validator-5.4.2.Final
+- validation-api-1.1.0.Final
+- jboss-logging-3.3.0.Final
+- classmate-1.3.1
+
+##### 4.4.1.2 定义实体
+
+```java
+public class Student {
+    private String name;
+    private double score;
+    private String mobile;
+
+    public Student() {
+    }
+
+    public Student(String name, double score, String mobile) {
+        this.name = name;
+        this.score = score;
+        this.mobile = mobile;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public double getScore() {
+        return score;
+    }
+
+    public void setScore(double score) {
+        this.score = score;
+    }
+
+    public String getMobile() {
+        return mobile;
+    }
+
+    public void setMobile(String mobile) {
+        this.mobile = mobile;
+    }
+
+    @Override
+    public String toString() {
+        return "Student [name=" + name + ", score=" + score + ", mobile=" + mobile + "]";
+    }
+
+}
+```
+
+##### 4.4.1.3 定义index页面
+
+```html
+<body>
+    <form action="test/register.do" method="POST">
+        <label>
+            姓名：
+            <input type="text" name="name" />
+        </label>
+        <br>
+        <label>
+            成绩：
+            <input type="text" name="score" />
+        </label>
+        <br>
+        <label>
+            手机号：
+            <input type="text" name="mobile" />
+        </label>
+        <br>
+        <input type="submit" value="提交" />
+    </form>
+</body>
+```
+
+##### 4.4.1.4 定义处理器
+
+```java
+@Controller
+@RequestMapping("/test")
+public class StudentController {
+    @RequestMapping("/register.do")
+    public ModelAndView doSome(Student student) {
+        ModelAndView mv = new ModelAndView();
+        mv.addObject("student", student);
+        mv.setViewName("/WEB-INF/jsp/show.jsp");
+        return mv;
+    }
+}
+```
+
+##### 4.4.1.5 定义show页面
+
+```html
+<body>
+
+student = ${student}
+
+</body>
+```
+
+##### 4.4.1.6 定义配置文件
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans
+    xmlns="http://www.springframework.org/schema/beans"
+    xmlns:mvc="http://www.springframework.org/schema/mvc"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:context="http://www.springframework.org/schema/context"
+    xmlns:aop="http://www.springframework.org/schema/aop"
+    xmlns:tx="http://www.springframework.org/schema/tx"
+    xsi:schemaLocation="
+        http://www.springframework.org/schema/beans 
+        http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/context 
+        http://www.springframework.org/schema/context/spring-context.xsd
+        http://www.springframework.org/schema/tx 
+        http://www.springframework.org/schema/tx/spring-tx.xsd
+        http://www.springframework.org/schema/aop 
+        http://www.springframework.org/schema/aop/spring-aop.xsd
+        http://www.springframework.org/schema/mvc
+        http://www.springframework.org/schema/mvc/spring-mvc.xsd">
+        
+    <!-- 注册组件扫描器 -->
+    <context:component-scan base-package="pers.tavish" />   
+        
+</beans>
+```
+
+#### 4.4.2 实现数据验证
+
+##### 4.4.2.1 修改配置文件
+
+验证器由SpringMVC框架的`LocalValidatorFactoryBean`类生成，而真正验证器的提供者则是`HibernateValidator`。
+
+在配置文件中需要注册验证器，然后将其注入给注解驱动：
+
+```xml
+<!-- 注册组件扫描器 -->
+<context:component-scan base-package="pers.tavish" />   
+    
+<!-- 注册验证器工厂bean -->
+<bean id="myValidator" class="org.springframework.validation.beanvalidation.LocalValidatorFactoryBean">
+    <!-- 注入HibernateValidator -->
+    <property name="providerClass" value="org.hibernate.validator.HibernateValidator" />
+</bean>   
+
+<!-- 将验证器注入给注解驱动 -->
+<mvc:annotation-driven validator="myValidator" />
+```
+
+##### 4.4.2.2 在实体类上添加验证注解
+
+```java
+@NotBlank(message = "姓名不能为空")
+@Size(min = 2, max = 6, message = "姓名必须在{min}--{max}个字符之间")
+private String name;
+
+@NotNull(message = "成绩不能为空")
+@DecimalMin(value = "0.0", message = "成绩不能小于{value}")
+@DecimalMax(value = "100.0", message = "成绩不能大于{value}")
+private Double score;
+
+@NotBlank(message = "手机号不能为空")
+@Pattern(regexp = "^1[34578]\\d{9}$", message = "手机号码格式不正确")
+private String mobile;
+```
+
+常用验证注解：
+
+序号 | 注解 | 说明
+-----|-----|-----
+1 | @AssertFalse | 验证注解的元素值是false
+2 | @AssertTrue | 验证注解的元素值是true
+3 | @DecimalMax(value=x) | 验证注解的元素值小于等于指定的十进制value值
+4 | @DecimalMin(value=x) | 验证注解的元素值大于等于指定的十进制value值
+5 | @Digits(integer=整数位数, fraction=小数位数) | 验证注解的元素值的整数位数和小数位数上限
+6 | @Max(value=x) | 验证注解的元素值小于等于指定的value值
+7 | @Min(value=x) | 验证注解的元素值大于等于指定的value值
+8 | @NotNull | 验证注解的元素值不是null
+9 | @Null | 验证注解的元素值是null
+10 | @Future | 验证注解的元素值（日期类型）比当前时间晚
+11 | @Past | 验证注解的元素值（日期类型）比当前时间早
+12 | @Pattern(regex=正则表达式) | 验证注解的元素值与指定的正则表达式匹配
+13 | @Size(min=最小值, max=最大值) | 验证注解的元素值在min和max指定区间（包含）之内，如字符长度、集合大小
+14 | @Valid | 验证关联的对象，如账户对象里有一个订单对象，指定验证订单对象
+15 | @NotEmpty | 验证注解的元素值不为null且不为空（字符串长度不为0、集合大小不为0）
+16 | @Range(min=最小值, max=最大值) | 验证注解的元素值在最小值和最大值之间
+17 | @NotBlank | 验证注解的元素值不为空（不为null、去除首位空格后长度为0），不同于@NotEmpty，该注解只应用于字符串且在比较时会去除字符串两端的空格
+18 | @Length(min=下限 ,max=上限) | 验证注解的元素值长度在min和max区间内 
+19 | @Email | 验证注解的元素值是Email，也可以通过正则表达式和flag指定自定义的email格式
+
+`@NotNull`、`@NotEmpty`和`@NotBlank`的区别：
+
+```java
+String name = null;
+@NotNull:  false
+@NotEmpty: false 
+@NotBlank: false 
+
+String name = "";
+@NotNull:  true
+@NotEmpty: false
+@NotBlank: false
+
+String name = " ";
+@NotNull:  true
+@NotEmpty: true
+@NotBlank: false
+
+String name = "Great answer!";
+@NotNull:  true
+@NotEmpty: true
+@NotBlank: true
+```
+
+通常情况下：
+
+- @NotEmpty 用在集合类上面
+- @NotBlank 用在String上面
+- @NotNull 用在基本类型的包装类型上
+
+##### 4.4.2.3 修改处理器
+
+由于这里使用的验证器为bean对象验证器，所以对于要验证的参数数据需要打包后由处理器方法以bean形参类型的方式接收，并由`@Validated`注解标注。*注意，不能将该注解用于`String`类型与基本类型的形参前。*
+
+紧跟着`@Validated`所注解的形参后面是一个`BindingResult`类型的形参。通过该形参可获取到所有验证异常的信息。
+
+```java
+@Controller
+@RequestMapping("/test")
+public class StudentController {
+    @RequestMapping("/register.do")
+    public ModelAndView doSome(@Validated Student student, BindingResult br) {
+        ModelAndView mv = new ModelAndView();
+        
+        List<ObjectError> errors = br.getAllErrors();
+        if (errors.size() > 0) {
+            FieldError nameError = br.getFieldError("name");
+            FieldError scoreError = br.getFieldError("score");
+            FieldError mobileError = br.getFieldError("mobile");
+            
+            if (nameError != null) {
+                mv.addObject("nameError", nameError.getDefaultMessage());
+            }
+            
+            if (scoreError != null) {
+                
+                String scoreMsg = scoreError.getDefaultMessage();
+                
+                // 修改类型转换错误的信息，例如表单输入“abc”
+                if (scoreMsg.contains("NumberFormatException")) {
+                    scoreMsg = "输入成绩信息不合法";
+                }
+                
+                mv.addObject("scoreError", scoreMsg);
+            }
+            
+            if (mobileError != null) {
+                mv.addObject("mobileError", mobileError.getDefaultMessage());
+            }
+            
+            mv.setViewName("/index.jsp");
+            return mv;
+        }
+        
+        mv.addObject("student", student);
+        mv.setViewName("/WEB-INF/jsp/show.jsp");
+        return mv;
+    }
+}
+```
+
+`BindingResult`接口中的常用方法：
+
+- getAllErrors()：获取到所有的异常信息。其返回值为`List`，但若没有发生异常，则该`List`也会被创建，只不过其`size()`为0。
+- getFieldError()：获取指定属性的异常信息。
+- getErrorCount()：获取所有异常的数量。
+- getRawFieldValue()：获取到用户输入的引发验证异常的原始值。
+
+若各个数据均通过验证，则代码正常执行。
+
+##### 4.4.2.4 页面显示验证异常信息
+
+修改index页面，增加验证异常信息和数据回显。这里数据回显的数据是从`param`中获取的，因为我们的处理器使用的是请求转发回到index页面，所以用户在表单提交的参数在`param`中，所以直接提取就可以了，不用在处理器中将各个参数存入`request`域中。
+
+```html
+<body>
+    <form action="test/register.do" method="POST">
+        <label>
+            姓名：
+            <input type="text" name="name" value="${param.name}" />
+        </label>
+        ${nameError}<br>
+        <label>
+            成绩：
+            <input type="text" name="score" value="${param.score}" />
+        </label>
+        ${scoreError}<br>
+        <label>
+            手机号：
+            <input type="text" name="mobile" value="${param.mobile}" />
+        </label>
+        ${mobileError}<br>
+        <input type="submit" value="提交" />
+    </form>
+</body>
+```
+
+### 4.5 文件上传
+
+#### 4.5.1 上传单个文件
+
+*以下内容在工程SpringMVC-65-fileupload-singlefile中。*
+
+##### 4.5.1.1 导入Jar包
+
+SpringMVC实现文件上传，需要再添加以下Jar包：
+
+- commons-fileupload-1.3.3
+- commons-io-2.2
+
+##### 4.5.1.2 定义上传页面
+
+定义具有文件上传功能的index页面：
+
+- method：POST
+- enctype：multipart/form-data
+
+```html
+<body>
+    <form action="test/upload.do" method="POST" enctype="multipart/form-data">
+        <label>
+            照片：
+            <input type="file" name="photo" />
+        </label>
+        <br>
+        <input type="submit" value="upload" />
+    </form>
+</body>
+```
+
+##### 4.5.1.3 定义处理器
+
+形参`MultipartFile`需要使用注解`@RequestParam`，否则会报错：Failed to instantiate [org.springframework.web.multipart.MultipartFile]: Specified class is an interface
+
+或者，添加mvc注解驱动：
+
+```xml
+<!-- 注册mvc注解驱动 -->
+<mvc:annotation-driven />
+```
+
+```java
+@Controller  
+@RequestMapping("/test")  
+public class MyController {
+
+    @RequestMapping("/upload.do")  
+    public String doUpload(@RequestParam MultipartFile photo, HttpSession session) throws IllegalStateException, IOException {
+        
+        if (!photo.isEmpty()) {
+            
+            // 获取应用根目录下的images文件夹路径
+            String path = session.getServletContext().getRealPath("/images");
+            
+            // 如果应用根目录下没有images文件夹，则创建一个
+            File file = new File(path);
+            if (!file.exists()) {
+                file.mkdir();
+            }
+            
+            // 获取上传文件的原始文件名
+            String fileName = photo.getOriginalFilename();
+            
+            // 限制上传类型
+            if (fileName.endsWith(".jpg") || fileName.endsWith(".png")) {
+                // 创建这个文件
+                File newFile = new File(path, fileName);
+                // 完成文件上传
+                photo.transferTo(newFile);
+                return "/WEB-INF/jsp/success.jsp";
+            } else {
+                return "/WEB-INF/jsp/fail.jsp";
+            }
+        } else {
+            return "/WEB-INF/jsp/fail.jsp";
+        }
+    }
+}
+```
+
+对于处理器的定义需要注意以下几点：
+
+1. **处理器方法的形参**：用于接收表单元素所提交的处理器方法的形参类型不是`File`，而是`MultipartFile`。这是一个接口，专门用于处理文件上传问题。该接口的实现类为`CommonsMultipartResolver`，该实现类中具有设置上传文件大小、上传文件字符集等属性，可以通过为其注入值来限定上传的文件。
+2. **未选择上传文件**：若用户没有选择上传文件就提交了表单，此时处理器方法的`MultipartFile`形参所接收到的实参值不是`null`，而是一个内容为empty的文件。所以，对于上述情况，其判断条件应为是否为空`file.isEmpty()`而不是`file == null`。
+3. **上传文件类型**：SpringMVC的文件上传功能没有直接用于限定上传类型的方法或属性，需要对获取到的文件名后缀加以判断。此时使用`String`的`endWith()`方法较为简捷。
+4. **上传方法**：对于上传单个文件，直接使用`MultipartFile`的`transferTo()`方法就可以完成上传功能。但是，需要注意的是，该方法要求服务端用于存放客户上传文件的目录必须存在，否则报错，即其不会自己创建该目标目录。
+
+##### 4.5.1.4 注册上传处理器
+
+```xml
+<!-- 注册组件扫描器 -->
+<context:component-scan base-package="pers.tavish.handlers" />   
+    
+<!-- 注册multipart解析器，这个id固定，由中央调度器直接调用 -->   
+<bean id="multipartResolver" class=" org.springframework.web.multipart.commons.CommonsMultipartResolver">
+    <!-- 设置默认字符集 -->
+    <property name="defaultEncoding" value="utf-8" />
+    <!-- 设置最大文件大小1M -->
+    <property name="maxUploadSize" value="1048576" />
+</bean>
+```
+
+**bean名称固定**
+
+在SpringMVC的配置文件中注册`MultipartFile`接口的实现类`CommonsMultipartResolver`的bean，要求其id必须为`multipartResolver`。因为中央调度器进行了相关的设置：
+
+```java
+public class DispatcherServlet extends FrameworkServlet {
+
+    /** Well-known name for the MultipartResolver object in the bean factory for this namespace. */
+    public static final String MULTIPART_RESOLVER_BEAN_NAME = "multipartResolver";
+
+    // ...
+
+    private void initMultipartResolver(ApplicationContext context) {
+        try {
+            this.multipartResolver = context.getBean(MULTIPART_RESOLVER_BEAN_NAME, MultipartResolver.class);
+            if (logger.isDebugEnabled()) {
+                logger.debug("Using MultipartResolver [" + this.multipartResolver + "]");
+            }
+        }
+        catch (NoSuchBeanDefinitionException ex) {
+            // Default is no multipart resolver.
+            this.multipartResolver = null;
+            if (logger.isDebugEnabled()) {
+                logger.debug("Unable to locate MultipartResolver with name '" + MULTIPART_RESOLVER_BEAN_NAME +
+                        "': no multipart request handling provided");
+            }
+        }
+    }
+}
+```
+
+如果容器中定义了名称为`multipartResolver`的bean，且请求类型也为`multipart`类型，则返回`MultipartHttpServletRequest`请求类型，完成文件上传功能。否则，返回普通的`HttpServletRequest`请求类型。
+
+```java
+protected HttpServletRequest checkMultipart(HttpServletRequest request) throws MultipartException {
+    if (this.multipartResolver != null && this.multipartResolver.isMultipart(request)) {
+        if (WebUtils.getNativeRequest(request, MultipartHttpServletRequest.class) != null) {
+            logger.debug("Request is already a MultipartHttpServletRequest - if not in a forward, " +
+                    "this typically results from an additional MultipartFilter in web.xml");
+        }
+        else if (hasMultipartException(request) ) {
+            logger.debug("Multipart resolution failed for current request before - " +
+                    "skipping re-resolution for undisturbed error rendering");
+        }
+        else {
+            try {
+                // 返回MultipartHttpServletRequest
+                return this.multipartResolver.resolveMultipart(request);
+            }
+            catch (MultipartException ex) {
+                if (request.getAttribute(WebUtils.ERROR_EXCEPTION_ATTRIBUTE) != null) {
+                    logger.debug("Multipart resolution failed for error dispatch", ex);
+                    // Keep processing error dispatch with regular request handle below
+                }
+                else {
+                    throw ex;
+                }
+            }
+        }
+    }
+    // If not returned before: return original request.
+    // 返回HttpServletRequest
+    return request;
+}
+```
+
+**文件上传字符集**
+
+对于文件名为中文的文件，默认情况下上传完成后，文件名为乱码，因为默认情况下文件上传处理器使用的字符集为`ISO-8859-1`，可以通过设置属性`defaultEncoding`来指定文件上传所使用的字符集。
+
+**限定文件大小**
+
+`MultipartFile`接口的实现类`CommonsMultipartResolver`继承自`CommonsFileUploadSupport`类，通过该类的属性`maxUploadSize`可以限定上传文件的大小，单位为字节byte。如果不设定该属性，或指定其值为-1，则表示不对上传文件大小作限制。
+
+注意，该大小为上传文件的总大小。即若上传多个文件，则多个文件的大小之和不能超过该值。
+当然也可以设置属性`maxUploadSizePerFile`，对每个上传文件的大小进行设置。即单个文件大小不能超过`maxUploadSizePerFile`，总大小不能超过`maxUploadSize`。
+
+当文件大小超过我们设定的最大值时，会发生异常，例如上传一个2207850字节的文件：
+
+>
+Request processing failed; nested exception is org.springframework.web.multipart.MaxUploadSizeExceededException: Maximum upload size of 1048576 bytes exceeded; nested exception is org.apache.commons.fileupload.FileUploadBase$SizeLimitExceededException: the request was rejected because its size (2207850) exceeds the configured maximum (1048576)
+
+##### 4.5.1.5 设置文件超出大小的异常处理
+
+当上传文件超出指定大小时，会抛出`MaxUploadSizeExceededException`。通过配置`SimpleMappingExceptionResolver`可以实现对该异常的处理。
+
+注册异常处理器：
+
+```xml
+<bean class="org.springframework.web.servlet.handler.SimpleMappingExceptionResolver">
+    <property name="defaultErrorView" value="/errors.jsp" />
+    <property name="exceptionAttribute" value="ex" />
+</bean>
+```
+
+定义异常响应页面：
+
+```html
+<body>
+
+${ex.message}
+
+</body>
+```
+
+##### 4.5.1.6 定义上传成功/失败页面
+
+成功页面：
+
+```html
+<body>
+
+Upload Succeeded.
+
+</body>
+```
+
+失败页面：
+
+```html
+<body>
+
+Upload Failed.
+
+</body>
+```
+
+#### 4.5.2 上传多个文件
+
+*以下内容在工程SpringMVC-66-fileupload-multifiles中*
+
+##### 4.5.2.1 修改index页面
+
+表单项均为photots。
+
+```html
+<body>
+    <form action="test/upload.do" method="POST" enctype="multipart/form-data">
+        <label>
+            照片1：
+            <input type="file" name="photos" />
+        </label>
+        <br>
+        <label>
+            照片2：
+            <input type="file" name="photos" />
+        </label>
+        <br>
+        <label>
+            照片3：
+            <input type="file" name="photos" />
+        </label>
+        <br>
+        <input type="submit" value="upload" />
+    </form>
+</body>
+```
+
+##### 4.5.2.2 修改处理器
+
+```java
+@Controller
+@RequestMapping("/test")
+public class MyController {
+
+    @RequestMapping("/upload.do")
+    public String doUpload(@RequestParam MultipartFile[] photos, HttpSession session)
+            throws IllegalStateException, IOException {
+
+        int count = photos.length;
+
+        // 对数组进行循环遍历
+        for (MultipartFile photo : photos) {
+
+            if (!photo.isEmpty()) {
+
+                // 获取应用根目录下的images文件夹路径
+                String path = session.getServletContext().getRealPath("/images");
+
+                // 如果应用根目录下没有images文件夹，则创建一个
+                File file = new File(path);
+                if (!file.exists()) {
+                    file.mkdir();
+                }
+
+                // 获取上传文件的原始文件名
+                String fileName = photo.getOriginalFilename();
+
+                // 限制上传类型
+                if (fileName.endsWith(".jpg") || fileName.endsWith(".png")) {
+                    // 创建这个文件
+                    File newFile = new File(path, fileName);
+                    // 完成文件上传
+                    photo.transferTo(newFile);
+                    count--;
+                } else {
+                    return "/WEB-INF/jsp/fail.jsp";
+                }
+            }
+        }
+        
+        // count == photos.length为true说明用户没有上传任何文件，返回到index页面
+        return count == photos.length ? "/index.jsp" : "/WEB-INF/jsp/success.jsp";
+    }
+}
+```
+
+**处理器方法的形参**
+
+用于接收表单元素所提交参数的处理器方法的形参类型为`MultipartFile`数组，且必须使用`@RequestParam`修饰。
+
+为什么上传单个文件是不用该注解修饰，而多文件时需要？
+
+因为在上传多个文件时，每个表单中的文件对象框架均会将其转换为`MultipartFile`类型，者域上传单文件是相同的。但上传多文件时，处理器方法需要的不是`MultipartFile`类型，而是`MultipartFile[]`类型。默认情况下框架只会将一个一个的表单元素转换为一个一个的对象，但并不会将这个对象创建为一个数组对象。
+
+此时需要`@RequestParam`来修饰这个数组参数，向框架表明表单传来的参数与处理器方法接收的参数名称与类型相同，需要框架调用相应的转换器将请求参数转换为方法参数类型。所以对于上传多个文件，处理器方法的`MultipartFile[]`必须用`@RequestParam`修饰。
+
+**未选择上传文件**
+
+即使没有选择任何要上传的文件`MultipartFile[]`也不为`null`，且其`length`值也大于0.因为系统会为每个`file`表单元素创建一个`File`对象，只不过没有选择上传文件的这个`File`将不会被赋予真正的文件，只是一个为empty的`File`。所以对于没有选择任何要上传的文件的情况处理只能逐个文件表单元素进行判断，判断文件是否为empty。
+
+#### 4.5.3 Multipart请求判断的源码分析
+
+首先当请求到达中央调度器时，中央调度器会在`doDispatch()`方法中对请求进行判断：
+
+```java
+protected void doDispatch(HttpServletRequest request, HttpServletResponse response) throws Exception {
+    HttpServletRequest processedRequest = request;
+    HandlerExecutionChain mappedHandler = null;
+    boolean multipartRequestParsed = false;
+
+    WebAsyncManager asyncManager = WebAsyncUtils.getAsyncManager(request);
+
+    try {
+        ModelAndView mv = null;
+        Exception dispatchException = null;
+
+        try {
+            processedRequest = checkMultipart(request);
+            multipartRequestParsed = (processedRequest != request);
+
+            // ...
+        }
+        // ...
+    }
+    // ...
+}
+```
+
+首先创建了新的`HttpServletRequest`引用`processedRequest`，值为到达中央调度器的当前请求`request`。然后设置`multipartRequestParsed`为`false`。之后调用`checkMultipart()`方法来判断当前的请求`request`是否为一个`Multipart`请求：
+
+```java
+protected HttpServletRequest checkMultipart(HttpServletRequest request) throws MultipartException {
+    if (this.multipartResolver != null && this.multipartResolver.isMultipart(request)) {
+        if (WebUtils.getNativeRequest(request, MultipartHttpServletRequest.class) != null) {
+            logger.debug("Request is already a MultipartHttpServletRequest - if not in a forward, " +
+                    "this typically results from an additional MultipartFilter in web.xml");
+        }
+        else if (hasMultipartException(request) ) {
+            logger.debug("Multipart resolution failed for current request before - " +
+                    "skipping re-resolution for undisturbed error rendering");
+        }
+        else {
+            try {
+                return this.multipartResolver.resolveMultipart(request);
+            }
+            catch (MultipartException ex) {
+                if (request.getAttribute(WebUtils.ERROR_EXCEPTION_ATTRIBUTE) != null) {
+                    logger.debug("Multipart resolution failed for error dispatch", ex);
+                    // Keep processing error dispatch with regular request handle below
+                }
+                else {
+                    throw ex;
+                }
+            }
+        }
+    }
+    // If not returned before: return original request.
+    return request;
+}
+```
+
+上述方法可能返回两个值，一个是`return this.multipartResolver.resolveMultipart(request)`，其返回类型是`MultipartHttpServletRequest`;另一个是`return request`，返回类型是`HttpServletRequest`。
+
+其中`multipartResolver`是我们在配置文件中注册的`CommonsMultipartResolver`。如果我们的表单具有`enctype="multipart/form-data"`，则这里会执行`return this.multipartResolver.resolveMultipart(request)`，即该方法会返回`MultipartHttpServletRequest`。
+
+所以当`processedRequest`被赋值为`MultipartHttpServletRequest`后，`multipartRequestParsed = (processedRequest != request)`的执行结果就会变为`multipartRequestParsed = true`。即对`Multipart`请求进行解析。
