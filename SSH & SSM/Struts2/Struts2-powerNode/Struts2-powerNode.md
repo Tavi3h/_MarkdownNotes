@@ -8,7 +8,7 @@
 
 struts2在MVC三层架构中位置：
 
-![struts2](images-powerNode\struts2.png)
+![struts2](images\struts2.png)
 
 #### 1.1.1 Struts2的优点
 
@@ -146,7 +146,7 @@ struts.xml
 
 #### 1.2.2 Struts2执行流程
 
-![Struts2执行流程](images-powerNode\Struts2执行流程.png)
+![Struts2执行流程](images\Struts2执行流程.png)
 
 **Struts2的过滤器应该处在web项目过滤器的底端。**
 
@@ -458,17 +458,17 @@ Struts2的默认核心配置文件，其中主要定义了11种返回类型、35
 
 返回类型：
 
-![result-type](images-powerNode\result-type.png)
+![result-type](images\result-type.png)
 
 默认的返回类型是请求转发。
 
 拦截器：
 
-![interceptors](images-powerNode\interceptors.png)
+![interceptors](images\interceptors.png)
 
 默认的拦截器栈：
 
-![defaultStack](images-powerNode\defaultStack.png)
+![defaultStack](images\defaultStack.png)
 
 **默认拦截器栈是Struts2的每一个Action都要经过的，无需单独声明。**
 
@@ -713,7 +713,7 @@ result标签用于指定Action执行完毕后所要转向的视图资源。
 
 Struts2中提供了11种视图转向类型，类型由result标签的type属性指定，type属性的值在struts-default.xml中可以查到。默认值为dispatcher。
 
-![result-type](images-powerNode\result-type.png)
+![result-type](images\result-type.png)
 
 **对于请求转发的页面，可以是WEB-INF中的页面；而重定向的页面不能是WEB-INF中的页面。因为重定向相当于用户再次发出一个请求，而用户是不能直接访问WEB-INF中的资源的。**
 
@@ -1414,7 +1414,7 @@ Struts2框架将ActionContext设置为OGNL上下文对象，将值栈（ValueSta
 >
 The framework sets the OGNL context to be our ActionContext, and the value stack to be the OGNL root object. (The value stack is a set of several objects, but to OGNL it appears to be a single object.) Along with the value stack, the framework places other objects in the ActionContext, including Maps representing the application, session, and request contexts. These objects coexist in the ActionContext, alongside the value stack (our OGNL root).
 
-![context_map](images-powerNode\context_map.PNG)
+![context_map](images\context_map.PNG)
 
 *There are other objects in the context map. The diagram is for example only.*
 
@@ -1601,7 +1601,7 @@ setRoot：
 
 所以ActionContext这个Map最终存放着如下内容：
 
-![context_map_2](images-powerNode\context_map_2.PNG)
+![context_map_2](images\context_map_2.PNG)
 
 #### 3.2.3 值栈操作
 
@@ -1664,7 +1664,7 @@ JSP:
 
 点击页面上的[Debug]连接，显示：
 
-![root_debug_1](images-powerNode\root_debug_1.PNG)
+![root_debug_1](images\root_debug_1.PNG)
 
 这里的Value Stack Contents就是root；Stack Context就是context。
 
@@ -1759,7 +1759,7 @@ JSP：使用名称myStudent访问。
 
 点击Debug，查看栈内对象的情况：
 
-![root_debug_2](images-powerNode\root_debug_2.PNG)
+![root_debug_2](images\root_debug_2.PNG)
 
 栈顶元素是HashMap，但其中并没有myStudent属性和属性值。而是具有属性empty（由于Map对象具有isEmpty()方法），这个属性的属性值为null（这里的null意义同false相同），意味着这个Map对象是非空的。
 
@@ -1869,7 +1869,7 @@ root的本质是ArrayList，所以可以调用其add()方法来添加数据。
 
 访问Action，点击Debug，显示：
 
-![root_debug_3](images-powerNode\root_debug_3.PNG)
+![root_debug_3](images\root_debug_3.PNG)
 
 ##### 3.2.3.2 向root中隐式放入数据
 
@@ -1946,7 +1946,7 @@ JSP：
 
 此时栈顶元素为RootImplicitAction：
 
-![root_debug_4](images-powerNode\root_debug_4.PNG)
+![root_debug_4](images\root_debug_4.PNG)
 
 **
 EL表达式也是从值栈栈顶读取的数据，如果将Action中的成员变量及set/get方法注释（即Action只负责跳转），再使用上述的URL访问Action，则不会显示任何数据。栈顶的Action也没有任何属性。
@@ -1972,7 +1972,7 @@ EL表达式也是从值栈栈顶读取的数据，如果将Action中的成员变
 
 此时相当于直接向ActionContext中写入数据，此时的key：foo与下面所列key是并列关系。
 
-![context_map](images-powerNode/context_map.PNG)
+![context_map](images/context_map.PNG)
 
 由于context本身是request范围，那么向context中直接添加数据，也即放入request范围中数据。此时JSP页面可通过系统定义好的名称为request的key来访问。
 
@@ -2002,7 +2002,7 @@ JSP:
 
 点击Debug，会发现ContextExplicitAction此时位于值栈栈顶；Stack Context的key中出现foo，其对应的值为foo_value (class java.lang.String)。
 
-![context_debug_1](images-powerNode\context_debug_1.PNG)
+![context_debug_1](images\context_debug_1.PNG)
 
 **（B）向context的session中放入数据**
 
@@ -2247,11 +2247,11 @@ JSP：
 
 此时ValueStack（root）中具有属性：
 
-![context_debug_2](images-powerNode\context_debug_2.png)
+![context_debug_2](images\context_debug_2.png)
 
 context的parameters中具有键值对：
 
-![context_debug_3](images-powerNode\context_debug_3.png)
+![context_debug_3](images\context_debug_3.png)
 
 Action重定向时提交的参数，若重定向到Action，并且Action中有属性用于接收该参数，则是放入到root中的；若重定向到的Action中无属性接收该参数，或直接重定向到页面，则是将参数放入到context中key为parameters的map中。
 
@@ -2259,7 +2259,7 @@ Action重定向时提交的参数，若重定向到Action，并且Action中有�
 
 当Action示例创建好后，不仅会自动将该Action的属性放入到root的栈顶，而且会将Action实例本身也放入到context的action属性中。
 
-![context_debug_4](images-powerNode\context_debug_4.png)
+![context_debug_4](images\context_debug_4.png)
 
 所以也可以这样访问，JSP：
 
@@ -3092,7 +3092,7 @@ result：
 
 Struts2默认情况下可以将表单中输入的文本数据转换为相应的基本数据类型。这个功能的实现，主要是由于Struts2内置了类型转换器。这些转换器在struts-default中看到其定义。
 
-![conversion](images-powerNode\conversion.PNG)
+![conversion](images\conversion.PNG)
 
 常见的类型，基本均可由String转换为相应类型：
 
@@ -3693,7 +3693,7 @@ Action：只对execute2方法进行验证。
 
 Struts2定义的验证器：
 
-![validator](images-powerNode\validator.png)
+![validator](images\validator.png)
 
 ##### 3.6.2.1 对Action中所有方法执行前的验证
 
@@ -5025,11 +5025,11 @@ Struts2提供了非常强大的标签支持。Struts2标签可以分为两大类
 
 一般标签：
 
-![genericTags](images-powerNode\generic_tags.png)
+![genericTags](images\generic_tags.png)
 
 ui标签：
 
-![uiTags](images-powerNode\ui_tags.png)
+![uiTags](images\ui_tags.png)
 
 各个标签的具体用法参见文档：struts-2.5.13\docs\docs\tag-reference.html
 
