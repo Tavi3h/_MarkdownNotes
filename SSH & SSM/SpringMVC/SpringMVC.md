@@ -4427,7 +4427,7 @@ SpringMVC支持JSR（Java Specification Requests，Java规范提案）303 - Bean
 
 所以这里除了SpringMVC的Jar包外，我们还需要导入Hibernate Validator的Jar包。
 
-这里使用hibernate-validator-5.4.2.Final版本的validator及其相关依赖（依赖由maven确定）：
+这里使用hibernate-validator-5.4.2.Final版本的validator及其相关依赖：
 
 - hibernate-validator-5.4.2.Final
 - validation-api-1.1.0.Final
@@ -5135,3 +5135,1058 @@ protected HttpServletRequest checkMultipart(HttpServletRequest request) throws M
 其中`multipartResolver`是我们在配置文件中注册的`CommonsMultipartResolver`。如果我们的表单具有`enctype="multipart/form-data"`，则这里会执行`return this.multipartResolver.resolveMultipart(request)`，即该方法会返回`MultipartHttpServletRequest`。
 
 所以当`processedRequest`被赋值为`MultipartHttpServletRequest`后，`multipartRequestParsed = (processedRequest != request)`的执行结果就会变为`multipartRequestParsed = true`。即对`Multipart`请求进行解析。
+
+### 4.6 拦截器
+
+SpringMVC中的拦截器是非常重要和相当有用的，它的主要作用是拦截指定的用户请求，并进行相应的预处理与后处理。
+
+#### 4.6.1 一个拦截器的执行
+
+*以下内容在工程SpringMVC-67-interceptor中。*
+
+##### 4.6.1.1 自定义拦截器
+
+```java
+public class MyInterceptor implements HandlerInterceptor {
+
+    @Override
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
+            throws Exception {
+        System.out.println("执行MyInterceptor ----- preHandle() -----");
+        return true;
+    }
+
+    @Override
+    public void postHandle(HttpServletRequest request, HttpServletResponse response, Object handler,
+            ModelAndView modelAndView) throws Exception {
+        System.out.println("执行MyInterceptor ----- postHandle() -----");
+        
+    }
+
+    @Override
+    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex)
+            throws Exception {
+        System.out.println("执行MyInterceptor ----- afterCompletion() -----");
+        
+    }
+}
+```
+
+自定义拦截器需要实现`HandlerInterceptor`接口，并实现三个方法：
+
+- boolean preHandle(request, response, handler)：该方法在处理器方法执行之前执行，其返回值为`boolean`类型。如果返回`true`，紧接着会执行处理器方法，且会将`afterCompletion()`方法放入到一个专门的方法栈中等待执行；如果返回`false`，则不会执行处理器方法。
+- void postHandle(request, response, handler, modelAndView)：该方法在处理器方法执行后执行。若处理器方法最终未被执行，则该方法不会执行。由于该方法是在处理器方法执行完后执行，且该方法参数中包含`ModelAndView`，所以该方法可以修改处理器方法的处理结果，例如修改跳转方向。
+- void afterCompletion(request, response, handler, ex)：当`preHandle()`方法返回`true`时，会将该方法放到专门的方法栈中，等到对请求进行相应的所有工作完成之后才会执行该方法。即该方法是在中央调度器渲染（数据填充）了响应页面之后执行的，此时对`ModelAndView`再操作也对响应无济于事。
+
+拦截器中方法与处理器方法的执行顺序如下图:
+
+![拦截器方法执行流程](images\拦截器方法执行流程.PNG)
+
+##### 4.6.1.2 注册拦截器
+
+```xml
+<!-- 注册拦截器 -->
+<mvc:interceptors>
+    <mvc:interceptor>
+        <mvc:mapping path="/**" />
+        <bean class="pers.tavish.interceptors.MyInterceptor" />
+    </mvc:interceptor>
+</mvc:interceptors>
+```
+
+&lt;mvc:mapping /&gt;用于指定当前所注册的拦截器可以拦截的请求路径，`/**`表示拦截所有请求。
+
+##### 4.6.1.3 修改index页面和show页面
+
+index页面：
+
+```html
+<body>
+    <a href="test/some.do">访问doSome方法</a>
+</body>
+```
+
+show页面：
+
+```html
+<body>
+    show page.
+</body>
+```
+
+##### 4.6.1.4 修改处理器
+
+```java
+@Controller  
+@RequestMapping("/test")  
+public class MyController {
+
+    @RequestMapping("/some.do")  
+    public String doSome() {
+        System.out.println("执行处理器方法");
+        return "/WEB-INF/jsp/show.jsp";
+    }
+}
+```
+
+##### 4.6.1.5 控制台输出结果
+
+发布工程，访问index页面的超链接，控制台输出：
+
+```text
+执行MyInterceptor ----- preHandle() -----
+执行处理器方法
+执行MyInterceptor ----- postHandle() -----
+执行MyInterceptor ----- afterCompletion() -----
+```
+
+#### 4.6.2 多个拦截器的执行
+
+*以下内容在工程SpringMVC-68-interceptor-2中。*
+
+##### 4.6.2.1 定义两个拦截器
+
+FirstInterceptor：
+
+```java
+public class FirstInterceptor implements HandlerInterceptor {
+
+    @Override
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
+            throws Exception {
+        System.out.println("执行FirstInterceptor ----- preHandle() -----");
+        return true;
+    }
+
+    @Override
+    public void postHandle(HttpServletRequest request, HttpServletResponse response, Object handler,
+            ModelAndView modelAndView) throws Exception {
+        System.out.println("执行FirstInterceptor ----- postHandle() -----");
+        
+    }
+
+    @Override
+    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex)
+            throws Exception {
+        System.out.println("执行FirstInterceptor ----- afterCompletion() -----");
+        
+    }
+}
+```
+
+SecondInterceptor：
+
+```java
+public class SecondInterceptor implements HandlerInterceptor {
+
+    @Override
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
+            throws Exception {
+        System.out.println("执行SecondInterceptor ----- preHandle() -----");
+        return true;
+    }
+
+    @Override
+    public void postHandle(HttpServletRequest request, HttpServletResponse response, Object handler,
+            ModelAndView modelAndView) throws Exception {
+        System.out.println("执行SecondInterceptor ----- postHandle() -----");
+
+    }
+
+    @Override
+    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex)
+            throws Exception {
+        System.out.println("执行SecondInterceptor ----- afterCompletion() -----");
+
+    }
+}
+```
+
+##### 4.6.2.2 注册多个拦截器
+
+拦截器的执行顺序与定义顺序相同。
+
+```xml
+<mvc:interceptors>
+    <!-- 注册拦截器 FirstInterceptor -->
+    <mvc:interceptor>
+        <mvc:mapping path="/**" />
+        <bean class="pers.tavish.interceptors.FirstInterceptor" />
+    </mvc:interceptor>
+    
+    <!-- 注册拦截器 SecondInterceptor -->
+    <mvc:interceptor>
+        <mvc:mapping path="/**" />
+        <bean class="pers.tavish.interceptors.SecondInterceptor" />
+    </mvc:interceptor>
+</mvc:interceptors>
+```
+
+##### 4.6.2.3 控制台输出结果
+
+发布工程，访问index页面的超链接，控制台输出：
+
+```text
+执行FirstInterceptor ----- preHandle() -----
+执行SecondInterceptor ----- preHandle() -----
+执行处理器方法
+执行SecondInterceptor ----- postHandle() -----
+执行FirstInterceptor ----- postHandle() -----
+执行SecondInterceptor ----- afterCompletion() -----
+执行FirstInterceptor ----- afterCompletion() -----
+```
+
+当有多个拦截器时，形成拦截器链。拦截器链的执行顺序，与其注册顺序一致。
+
+**需要再次强调的是，当某一个拦截器的`preHandle()`方法返回`true`时，就会向一个专门的方法栈中放入该拦截器的`afterCompletion()`方法。**
+
+##### 4.6.2.4 多个拦截器中方法与处理器方法执行顺序
+
+执行流程如下：
+
+![拦截器链执行流程](images\拦截器链执行流程.png)
+
+只要由一个`preHandle()`方法返回`false`，则链就会断开，其后续拦截器的拦截器方法和处理器方法均不会执行。但无论执行链情况怎样，只要方法栈中有方法，即执行链中只要有`preHandle()`返回`true`，则方法栈中就会有其对应的`afterCompletion()`方法，并得到执行。
+
+举例来说：
+
+- 拦截器1、拦截器2的`preHandle()`均返回`true`：则依序执行pre-1、pre-2、处理器方法、post-2、post-1、after-2、after-1。
+- 拦截器1、拦截器2的`preHandle()`均返回`false`：只执行pre-1。
+- 拦截器1返回`true`，拦截器2返回`false`：依次执行pre-1、pre-2、after-1。
+- 拦截器1返回`false`，拦截器2返回`true`：只执行pre-1。
+
+
+##### 4.6.2.5 源码分析
+
+查看中央调度器`doDispatch()`的源码，在执行处理器方法之前，中央调度器会执行处理器执行链对象`mappedHandler`的`applyPreHandle()`方法，然后执行处理器方法，最后执行处理器执行链对象的`applyPostHandle()`方法。
+
+`mappedHandler`的类型是`HandlerExecutionChain`，这个类包含处理器和拦截器：
+
+>
+* Handler execution chain, consisting of handler object and any handler interceptors.
+* Returned by HandlerMapping's {@link HandlerMapping#getHandler} method.
+
+```java
+// 执行拦截器的preHandle()方法
+if (!mappedHandler.applyPreHandle(processedRequest, response)) {
+    return;
+}
+
+// Actually invoke the handler.
+// 执行处理器方法
+mv = ha.handle(processedRequest, response, mappedHandler.getHandler());
+
+if (asyncManager.isConcurrentHandlingStarted()) {
+    return;
+}
+
+applyDefaultViewName(processedRequest, mv);
+// 执行拦截器的postHandle()方法
+mappedHandler.applyPostHandle(processedRequest, response, mv);
+```
+
+`applyPreHandle()`方法用于执行处理执行链中的所有拦截器的`preHandle()`方法，其返回值取决于链中每一个拦截器的`preHandle()`的返回值。即只要有一个拦截器的`preHandle()`返回`false`，则`applyPreHandle()`方法就会返回`false`，此时中央调度器的`doDispatch()`方法就会`return`，即结束了该请求，当然也就不会执行处理器方法和拦截器`postHandle()`方法了。
+
+`applyPreHandle()`方法会按照正序依次执行所有拦截器的`preHandle()`方法，返回`true`的拦截器编号会被变量`interceptorIndex`接收，该变量在`triggerAfterCompletion()`方法中起到指示作用，即应该从哪一个拦截器的`afterCompletion()`开始向前执行（由于是倒序执行，即我们前面所说的方法栈）：
+
+```java
+boolean applyPreHandle(HttpServletRequest request, HttpServletResponse response) throws Exception {
+    HandlerInterceptor[] interceptors = getInterceptors();
+    if (!ObjectUtils.isEmpty(interceptors)) {
+        for (int i = 0; i < interceptors.length; i++) {
+            HandlerInterceptor interceptor = interceptors[i];
+            // 只要有一个拦截器的preHandle()返回false，则该方法返回false
+            if (!interceptor.preHandle(request, response, this.handler)) {
+                triggerAfterCompletion(request, response, null);
+                return false;
+            }
+            this.interceptorIndex = i;
+        }
+    }
+
+    // 所有拦截器的preHandle()方法==都返回true，该方法才会返回true
+    return true;
+}
+```
+
+对于拦截器的`postHandle()`方法，`applyPostHandle()`方法是按照倒叙执行的：
+
+```java
+void applyPostHandle(HttpServletRequest request, HttpServletResponse response, ModelAndView mv) throws Exception {
+    HandlerInterceptor[] interceptors = getInterceptors();
+    if (!ObjectUtils.isEmpty(interceptors)) {
+        for (int i = interceptors.length - 1; i >= 0; i--) {
+            HandlerInterceptor interceptor = interceptors[i];
+            interceptor.postHandle(request, response, this.handler, mv);
+        }
+    }
+}
+```
+
+那么`afterCompetion()`是什么时候执行的呢？
+
+在`applyPreHandle()`中，若存在任意一个拦截器的`preHandle()`方法返回`false`，则此时会调用处理器执行链的`triggerAfterCompletion()`方法，该方法会触发所有`afterCompetion()`方法的执行：
+
+```java
+if (!interceptor.preHandle(request, response, this.handler)) {
+    triggerAfterCompletion(request, response, null);
+    return false;
+}
+```
+
+在`doDispatch()`方法中也存在`catch`语句，表示若发生异常或错误，也会执行`triggerAfterCompletion()`：
+
+```java
+catch (Exception ex) {
+    triggerAfterCompletion(processedRequest, response, mappedHandler, ex);
+}
+catch (Throwable err) {
+    triggerAfterCompletion(processedRequest, response, mappedHandler,
+            new NestedServletException("Handler processing failed", err));
+}
+```
+
+在正常情况下，即所有的`preHandle()`方法均返回`true`，且`doDispatch()`方法没有异常发生的情况下，`triggerAfterCompletion()`方法是`doDispatch()`方法中的`processDispatchResult()`方法内被执行的，具体的执行位置在视图渲染之后。
+
+查看中央调度器的`processDispatchResult()`方法，在对视图渲染之后，会调用处理器执行链的`triggerAfterCompletion()`方法，为所有的拦截器执行`afterCompetion()`方法：
+
+```java
+private void processDispatchResult(HttpServletRequest request, HttpServletResponse response,
+        HandlerExecutionChain mappedHandler, ModelAndView mv, Exception exception) throws Exception {
+
+    boolean errorView = false;
+
+    if (exception != null) {
+        if (exception instanceof ModelAndViewDefiningException) {
+            logger.debug("ModelAndViewDefiningException encountered", exception);
+            mv = ((ModelAndViewDefiningException) exception).getModelAndView();
+        }
+        else {
+            Object handler = (mappedHandler != null ? mappedHandler.getHandler() : null);
+            mv = processHandlerException(request, response, handler, exception);
+            errorView = (mv != null);
+        }
+    }
+
+    // Did the handler return a view to render?
+    if (mv != null && !mv.wasCleared()) {
+        // 渲染视图，该方法内部会调用View对象的render()方法对视图进行渲染
+        render(mv, request, response);
+        if (errorView) {
+            WebUtils.clearErrorRequestAttributes(request);
+        }
+    }
+    else {
+        if (logger.isDebugEnabled()) {
+            logger.debug("Null ModelAndView returned to DispatcherServlet with name '" + getServletName() +
+                    "': assuming HandlerAdapter completed request handling");
+        }
+    }
+
+    if (WebAsyncUtils.getAsyncManager(request).isConcurrentHandlingStarted()) {
+        // Concurrent handling started during a forward
+        return;
+    }
+
+    if (mappedHandler != null) {
+        // 执行所有拦截器的afterCompetion()方法
+        mappedHandler.triggerAfterCompletion(request, response, null);
+    }
+}
+```
+
+处理器执行链对拦截器的`afterCompletion()`方法的执行是按照倒序执行的，开始位置由在`applyPreHandle()`方法中设置的`interceptorIndex`指示。
+由于`interceptorIndex`的初始值是-1，所以如果第一个拦截器的`preHandle()`方法就返回false，则此时就不会进入循环，也就不会执行任何`afterCompletion()`方法了：
+
+```java
+void triggerAfterCompletion(HttpServletRequest request, HttpServletResponse response, Exception ex)
+        throws Exception {
+
+    HandlerInterceptor[] interceptors = getInterceptors();
+    if (!ObjectUtils.isEmpty(interceptors)) {
+        // 从interceptorIndex开始倒序执行拦截器中的afterCompletion()方法
+        for (int i = this.interceptorIndex; i >= 0; i--) {
+            HandlerInterceptor interceptor = interceptors[i];
+            try {
+                interceptor.afterCompletion(request, response, this.handler, ex);
+            }
+            catch (Throwable ex2) {
+                logger.error("HandlerInterceptor.afterCompletion threw exception", ex2);
+            }
+        }
+    }
+}
+```
+
+#### 4.6.3 权限拦截器举例
+
+模拟一个简单的权限拦截器，只有经过登录的用户可以访问处理器，否则返回“无权访问”提示。
+
+*以下内容在工程SpringMVC-69-interceptor-permission中。*
+
+##### 4.6.3.1 定义页面
+
+index页面：
+
+```html
+<body>
+    <a href="login.jsp">登录</a><br>
+    <a href="logout.jsp">登出</a><br>
+    <a href="test/some.do">访问welcome页面</a>
+</body>
+```
+
+login页面：
+
+访问该页面后，将用户名写入`session`。
+
+```html
+<body>
+    <%
+        session.setAttribute("user", "tavish");
+    %>
+    登录成功！
+</body>
+```
+
+logout页面：
+
+访问该页面后，将`session`中的用户删除。
+
+```html
+<body>
+    <%
+        session.removeAttribute("user");
+    %>
+    登出成功！
+</body>
+```
+
+welcome页面：
+
+```html
+<body>
+    Welcome Page.
+</body>
+```
+
+fail页面：
+
+```html
+<body>
+    未登录，无权访问！
+</body>
+```
+
+##### 4.6.3.2 定义拦截器
+
+当`preHandle()`方法返回`false`时，需要使用`request`进行请求转发。
+
+```java
+public class PermissionInterceptor implements HandlerInterceptor {
+
+    @Override
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
+            throws Exception {
+        String user = (String) request.getSession().getAttribute("user");
+        if (!"tavish".equals(user)) {
+            request.getRequestDispatcher("/WEB-INF/jsp/fail.jsp").forward(request, response);
+            return false;
+        }
+        return true;
+    }
+
+    @Override
+    public void postHandle(HttpServletRequest request, HttpServletResponse response, Object handler,
+            ModelAndView modelAndView) throws Exception {
+        
+    }
+
+    @Override
+    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex)
+            throws Exception {
+        
+    }
+}
+```
+
+##### 4.6.3.2 定义处理器
+
+```java
+@Controller  
+@RequestMapping("/test")  
+public class MyController {
+
+    @RequestMapping("/some.do")  
+    public String doSome() {
+        return "/WEB-INF/jsp/welcome.jsp";
+    }
+}
+```
+
+##### 4.6.3.3 修改配置文件
+
+```xml
+<!-- 注册组件扫描器 -->
+<context:component-scan base-package="pers.tavish.handlers" />
+
+<mvc:interceptors>
+    <!-- 注册拦截器 FirstInterceptor -->
+    <mvc:interceptor>
+        <mvc:mapping path="/**" />
+        <bean class="pers.tavish.interceptors.PermissionInterceptor" />
+    </mvc:interceptor>
+</mvc:interceptors>
+```
+
+##### 4.6.3.4 测试结果
+
+访问index页面。
+
+- 直接访问“访问welcome页面”：未登录，无权访问！
+- 访问“登录”后再访问“访问welcome页面”：Welcome Page.
+- 访问“登录”后再访问“登出”，最后再访问“访问welcome页面”：未登录，无权访问！
+
+## 第五章 SSM整合
+
+SSM整合，即Spring + SpringMVC + MyBatis整合。由于SpringMVC原本就是Spring框架的一部分，不用专门整合，所以SSM整合的实质就是将MyBatis整合入Spring。
+
+### 5.1 环境搭建
+
+#### 5.1.1 导入Jar包
+
+某些Jar包是可选的。
+
+- mybaits：
+    + mybatis-3.4.5
+    + asm-5.2
+    + cglib-3.2.5
+    + javassist-3.22.0-CR2
+    + ognl-3.1.15
+    + commons-logging-1.2
+    + log4j-1.2.17
+    + log4j-api-2.3
+    + log4j-core-2.3
+    + slf4j-api-1.7.25
+    + slf4j-log4j12-1.7.25
+- Spring：
+    + aopalliance-1.0
+    + aspectjweaver-1.8.10
+    + spring-aop-4.3.9.RELEASE
+    + spring-aspects-4.3.9.RELEASE
+    + spring-beans-4.3.9.RELEASE
+    + spring-context-4.3.9.RELEASE
+    + spring-context-support-4.3.9.RELEASE
+    + spring-core-4.3.9.RELEASE
+    + spring-expression-4.3.9.RELEASE
+    + spring-jdbc-4.3.9.RELEASE
+    + spring-orm-4.3.9.RELEASE
+    + spring-tx-4.3.9.RELEASE
+    + spring-web-4.3.9.RELEASE
+    + spring-webmvc-4.3.9.RELEASE
+- mybatis-spring：
+    + mybatis-spring-1.3.2
+- ehcache：
+    + ehcache-core-2.6.11
+    + mybatis-ehcache-1.1.0
+- hibernate-validator：
+    + classmate-1.3.1
+    + hibernate-validator-5.4.2.Final
+    + jboss-logging-3.3.0.Final
+    + validation-api-1.1.0.Final
+- json-lib：
+    + commons-beanutils-1.8.0
+    + commons-collections-3.2.1
+    + commons-lang-2.5
+    + ezmorph-1.0.6
+    + json-lib-2.4-jdk15
+- jackson：
+    + jackson-annotations-2.9.6
+    + jackson-core-2.9.6
+    + jackson-databind-2.9.6
+- c3p0：
+    + c3p0-0.9.2.1
+    + mchange-commons-java-0.2.3.4
+- mysql：
+    + mysql-connector-java-5.1.44
+
+#### 5.1.2 配置web.xml
+
+##### 5.1.2.1 注册Spring容器
+
+这里说的Spring配置文件指的是Spring容器，即整个SSM项目的总的容器。其中注册了数据源、事务管理、Service、Dao的bean等，不是SpringMVC的配置文件。SpringMVC的配置文件中是用来注册处理器、视图解析器等即相关bean的，只是SSM项目中的一部分。
+
+当然，我们也可以将这两个文件合二为一，不过一般不这样做。因为为了便于后期的维护，Spring的配置文件还要根据功能与模块再进行拆分，所以SpringMVC的配置文件就无需再合并了。
+
+```xml
+<!-- 注册Spring配置文件的位置 -->
+<context-param>
+    <param-name>contextConfigLocation</param-name>
+    <param-value>classpath:resources/spring-*.xml</param-value>
+</context-param>
+
+<!-- 注册ServletContext监听器 -->
+<listener>
+    <listener-class>org.springframework.web.context.ContextLoaderListener</listener-class>
+</listener>
+```
+
+##### 5.1.2.2 注册SpringMVC中央调度器及字符编码过滤器
+
+```xml
+<!-- 注册SpringMVC中央调度器 -->
+<servlet>
+    <servlet-name>springmvc</servlet-name>
+    <servlet-class>org.springframework.web.servlet.DispatcherServlet</servlet-class>
+    <init-param>
+        <param-name>contextConfigLocation</param-name>
+        <param-value>classpath:resources/spring-mvc.xml</param-value>
+    </init-param>
+    <load-on-startup>1</load-on-startup>
+</servlet>
+<servlet-mapping>
+    <servlet-name>springmvc</servlet-name>
+    <url-pattern>*.do</url-pattern>
+</servlet-mapping>
+
+<!-- 注册字符编码过滤器 -->
+<filter>
+    <filter-name>characterEncodingFilter</filter-name>
+    <filter-class>org.springframework.web.filter.CharacterEncodingFilter</filter-class>
+    <init-param>
+        <param-name>encoding</param-name>
+        <param-value>utf-8</param-value>
+    </init-param>
+    <init-param>
+        <param-name>forceEncoding</param-name>
+        <param-value>true</param-value>
+    </init-param>
+</filter>
+<filter-mapping>
+    <filter-name>characterEncodingFilter</filter-name>
+    <url-pattern>/*</url-pattern>
+</filter-mapping>
+```
+
+### 5.2 配置式开发
+
+完成一个简单的表单注册功能。
+
+*以下内容在工程SpringMVC-70-ssm-xml中。*
+
+#### 5.2.1 定义实体类及student表
+
+实体类：
+
+```java
+public class Student {
+    
+    private Integer id;
+    private String name;
+    private int age;
+
+    public Student(String name, int age) {
+        this.name = name;
+        this.age = age;
+    }
+
+    public Student() {
+    }
+
+    public Integer getId() {
+        return id;
+    }
+
+    public void setId(Integer id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public int getAge() {
+        return age;
+    }
+
+    public void setAge(int age) {
+        this.age = age;
+    }
+
+    @Override
+    public String toString() {
+        return "Student [id=" + id + ", name=" + name + ", age=" + age + "]";
+    }
+}
+```
+
+表：
+
+```sql
+CREATE TABLE `student` (
+  `id` int(5) NOT NULL AUTO_INCREMENT,
+  `name` varchar(20) DEFAULT NULL,
+  `age` int(3) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8
+```
+
+#### 5.2.2 定义index页面
+
+```html
+<body>
+    <form action="test/register.do" method="POST">
+        <label>
+            姓名：
+            <input type="text" name="name" />
+        </label>
+        <br>
+        <label>
+            年龄：
+            <input type="text" name="age" />
+        </label>
+        <br>
+        <input type="submit" value="注册" />
+    </form>
+</body>
+```
+
+#### 5.2.3 定义处理器
+
+```java
+public class StudentController implements Controller {
+    
+    private IStudentService service;
+    
+    public void setService(IStudentService service) {
+        this.service = service;
+    }
+
+    @Override
+    public ModelAndView handleRequest(HttpServletRequest req, HttpServletResponse rep) throws Exception {
+        
+        String name = req.getParameter("name");
+        int age = Integer.parseInt(req.getParameter("age"));
+        
+        service.addStudent(new Student(name, age));
+        
+        return new ModelAndView("/WEB-INF/jsp/welcome.jsp");
+    }
+}
+```
+
+#### 5.2.4 定义Service接口及实现类
+
+Service接口：
+
+```java
+public interface IStudentService {
+    void addStudent(Student student);
+}
+```
+
+实现类：
+
+```java
+public class IStudentServiceImpl implements IStudentService {
+
+    private IStudentDao dao;
+    
+    public void setDao(IStudentDao dao) {
+        this.dao = dao;
+    }
+
+    @Override
+    public void addStudent(Student student) {
+        dao.insertStudent(student);
+    }
+}
+```
+
+#### 5.2.5 定义Dao接口
+
+Dao接口：
+
+```java
+public interface IStudentDao {
+    void insertStudent(Student student);
+}
+```
+
+#### 5.2.6 定义mybatis配置文件
+
+##### 5.2.6.1 mapper配置文件
+
+在`IStudentDao`的包中定义IStudentDao.xml：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="pers.tavish.dao.IStudentDao">
+    <insert id="insertStudent">
+        insert into student(name, age) values(#{name}, #{age})
+    </insert>
+</mapper>
+```
+
+##### 5.2.6.2 mybatis主配置文件
+
+在resources下定义mybatis.xml：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE configuration
+    PUBLIC "-//mybatis.org//DTD Config 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-config.dtd">
+<configuration>
+    <!-- 为实体类指定别名，别名为简单类名 -->
+    <typeAliases>
+        <package name="pers.tavish.beans" />
+    </typeAliases>
+    
+    <!-- 注册映射文件 -->
+    <mappers>
+        <package name="pers.tavish.dao" />
+    </mappers>
+</configuration>
+```
+
+#### 5.2.7 定义Spring相关配置文件
+
+##### 5.2.7.1 注册数据源及数据库连接四要素
+
+注册c3p0数据源：在resources下定义spring-db.xml。
+
+```xml
+<!-- 注册c3p0数据源 -->
+<bean id="dataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource">
+    <property name="driverClass" value="${jdbc.driver}" />
+    <property name="jdbcUrl" value="${jdbc.url}" />
+    <property name="user" value="${jdbc.user}" />
+    <property name="password" value="${jdbc.password}" />
+</bean>
+
+<!-- 注册属性文件 -->
+<context:property-placeholder location="classpath:resources/jdbc.properties"/> 
+```
+
+
+定义数据库连接四要素：在resources下定义jdbc.properties。
+
+```text
+jdbc.driver=com.mysql.jdbc.Driver
+jdbc.url=jdbc:mysql://localhost:3306/test
+jdbc.user=root
+jdbc.password=mysql
+```
+
+##### 5.2.7.2 生成Dao的代理对象
+
+在resources下定义spring-mybatis.xml：
+
+```xml
+<!-- 注册SqlSessionFactory -->    
+<bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+    <!-- 注册mybatis配置文件位置 -->
+    <property name="configLocation" value="classpath:resources/mybatis.xml" />
+    <!-- 注入数据源 -->
+    <property name="dataSource" ref="dataSource" />
+</bean>
+
+<!-- 生成Dao的代理对象 -->
+<bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+    <!-- 注入sqlSessionFactory -->
+    <property name="sqlSessionFactoryBeanName" value="sqlSessionFactory" />
+    <!-- 定义要生成代理的包 -->
+    <property name="basePackage" value="pers.tavish.dao" />
+</bean>
+```
+
+##### 5.2.7.3 注册Service
+
+在resources下定义spring-service.xml：
+
+```xml
+<!-- 注册Service -->
+<bean id="studentService" class="pers.tavish.services.IStudentServiceImpl">
+    <!-- 注入dao -->
+    <property name="dao" ref="IStudentDao" />
+</bean>
+```
+
+##### 5.2.7.4 注册处理器
+
+在resources下定义spring-mvc.xml：
+
+```xml
+<!-- 注册处理器 -->
+<bean id="/test/register.do" class="pers.tavish.handlers.StudentController">
+    <property name="service" ref="studentService" /> 
+</bean>
+```
+
+##### 5.2.7.5 配置事务管理器
+
+在resources下定义spring-tx.xml：
+
+```xml
+<!-- 注册事务管理器 -->
+<bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+    <property name="dataSource" ref="dataSource" />
+</bean>
+
+<!-- 注册事务通知 -->
+<tx:advice id="txAdvice" transaction-manager="transactionManager">
+    <tx:attributes>
+        <tx:method name="add*" isolation="DEFAULT" propagation="REQUIRED"/>
+    </tx:attributes>
+</tx:advice>    
+
+<!-- AOP配置 -->
+<aop:config>
+    <aop:pointcut expression="execution(* *..services.*.*(..))" id="studentPointcut"/>
+    <aop:advisor advice-ref="txAdvice" pointcut-ref="studentPointcut"/>
+</aop:config>
+```
+
+### 5.3 注解式开发
+
+*以下内容在工程SpringMVC-71-ssm-annotation中。*
+
+#### 5.3.1 将SpringMVC改为注解
+
+##### 5.3.1.1 注册组件扫描器
+
+修改spring-mvc.xml将处理器的注册方式由bean注册方式改为组件扫描器：
+
+```xml
+<context:component-scan base-package="pers.tavish.handlers" />
+```
+
+##### 5.3.1.2 修改处理器
+
+处理器中需要以注解的方式完成对Service的注入：
+
+```java
+@Controller
+@RequestMapping("/test")
+public class StudentController {
+    
+    @Autowired // ByName注入
+    @Qualifier("studentService")
+    private IStudentService service;
+    
+    public void setService(IStudentService service) {
+        this.service = service;
+    }
+
+    @RequestMapping("/register.do")
+    public String doRegister(String name, int age) {
+        
+        service.addStudent(new Student(name, age));
+        
+        return "/WEB-INF/jsp/welcome.jsp";
+    }
+}
+```
+
+注入方式也可以选择ByType方式:
+
+```java
+@Autowired
+private IStudentService service;
+```
+
+#### 5.3.2 将Spring改为注解
+
+##### 5.3.2.1 注册组件扫描器
+
+修改spring-service.xml将service的注册方式由bean注册方式改为组件扫描器：
+
+```xml
+<context:component-scan base-package="pers.tavish.services" /> 
+```
+
+##### 5.3.2.2 修改Service实现类
+
+Service实现类中要完成对Dao的注入：
+
+```java
+@Service("studentService")
+public class IStudentServiceImpl implements IStudentService {
+
+    @Autowired // ByType注入
+    private IStudentDao dao;
+    
+    public void setDao(IStudentDao dao) {
+        this.dao = dao;
+    }
+
+    @Override
+    public void addStudent(Student student) {
+        dao.insertStudent(student);
+    }
+}
+```
+
+这里如果选择使用ByName方式注入，则注入的Name为Dao接口的简单类名，因为我们没有自己定义Dao接口的实现类：
+
+```java
+@Autowired
+@Qualifier("IStudentDao")
+private IStudentDao dao;
+```
+
+##### 5.3.2.3 将事务以注解方式织入Service
+
+修改spring-tx.xml：
+
+```xml
+<!-- 注册事务管理器 -->
+<bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+    <property name="dataSource" ref="dataSource" />
+</bean>
+
+<!-- 注册事务通知 -->
+<tx:annotation-driven transaction-manager="transactionManager" />
+```
+
+修改Service实现类：
+
+```java
+@Service("studentService")
+public class IStudentServiceImpl implements IStudentService {
+
+    @Autowired
+    private IStudentDao dao;
+
+    public void setDao(IStudentDao dao) {
+        this.dao = dao;
+    }
+
+    @Override
+    @Transactional(isolation = Isolation.DEFAULT, propagation = Propagation.REQUIRED)
+    public void addStudent(Student student) {
+        dao.insertStudent(student);
+    }
+}
+```
+
+#### 5.3.3 将MyBatis改为注解
+
+一般情况下，考虑到性能和日后维护的问题，MyBatis是不建议使用注解式开发的。对于大型的项目还是尽量使用配置式对MyBatis进行开发。
+
+删除MyBatis的映射文件，直接修改Dao接口即可：
+
+```java
+public interface IStudentDao {
+    @Insert("insert into student(name, age) values(#{name}, #{age})")
+    void insertStudent(Student student);
+}
+```
