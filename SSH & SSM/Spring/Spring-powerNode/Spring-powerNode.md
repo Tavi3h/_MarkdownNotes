@@ -198,11 +198,11 @@ ApplicationContext用于加载Spring的配置文件，在程序中充当“容�
 例如：
 
     // 使用FileSystemXmlApplicationContext
-    ApplicationContext ac = new FileSystemXmlApplicationContext(applicationContext.xml");
+    ApplicationContext ac = new FileSystemXmlApplicationContext("applicationContext.xml");
 
 ##### 2.1.4.2 BeanFactory接口容器
 
-*注意：该容器已经的实现类XmlBeanFactory已经被标注为deprecate。*
+*注意：该容器的实现类XmlBeanFactory已经被标注为deprecate。*
 
 BeanFactory接口对象也可作为Spring容器出现。BeanFactory接口是ApplicationContext接口的父接口。
 
