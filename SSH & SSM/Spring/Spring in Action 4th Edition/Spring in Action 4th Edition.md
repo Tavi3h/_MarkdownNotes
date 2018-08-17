@@ -188,28 +188,21 @@ public class BraveKnightTest {
 现在`BraveKnight`类可以接受你传递给它的任意一种`Quest`的实现，但该怎样把特定的`Quest`实现传给它呢？假设，希望`BraveKnight`所要进行探险任务是杀死一只怪龙，那么`SlayDragonQuest`也许是挺合适的。
 
 ```java
-package sia.knights.test;
+package sia.knights;
 
-import org.junit.Test;
+import java.io.PrintStream;
 
-import sia.knights.BraveKnight;
-import sia.knights.Quest;
+public class SlayDragonQuest implements Quest {
 
-import static org.mockito.Mockito.*;
+    private PrintStream stream;
 
-public class BraveKnightTest {
-    
-    @Test
-    public void knightShouldEmbarkOnQuest() {
-        // 创建mock Quest
-        Quest mockQuest = mock(Quest.class);
-        
-        // 注入 mock Quest
-        BraveKnight knight = new BraveKnight(mockQuest);
-        
-        knight.embarkOnQuest();
-        
-        verify(mockQuest, times(1)).embark();
+    public SlayDragonQuest(PrintStream stream) {
+        this.stream = stream;
+    }
+
+    @Override
+    public void embark() {
+        stream.println("Embarking on quest to slay the dragon!");
     }
 }
 ```
@@ -1223,24 +1216,24 @@ public class SgtPeppers implements CompactDisc {
 }
 ```
 
-和`CompactDisc`接口一样，`SgtPeppers`的具体内容并不重要。你需要注意的就是SgtPeppers类上使用了`@Component`注解。这个简单的注解表明该类会作为组件类，并告知Spring要为这个类创建bean。没有必要显式配置`SgtPeppers` bean，因为这个类使用了`@Component`注解，所以Spring会为你把事情处理妥当。
+和`CompactDisc`接口一样，`SgtPeppers`的具体内容并不重要。你需要注意的就是·类上使用了`@Component`注解。这个简单的注解表明该类会作为组件类，并告知Spring要为这个类创建bean。没有必要显式配置`SgtPeppers` bean，因为这个类使用了`@Component`注解，所以Spring会为你把事情处理妥当。
 
 不过，**组件扫描默认是不启用的**。我们还需要显式配置一下Spring，从而命令它去寻找带有`@Component`注解的类，并为其创建bean。
+
+（注意，根据这个注解的文档“Configures component scanning directives for use with @{@link Configuration} classes.”，表明这个注解应该搭配`@Configuration`使用。但本例的测试没有使用`@Configuration`也通过了。但通常情况下我们还是应该在配置类上使用`@Configuration`。）
 
 ```java
 package soundsystem;
 
 import org.springframework.context.annotation.ComponentScan;
-import org.springframework.context.annotation.Configuration;
 
-@Configuration
 @ComponentScan
 public class CDPlayerConfig {
 
 }
 ```
 
-类`CDPlayerConfig`通过Java代码定义了Spring的装配规则。在2.3节中，我们还会更为详细地介绍基于Java的Spring配置。不过，现在我们只需观察一下`CDPlayerConfig`类并没有显式地声明任何bean，只不过它使用了`@ComponentScan`注解，这个注解能够在Spring中启用组件扫描。
+`CDPlayerConfig`类并没有显式地声明任何bean，只不过它使用了`@ComponentScan`注解，这个注解能够在Spring中启用组件扫描。
 
 如果没有其他配置的话，**`@ComponentScan`默认会扫描与配置类相同的包**。因为`CDPlayerConfig`类位于`soundsystem`包中，因此Spring将会**扫描这个包以及这个包下的所有子包**，查找带有`@Component`注解的类。这样的话，就能发现`CompactDisc`，并且会在Spring中自动为其创建一个bean。
 
@@ -1329,8 +1322,6 @@ Spring支持将`@Named`作为`@Component`注解的替代方案。两者之间有
 为了指定不同的基础包，我们要做的就是在`@ComponentScan`的`value`或`basePackages`属性中指明包的名称：
 
 ```java
-@Configuration
-// @ComponentScan("soundsystem")
 @ComponentScan(basePackages = "soundsystem")
 public class CDPlayerConfig {
 
@@ -1340,7 +1331,6 @@ public class CDPlayerConfig {
 根据源码，`value`和`basePackages`属性的类型是`String[]`，所以我们可以指定多个包：
 
 ```java
-@Configuration
 @ComponentScan(basePackages = {"soundsystem", "video"})
 public class CDPlayerConfig {
 
@@ -1352,7 +1342,6 @@ public class CDPlayerConfig {
 `@ComponentScan`还提供了另外一种方法，那就是将其指定为包中所包含的类或接口，这需要使用属性`basePackageClasses`，它的类型是`Class<?>[]`：
 
 ```java
-@Configuration
 @ComponentScan(basePackageClasses = {CDPlayer.class, DVDPlayer.class})
 public class CDPlayerConfig {
 
@@ -1517,12 +1506,9 @@ public class CDPlayerTest {
 
 #### 2.3.1 创建配置类
 
-上一节的`CDPlayerConfig`类就是JavaConfig的一个样例：
-
 ```java
 package soundsystem;
 
-import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
@@ -1531,11 +1517,11 @@ public class CDPlayerConfig {
 }
 ```
 
-创建JavaConfig类的关键在于为其添加`@Configuration`注解，`@Configuration`注解表明这个类是一个配置类，该类应该包含在Spring应用上下文中如何创建bean的细节。
+创建JavaConfig类的关键在于为其添加`@Configuration`注解，`@Configuration`注解表明这个类是一个配置类，该类应该包含Spring应用上下文中如何创建bean的细节。
 
 这里由于我们要尽量使用显式配置，所以`@ComponentScan`被移除了。
 
-移除了`@ComponentScan`注解，此时的`CDPlayerConfig`类就没有任何作用了。如果你现在运行`CDPlayerTest`的话，测试会失败，并且会出现`NoSuchBeanDefinitionException`异常。测试期望被注入`CDPlayer`和`CompactDisc`，但是这些bean根本就没有创建，因为组件扫描不会发现它们。
+移除了`@ComponentScan`注解，此时的`CDPlayerConfig`类就没有任何作用了。如果你现在运行`CDPlayerTest`的话，测试会失败，并且会出现`NoSuchBeanDefinitionException`异常。测试期望被注入`CDPlayer`和`CompactDisc`，但是这些bean根本就没有创建。
 
 让我们看一下如何使用JavaConfig装配`CDPlayer`和`CompactDisc`。
 
@@ -3702,3 +3688,721 @@ Profile bean是在运行时条件化创建bean的一种方式，但是Spring 4�
 最后，我们学习了Spring表达式语言，它能够在运行时计算要注入到bean属性中的值。
 >
 对于bean装配，我们已经掌握了扎实的基础知识，现在我们要将注意力转向面向切面编程（aspect-oriented programming ，AOP）了。依赖注入能够将组件及其协作的其他组件解耦，与之类似，AOP有助于将应用组件与跨多个组件的任务进行解耦。在下一章，我们将会深入学习在Spring中如何创建和使用切面。
+
+## 第四章 面向切面的Spring
+
+本章内容：
+
+- 面向切面编程的基本原理
+- 通过POJO创建切面
+- 使用`@AspectJ`注解
+- 为AspectJ切面注入依赖
+
+在软件开发中，散布于应用中多处的功能被称为横切关注点（cross-cutting concern），例如日志、安全和事务管理等。通常来讲，这些横切关注点从概念上是与应用的业务逻辑相分离的（但是往往会直接嵌入到应用的业务逻辑之中）。把这些横切关注点与业务逻辑相分离正是面向切面编程（AOP）所要解决的问题。
+
+### 4.1 什么是面向切面编
+
+切面能帮助我们模块化横切关注点。简而言之，横切关注点可以被描述为影响应用多处的功能。例如，安全就是一个横切关注点，应用中的许多方法都会涉及到安全规则。
+
+<center>
+    ![图4.1-切面实现了横切关注点的模块化](images\图4.1-切面实现了横切关注点的模块化.PNG)
+    **切面实现了横切关注点（跨多个应用对象的逻辑）的模块化**
+</center>
+
+上图展现了一个被划分为模块的典型应用。每个模块的核心功能都是为特定业务领域提供服务，但是这些模块都需要类似的辅助功能，例如安全和事务管理。
+
+如果要重用通用功能的话，最常见的面向对象技术是继承（inheritance）或委托（delegation）。但是，如果在整个应用中都使用相同的基类，继承往往会导致一个脆弱的对象体系；而使用委托可能需要对委托对象进行复杂的调用。
+
+切面提供了取代继承和委托的另一种可选方案，而且在很多场景下更清晰简洁。在使用面向切面编程时，我们仍然在一个地方定义通用功能，但是可以通过声明的方式定义这个功能要以何种方式在何处应用，而无需修改受影响的类。**横切关注点可以被模块化为特殊的类，这些类被称为切面（aspect）**。这样做有两个好处：首先，现在每个关注点都集中于一个地方，而不是分散到多处代码中；其次，服务模块更简洁，因为它们只包含主要关注点（或核心功能）的代码，而次要关注点的代码被转移到切面中了。
+
+#### 4.1.1 定义AOP术语
+
+AOP已经形成了自己的术语。描述切面的常用术语有通知（advice）、切点（pointcut）和连接点（join point）。下图表示了这些概念是如何关联的：
+
+<center>
+    ![图4.2-通知、切点和连接点的关联](images\图4.2-通知、切点和连接点的关联.PNG)
+    **在一个或多个连接点上，可以把切面的功能（通知）织入到程序的执行过程中**
+</center>
+
+>
+遗憾的是，大多数用于描述AOP功能的术语并不直观，尽管如此，它们现在已经是AOP行话的组成部分了，为了理解AOP，我们必须了解这些术语。在我们进入某个领域之前，必须学会在这个领域该如何说话。
+
+**通知（Advice）**
+
+在AOP术语中，切面的工作被称为通知。通知定义了切面是什么以及何时使用。除了描述切面要完成的工作，通知还解决了何时执行这个工作的问题。
+
+Spring切面可以应用5种类型的通知：
+
+- 前置通知（Before）：在目标方法被调用之前调用通知功能。
+- 后置通知（After）：在目标方法完成之后调用通知，此时不会关心方法的输出是什么。
+- 返回通知（After-returning）：在目标方法成功执行之后调用通知。
+- 异常通知（After-throwing）：在目标方法抛出异常后调用通知。
+- 环绕通知（Around）：通知包裹了被通知的方法，在被通知的方法调用之前和调用之后执行自定义的行为。
+
+
+**连接点（Joint point）**
+
+我们的应用可能有数以千计的时机应用通知。这些时机被称为连接点。连接点是在应用执行过程中能够插入切面的一个点。这个点可以是调用方法时、抛出异常时、甚至修改一个字段时。切面代码可以利用这些点插入到应用的正常流程之中，并添加新的行为。
+
+**切点（Pontcut）**
+
+一个切面并不需要通知应用的所有连接点。切点有助于缩小切面所通知的连接点的范围。如果说通知定义了切面的“什么”和“何时”的话，那么切点就定义了“何处”。切点的定义会匹配通知所要织入的一个或多个连接点。我们通常使用明确的类和方法名称，或是利用正则表达式定义所匹配的类和方法名称来指定这些切点。有些AOP框架允许我们创建动态的切点，可以根据运行时的决策（比如方法的参数值）来决定是否应用通知。
+
+**切面（Aspect）**
+
+切面是通知和切点的结合。通知和切点共同定义了切面的全部内容：它是什么，在何时和何处完成其功能。
+
+**引入（Introduction）**
+
+引入允许我们向现有的类添加新方法或属性。
+
+**织入（Weaving）**
+
+织入是把切面应用到目标对象并创建新的代理对象的过程。切面在指定的连接点被织入到目标对象中。在目标对象的生命周期里有多个点可以进行织入：
+
+- 编译期：切面在目标类编译时被织入。这种方式需要特殊的编译器。AspectJ的织入编译器就是以这种方式织入切面的。
+- 类加载期：切面在目标类加载到JVM时被织入。这种方式需要特殊的类加载器（ClassLoader），它可以在目标类被引入应用之前增强该目标类的字节码。AspectJ 5的加载时织入（load-timeweaving，LTW）就支持以这种方式织入切面。
+- 运行期：切面在应用运行的某个时刻被织入。一般情况下，在织入切面时，AOP容器会为目标对象动态地创建一个代理对象。Spring AOP就是以这种方式织入切面的。
+
+#### 4.1.2 Spring对AOP的支持
+
+并不是所有的AOP框架都是相同的，它们在连接点模型上可能有强弱之分。有些允许在字段修饰符级别应用通知，而另一些只支持与方法调用相关的连接点。它们织入切面的方式和时机也有所不同。但是无论如何，创建切点来定义切面所织入的连接点是AOP框架的基本功能。
+
+Spring提供了4种类型的AOP支持：
+
+- 基于代理的经典Spring AOP。
+- 纯POJO切面。
+- `@AspectJ`注解驱动的切面。
+- 注入式AspectJ切面。
+
+前三种都是Spring AOP实现的变体，Spring AOP构建在动态代理基础上，因此Spring对AOP的支持局限于方法拦截。
+
+经典Spring AOP曾经非常好，但现在Spring提供了更简洁和干净的面向切面编程方式。引入了简单的声明式AOP和基于注解的AOP之后，Spring经典的AOP看起来就显得非常笨重和过于复杂，直接使用`ProxyFactory` Bean会让人感觉厌烦。
+
+借助Spring的aop命名空间，我们可以将纯POJO转换为切面。实际上，这些POJO只是提供了满足切点条件时所要调用的方法。遗憾的是，这种技术需要XML配置，但这的确是声明式地将对象转换为切面的简便方式。
+
+Spring借鉴了AspectJ的切面，以提供注解驱动的AOP。本质上，它依然是Spring基于代理的AOP，但是编程模型几乎与编写成熟的AspectJ注解切面完全一致。这种AOP风格的好处在于能够不使用XML来完成功能。
+
+如果你的AOP需求超过了简单的方法调用（如构造器或属性拦截），那么你需要考虑使用AspectJ来实现切面。在这种情况下，上文所示的第四种类型能够帮助你将值注入到AspectJ驱动的切面中。
+
+**Spring通知是Java编写的**
+
+Spring所创建的通知都是用标准的Java类编写的。这样的话，我们就可以使用与普通Java开发一样的集成开发环境（IDE）来开发切面。而且，定义通知所应用的切点通常会使用注解或在Spring配置文件里采用XML来编写，这两种语法对于Java开发者来说都是相当熟悉的。
+
+AspectJ与之相反。虽然AspectJ现在支持基于注解的切面，但AspectJ最初是以Java语言扩展的方式实现的。这种方式有优点也有缺点。通过特有的AOP语言，我们可以获得更强大和细粒度的控制，以及更丰富的AOP工具集，但是我们需要额外学习新的工具和语法。
+
+**Spring在运行时通知对象**
+
+通过在代理类中包裹切面，Spring在运行期把切面织入到Spring管理的bean中。
+
+如下所示，代理类封装了目标类，并拦截被通知方法的调用，再把调用转发给真正的目标bean。当代理拦截到方法调用时，在调用目标bean方法之前，会执行切面逻辑。
+
+<center>
+    ![图4.3-Spring的切面由包裹了目标对象的代理类实现](images\图4.3-Spring的切面由包裹了目标对象的代理类实现.PNG)
+    **Spring的切面包裹了目标对象的代理类实现。代理类处理方法的调用，执行额外的切面逻辑并调用目标方法**
+</center>
+
+直到应用需要被代理的bean时，Spring才创建代理对象。如果使用的是`ApplicationContext`的话，在`ApplicationContext`从`BeanFactory`中加载所有bean的时候，Spring才会创建被代理的对象。因为Spring运行时才创建代理对象，所以我们不需要特殊的编译器来织入Spring AOP的切面。
+
+**Spring只支持方法级别的连接点**
+
+正如前面所探讨过的，通过使用各种AOP方案可以支持多种连接点模型。因为Spring基于动态代理，所以Spring只支持方法连接点。这与一些其他的AOP框架是不同的，例如AspectJ和JBoss，除了方法切点，它们还提供了字段和构造器接入点。Spring缺少对字段连接点的支持，无法让我们创建细粒度的通知，例如拦截对象字段的修改。而且它不支持构造器连接点，我们就无法在bean创建时应用通知。
+
+但是方法拦截可以满足绝大部分的需求。如果需要方法拦截之外的连接点拦截功能，那么我们可以利用Aspect来补充Spring AOP的功能。
+
+### 4.2 通过切点来选择连接点
+
+正如之前所提过的，**切点用于准确定位应该在什么地方应用切面的通知**。通知和切点是切面的最基本元素。因此，了解如何编写切点非常重要。
+
+在Spring AOP中，要使用AspectJ的切点表达式语言来定义切点。关于Spring AOP的AspectJ切点，最重要的一点就是Spring仅支持AspectJ切点指示器（pointcut designator）的一个子集。Spring是基于代理的，而某些切点表达式是与基于代理的AOP无
+关的。
+
+Spring AOP支持的AspectJ切点指示器：
+
+AspectJ指示器 | 描述
+----- | -----
+`arg()` | 限制连接点匹配参数为指定类型的执行方法
+`@args()` | 限制连接点匹配参数由指定注解标注的执行方法
+`execution()` | 用于匹配是连接点的执行方法
+`this()` | 限制连接点匹配AOP代理的bean引用为指定类型的类
+`target` | 限制连接点匹配目标对象为指定类型的类
+`@target()` | 限制连接点匹配特定的执行对象，这些对象对应的类要具有指定类型的注解
+`within()` | 限制连接点匹配指定的类型
+`@within()` | 限制连接点匹配指定注解所标注的类型
+`@annotation` | 限定匹配带有指定注解的连接点
+
+在Spring中尝试使用AspectJ其他指示器时，将会抛出`IllegalArgumentException`异常。
+
+当我们查看如上所展示的这些Spring支持的指示器时，**注意只有`execution()`指示器是实际执行匹配的，而其他的指示器都是用来限制匹配的**。这说明`execution()`指示器是我们在编写切点定义时最主要使用的指示器。在此基础上，我们使用其他指示器来限制所匹配的切点。
+
+**`execution()`表达式的内容**
+
+```text
+execution(modifiers-pattern? ret-type-pattern declaring-type-pattern? name-pattern(param-pattern) throws-pattern?)
+```
+
+- modifiers-pattern?：表示的是修饰符，其中?代表可以省略
+- ret-type-pattern：方法的返回参数
+- declaring-type-pattern?：表示方法所在的类的访问路径
+- name-pattern(param-pattern)：表示的是方法名
+- throws-pattern?：表示的是异常
+
+#### 4.2.1 编写切点
+
+为了阐述Spring中的切面，我们需要有个主题来定义切面的切点。为此，这里定义一个`Performance`接口：
+
+```java
+package concert;
+
+public interface Performance {
+    void perform();
+}
+```
+
+`Performance`可以代表任何类型的现场表演，如舞台剧、电影或音乐会。
+
+现在我们编写`Performace`的`perform()`方法触发的通知。
+
+**（注意，这里的切点为接口的方法，不是实现类的方法。当括号里面解析为一个接口的方法时，Spring会去拦截其所有实现类的该方法。）**
+
+```text
+execution(* concert.Performance.perform(..))
+```
+
+<center>
+    ![图4.4-使用execution切点表达式来选择Performance类中的方法](images\图4.4-使用execution切点表达式来选择Performance类中的方法.PNG)
+    **使用execution()切点表达式来选择Performance的perform()方法**
+</center>
+
+- 第一个“*”表示任意的返回类型
+- concert.Performance.：方法所述的类
+- perform：方法名
+- (..)：任意参数
+
+假设我们需要配置的切点仅匹配concert包，再次场景下可以使用`within()`指示器来进行限制：
+
+```text
+execution(* concert.Performance.perform(..) && within(concert.*))
+```
+
+<center>
+    ![图4.5-使用within指示器进行限制](images\图4.5-使用within指示器进行限制.PNG)
+    **使用within()指示器限制切点范围**
+</center>
+
+这里使用了“&&”操作符将两个指示器连接在一起形成与关系（切点必须匹配所有指示器）。类似地还有“||”、“!”来表示或关系和非操作。
+
+**因为“&”在XML种有特殊含义，所以当使用XML配置时要使用“and”代替“&&”、“or”代替“||”以及“not”代替“!”。**
+
+#### 4.2.2 在切点中选择bean
+
+除了上文中表所列出的指示器外，Spring还引入了一个新的指示器`bean()`，它允许我们在切点表达式中使用bean的ID来标识bean。这用来限定只匹配特定的bean。
+
+例如：
+
+```text
+execution(* concert.Performance.perform(..) and bean('woodstock'))
+```
+
+这里我们希望在执行`Performance`的`perform()`方法时应用通知，但限定bean的ID为woodstock。
+
+同样的我们还可以使用非操作符：
+
+```text
+execution(* concert.Performance.perform(..) and !bean('woodstock'))
+```
+
+这样就限定了除了特定ID以外的bean应用通知。
+
+### 4.3 使用注解创建切面
+
+使用注解来创建切面是AspectJ 5所引入的关键特性。AspectJ 5之前，编写AspectJ切面需要学习一种Java语言的扩展，但是AspectJ面向注解的模型可以非常简便地通过少量注解把任意类转变为切面。
+
+我们已经定义了`Performance`接口，它是切面中切点的目标对象。现在，让我们使用AspecJ注解来定义切面。
+
+#### 4.3.1 定义切面
+
+如果一场演出没有观众的话，那不能称之为演出。对不对？从演出的角度来看，观众是非常重要的，但是对演出本身的功能来讲，它并不是核心，这是一个单独的关注点。因此，将观众定义为一个切面，并将其应用到演出上就是较为明智的做法。
+
+`Audience`类：
+
+```java
+package concert;
+
+import org.aspectj.lang.annotation.AfterReturning;
+import org.aspectj.lang.annotation.AfterThrowing;
+import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.annotation.Before;
+
+@Aspect
+public class Audience {
+
+    // 表演之前
+    @Before("execution(** concert.Performance.perform(..))")
+    public void silenceCellPhones() {
+        System.out.println("Silencing cell phones");
+    }
+
+    // 表演之前
+    @Before("execution(** concert.Performance.perform(..))")
+    public void takeSeats() {
+        System.out.println("Taking seats");
+    }
+
+    // 表演之后
+    @AfterReturning("execution(** concert.Performance.perform(..))")
+    public void applause() {
+        System.out.println("CLAP CLAP CLAP!!!");
+    }
+
+    // 表演失败之后
+    @AfterThrowing("execution(** concert.Performance.perform(..))")
+    public void demandRefund() {
+        System.out.println("Demanding a refund");
+    }
+}
+```
+
+`Audience`类使用`@AspectJ`注解，该注解表明`Audience`不仅仅是一个POJO，同时它还是一个切面。`Audience`类中的方法都使用注解来定义切面的具体行为。
+
+`Audience`有四个方法，定义了一个观众在观看演出时可能会做的事情。在演出之前，观众要就坐（`takeSeats()`）并将手机调至静音状态（`silenceCellPhones()`）。如果演出很精彩的话，观众应该会鼓掌喝彩（`applause()`）。不过，如果演出没有达到观众预期的话，观众会要求退款（`demandRefund()`）。
+
+可以看到这些方法都使用了通知注解来表明它们应该在什么时候调用。AspectJ提供了五个注解来定义通知：
+
+注解 | 通知
+-----|-----
+`@After` | 通知方法会在目标方法返回或抛出异常后调用
+`@AfterReturing` | 通知方法会在目标方法返回后调用
+`@AfterThrowing` | 通知方法会在目标方法抛出异常后调用
+`@Around` | 通知方法会将目标方法封装起来
+`@Before` | 通知方法会在目标方法调用之前执行
+
+`Audience`使用到了前面五个注解中的三个。`takeSeats()`和`silenceCellPhones()`方法都用到了`@Before`注解，表明它们应该在演出开始之前调用。`applause()`方法使用了`@AfterReturning`注解，它会在演出成功返回后调用。`demandRefund()`方法上添加了`@AfterThrowing`注解，这表明它会在抛出异常以后执行。
+
+所有的这些注解都给定了一个切点表达式作为它的值，同时，这四个方法的切点表达式都是相同的。其实，它们可以设置成不同的切点表达式，但是在这里，这个切点表达式就能满足所有通知方法的需求。如果我们只定义这个切点一次，然后每次需要的时候引用它，那么这会是一个很好的方案。
+
+我们完全可以这样做：`@Pointcut`注解能够在一个`@AspectJ`切面内定义可重用的切点：
+
+在`Audience`中，`performance()`方法使用了`@Pointcut`注解。为`@Pointcut`注解设置的值是一个切点表达式，就像之前在通知注解上所设置的那样。通过在`performance()`方法上添加`@Pointcut`注解，我们实际上扩展了切点表达式语言，这样就可以在任何的切点表达式中使用`performance()`了。
+
+**`performance()`方法的实际内容并不重要，在这里它实际上应该是空的。其实该方法本身只是一个标识，供`@Pointcut`注解依附。**
+
+需要注意的是，除了注解和没有实际操作的`performance()`方法，`Audience`类依然是一个POJO。我们能够像使用其他的Java类那样调用它的方法，它的方法也能够独立地进行单元测试，这与其他的Java类并没有什么区别。`Audience`只是一个Java类，只不过它通过注解表明会作为切面使用而已。
+
+像其它类一样，我们也可以将`Audience`装配为Spring中的bean：
+
+```java
+@Bean
+public Audience audience() {
+    return new Audience();
+}
+```
+
+如果我们就此止步的话，`Audience`只会是Spring容器中的一个bean。即使我们用了AspectJ注解，它也不会被视为切面，这些注解被解析，也不会创建将其转为切面的代理。
+
+如果我们使用JavaConfig配置，那么可以在配置类的类级别上通过使用`@EnableAspectJAutoProxy`注解启用自动代理功能：
+
+```java
+package concert;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.EnableAspectJAutoProxy;
+
+@Configuration
+@ComponentScan
+@EnableAspectJAutoProxy
+public class ConcertConfig {
+
+    @Bean
+    public Audience audience() {
+        return new Audience();
+    }
+}
+```
+
+如果使用XML配置，则要使用元素`<aop:aspectj-autoproxy />`
+
+无论我们使用什么配置，AspectJ都会为使用`@AspectJ`注解的bean创建一个代理，这个代理会围绕着所有该切面的切点所匹配的bean。在这种情况下，将会为`Concert` bean创建一个代理，`Audience`类中的通知方法将会在`perform()`调用前后执行。
+
+我们需要记住的是，Spring的AspectJ自动代理仅仅使用`@AspectJ`作为创建切面的指导，切面依然是基于代理的。在本质上，它依然是Spring基于代理的切面。这一点非常重要，因为这意味着尽管使用的是`@AspectJ`注解，但我们仍然限于代理方法的调用。如果想利用AspectJ的所有能力，我们必须在运行时使用AspectJ并且不依赖Spring来创建基于代理的切面。
+
+到现在为止，我们的切面在定义时，使用了不同的通知方法来实现前置通知和后置通知。但是我们还有另外的一种通知：环绕通知（around advice）。环绕通知与其他类型的通知有所不同，因此值得花点时间来介绍如何进行编写。
+
+#### 4.3.2 创建环绕通知
+
+环绕通知是最为强大的通知类型。它能够让你所编写的逻辑将被通知的目标方法完全包装起来。实际上就像在一个通知方法中同时编写前置通知和后置通知。
+
+为了描述环绕通知，我们重写`Audience`切面。这次使用一个环绕通知来代替之前的多个不同的前置通知和后置通知：
+
+```java
+@Around("performance()")
+public void watchPerformance(ProceedingJoinPoint jp) {
+    System.out.println("Silencing cell phones");
+    System.out.println("Taking seats");
+    try {
+        jp.proceed();
+    } catch (Throwable e) {
+        System.out.println("Demanding a refund");
+    }
+    System.out.println("CLAP CLAP CLAP!!!");
+}
+```
+
+在这里，`@Around`注解表明`watchPerformance()`方法会作为performance()切点的环绕通知。在这个通知中，观众在演出之前会将手机调至静音并就坐，演出结束后会鼓掌喝彩。像前面一样，如果演出失败的话，观众会要求退款。
+
+关于这个新的通知方法，你首先注意到的可能是它接受`ProceedingJoinPoint`作为参数。这个对象是必须要有的，因为你要在通知中通过它来调用被通知的方法。通知方法中可以做任何的事情，当要将控制权交给被通知的方法时，它需要调用`ProceedingJoinPoint`的`proceed()`方法。**如果不调这个方法的话，那么你的通知实际上会阻塞对被通知方法的调用。**
+
+#### 4.3.3 处理通知中的参数
+
+到目前为止，我们的切面都很简单，没有任何参数。唯一的例外是我们为环绕通知所编写的`watchPerformance()`示例方法中使用了`ProceedingJoinPoint`作为参数。除了环绕通知，我们编写的其他通知不需要关注传递给被通知方法的任意参数。这很正常，因为我们所通知的`perform()`方法本身没有任何参数。
+
+但是，如果切面所通知的方法确实有参数该怎么办呢？切面能访问和使用传递给被通知方法的参数吗？
+
+为了阐述这个问题，让我们重新看一下`BlankDisc`样例。
+
+`CompactDisc`接口：
+
+```java
+package soundsystem;
+
+public interface CompactDisc {
+    void playTrack(int trackNumber);
+}
+
+```
+
+`BlankDisc`类：
+
+```java
+package soundsystem;
+
+import java.util.List;
+
+import soundsystem.CompactDisc;
+
+public class BlankDisc implements CompactDisc {
+
+    private String title;
+    private String artist;
+    private List<String> tracks;
+
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    public void setArtist(String artist) {
+        this.artist = artist;
+    }
+
+    public void setTracks(List<String> tracks) {
+        this.tracks = tracks;
+    }
+
+    public void play() {
+        for (int i = 0; i < tracks.size(); i++) {
+            playTrack(i);
+        }
+    }
+
+    @Override
+    public void playTrack(int trackNumber) {
+        System.out.println("Playing " + title + " -Track: " + trackNumber + " " + tracks.get(trackNumber) + " by " + artist);
+    }
+}
+```
+
+这里`play()`方法会循环所有的音轨，并调用`playTrack()`方法。
+
+现在我们假设想要记录每个音轨被播放的次数。其中一种方法就是修改`playTrack()`的实现，直接在每次调用的时候记录这个数量。但是记录音轨的播放次数与播放本身是不同的关注点，因此这个任务不应该属于`playTrack()`方法，而是术语切面要完成的任务。
+
+为了记录每个磁道所播放的次数，我们创建了`TrackCounter`类，它是通知`playTrack()`方法的一个切面。
+
+```java
+package soundsystem;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.annotation.Before;
+import org.aspectj.lang.annotation.Pointcut;
+
+@Aspect
+public class TrackCounter {
+
+    private Map<Integer, Integer> trackCounts = new HashMap<>();
+
+    // 定义切点
+    @Pointcut("execution(* soundsystem.CompactDisc.playTrack(int)) && args(trackNumber)")
+    public void trackPlayed(int trackNumber) {
+
+    }
+
+    // 在播放前为该音轨计数
+    @Before("trackPlayed(trackNumber)")
+    public void countTrack(int trackNumber) {
+        int currentCount = getPlayCount(trackNumber);
+        trackCounts.put(trackNumber, currentCount + 1);
+    }
+
+    public int getPlayCount(int trackNumber) {
+        return trackCounts.containsKey(trackNumber) ? trackCounts.get(trackNumber) : 0;
+    }
+}
+```
+
+与之前所创建的切面相同，这个切面使用`@Pointcut`注解定义，并使用`@Before`将一个方法声明为前置通知。但是，着谜的不同点在于切点声明了要提供给通知方法的参数：
+
+<center>
+    ![图4.6-在切点表达式中声明参数](images\图4.6-在切点表达式中声明参数.PNG)
+    **在切点表达式中声明参数，这个参数传入到通知方法中**
+</center>
+
+需要关注的是切点表达式中的`args(trackNumber)`限定符。它表明传递给`playTrack()`方法的int类型参数也会传递到通知中去。参数的名称`trackNumber`也与切点方法签名中的参数相匹配。
+
+这个参数会传递到通知方法中，这个通知方法是通过`@Before`注解和命名切点`trackPlayed(trackNumber)`定义的。切点定义中的参数与切点方法中的参数名称是一样的，这样就完成了从命名切点到通知方法的参数转移。
+
+我们可以在Spring配置中将`BlankDisc`和`TrackCounter`定义为bean，并启用AspectJ自动代理：
+
+```java
+package soundsystem;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.EnableAspectJAutoProxy;
+
+@Configuration
+@EnableAspectJAutoProxy
+public class TrackCounterConfig {
+
+    @Bean("sgtPeppers")
+    public CompactDisc sgtPeppers() {
+        BlankDisc cd = new BlankDisc();
+        cd.setTitle("Sgt. Pepper's Lonely Hearts Club Band");
+        cd.setArtist("The Beatles");
+        List<String> tracks = new ArrayList<>();
+        tracks.add("Sgt. Pepper's Lonely Hearts Club Band");
+        tracks.add("With a Little Help from My Friends");
+        tracks.add("Lucy in the Sky with Diamonds");
+        tracks.add("Getting Better");
+        tracks.add("Fixing a Hole");
+        cd.setTracks(tracks);
+        return cd;
+    }
+
+    @Bean("trackCounter")
+    public TrackCounter trackCounter() {
+        return new TrackCounter();
+    }
+}
+```
+
+编写测试类：
+
+```java
+package soundsystem;
+
+import static org.junit.Assert.assertEquals;
+
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.contrib.java.lang.system.SystemOutRule;
+import org.junit.runner.RunWith;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+
+@RunWith(SpringJUnit4ClassRunner.class)
+@ContextConfiguration(classes = TrackCounterConfig.class)
+public class TrackCounterTest {
+    
+    @Rule
+    public final SystemOutRule log = new SystemOutRule().enableLog();
+    
+    @Autowired
+    private CompactDisc cd;
+    
+    @Autowired
+    private TrackCounter counter;
+    
+    @Test
+    public void testTrackCounter() {
+        cd.playTrack(1);
+        cd.playTrack(2);
+        cd.playTrack(3);
+        cd.playTrack(3);
+        cd.playTrack(3);
+        cd.playTrack(3);
+        cd.playTrack(4);
+        assertEquals(0, counter.getPlayCount(0));
+        assertEquals(1, counter.getPlayCount(1));
+        assertEquals(1, counter.getPlayCount(2));
+        assertEquals(4, counter.getPlayCount(3));
+        assertEquals(1, counter.getPlayCount(4));
+    }
+}
+```
+
+测试均正常通过。
+
+到目前为止，在我们所使用的切面中，所包装的都是被通知对象的已有方法。但是，方法包装仅仅是切面所能实现的功能之一。让我们看一下如何通过编写切面，为被通知的对象引入全新的功能。
+
+#### 4.3.4 通过注解引入新功能
+
+一些编程语言，例如Ruby和Groovy，有开放类的理念。它们可以不用直接修改对象或类的定义就能够为对象或类增加新的方法。不过，Java并不是动态语言。一旦类编译完成了，我们就很难再为该类添加新的功能了。
+
+但是如果仔细想想，我们在本章中不是一直在使用切面这样做吗？当然，我们还没有为对象增加任何新的方法，但是已经为对象拥有的方法添加了新功能。如果切面能够为现有的方法增加额外的功能，为什么不能为一个对象增加新的方法呢？实际上，利用被称为**引入（introduction）**的AOP概念，切面可以为Spring bean添加新方法。
+
+在Spring中，切面只是实现了它们所包装bean相同接口的代理。如果除了实现这些接口，代理也能暴露新接口的话，会怎么样呢？那样的话，切面所通知的bean看起来像是实现了新的接口，即便底层实现类并没有实现这些接口也无所谓。
+
+<center>
+    ![图4.7-使用Spring AOP我们可以为bean引入新的方法](images\图4.7-为bean引入新的方法.PNG)
+    **使用Spring AOP，我们可以为bean引入新的方法。代理拦截调用并委托给实现该方法的其他对象**
+</center>
+
+我们需要注意的是，当引入接口的方法被调用时，代理会把此调用委托给实现了新接口的某个其他对象。实际上，一个bean的实现被拆分到了多个类中。
+
+下面来验证这个主意是否能行得通。我们为示例中的所有的`Performance`实现引入下面的`Encoreable`接口：
+
+```java
+package concert;
+
+public interface Encoreable {
+    void performEncore();
+}
+```
+
+我们需要有一种方式将这个接口应用到`Performance`实现中。我们现在假设你能够访问`Performance`的所有实现，并对其进行修改，让它们都实现`Encoreable`接口。但是，从设计的角度来看，这并不是最好的做法，并不是所有的`Performance`都是具有`Encoreable`特性的。另一方面，我们有可能无法修改`Performance`实现，当使用第三方实现并且没有源码的时候更是如此。
+
+值得庆幸的是，借助于AOP的引入功能，我们可以不必在设计上妥协或者侵入性地改变现有的实现。为了实现该功能，我们要创建一个新的切面：
+
+```java
+package concert;
+
+import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.annotation.DeclareParents;
+
+@Aspect
+public class EncoreableIntroducer {
+
+    @DeclareParents(value = "concert.Performance+", defaultImpl = DefaultEncoreable.class)
+    public static Encoreable encoreable;
+}
+```
+
+可以看到，`EncoreableIntroducer`是一个切面。但是，它与我们之前所创建的切面不同，它并没有提供前置、后置或环绕通知，而是通过`@DeclareParents`注解，将`Encoreable`接口引入到`Performance` bean中。
+
+`@DeclareParents`注解由三部分组成：
+
+- value属性指定了哪种类型的bean要引入该接口。在本例中，也就是所有实现`Performance`的类型。（标记符后面的加号表示是`Performance`的所有子类型，而不是`Performance`本身。）
+- defaultImpl属性指定了为引入功能提供实现的类。在这里，我们指定的是`DefaultEncoreable`提供实现。
+- `@DeclareParents`注解所标注的静态属性指明了要引入了接口。在这里，我们所引入的是`Encoreable`接口。
+
+和其他的切面一样，我们需要在Spring应用中将`EncoreableIntroducer`声明为一个bean。
+
+```java
+@Bean
+public EncoreableIntroducer introducer() {
+    return new EncoreableIntroducer();
+}
+```
+
+Spring的自动代理机制会获取到它的声明, 然后当Spring发现一个bean中使用了`@Aspect`注解时, Spring就会创建一个代理, 然后由代理调用目标bean的方法或是被引入接口的方法。
+
+`EncoreableIntroducer`中声明了我们的默认实现为`DefaultEncoreable`，所以要创建这个类：
+
+（该类不用注册为bean）
+
+```java
+package concert;
+
+public class DefaultEncoreable implements Encoreable {
+
+    @Override
+    public void performEncore() {
+        System.out.println("Final Encore!");
+    }
+}
+```
+
+下面进行测试。
+
+`Performance`实现类：
+
+```java
+package concert;
+
+public class OrchestralPerformance implements Performance {
+
+    @Override
+    public void perform() {
+        System.out.println("Orchestral performance now !");
+    }
+}
+```
+
+将其注册为bean：
+
+```java
+@Bean
+public Performance orchestral() {
+    return new OrchestralPerformance();
+}
+```
+
+测试类：
+
+```java
+package soundsystem;
+
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+
+import concert.ConcertConfig;
+import concert.Encoreable;
+import concert.Performance;
+
+@RunWith(SpringJUnit4ClassRunner.class)
+@ContextConfiguration(classes = ConcertConfig.class)
+public class IntroducerTest {
+
+    @Autowired
+    private Performance performance;
+
+    @Test
+    public void testEncore() {
+
+        // perform()切点上定义了环绕通知
+        performance.perform();
+
+        // 将Performance接口的实现强转为Encoreable
+        Encoreable encoreable = (Encoreable) performance;
+        // 调用Encoreable接口的performEncore()方法会自动调用DefaultEncoreable的performEncore()方法
+        encoreable.performEncore();
+    }
+}
+```
+
+输出：
+
+```text
+Silencing cell phones
+Taking seats
+Orchestral performance now !
+CLAP CLAP CLAP!!!
+Final Encore!
+```
+
+在Spring中，注解和自动代理提供了一种很便利的方式来创建切面。它非常简单，并且只涉及到最少的Spring配置。但是，面向注解的切面声明有一个明显的劣势：你必须能够为通知类添加注解。为了做到这一点，必须要有源码。
+
+如果我们没有源码的话，或者不想将AspectJ注解放到你的代码之中，Spring为切面提供了另外一种可选方案，即使用XML声明切面。
+
+### 4.4 在XML中声明切面
