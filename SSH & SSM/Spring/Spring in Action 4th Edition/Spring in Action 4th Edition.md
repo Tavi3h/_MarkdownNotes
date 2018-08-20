@@ -4,6 +4,15 @@
 
 *使用Eclipse + Gradle构建工程，Spring版本为4.3.9，OS为Windows10。相较于书中给出的源码，这里对一些类或语句以及写法做了少许修改*。
 
+- Part 1：**Spring核心**
+    + Chapter：01-04
+- Part 2：**Web中的Spring**
+    + Chapter：05-09
+- Part 3：**后端中的Spring**
+    + Chapter：10-14
+- Part 4：**Spring集成**
+    + Chapter：15-21
+
 ## 第一章 Spring之旅
 
 *以下内容代码在工程sia4e-P1_Core_Spring-C01_Springing_into_action中。*
@@ -3916,6 +3925,8 @@ execution(* concert.Performance.perform(..) and !bean('woodstock'))
 
 ### 4.3 使用注解创建切面
 
+*以下内容代码在工程sia4e-P1_Core_Spring-C04_Aspect-oriented_Spring-01_annotation中。*
+
 使用注解来创建切面是AspectJ 5所引入的关键特性。AspectJ 5之前，编写AspectJ切面需要学习一种Java语言的扩展，但是AspectJ面向注解的模型可以非常简便地通过少量注解把任意类转变为切面。
 
 我们已经定义了`Performance`接口，它是切面中切点的目标对象。现在，让我们使用AspecJ注解来定义切面。
@@ -4358,7 +4369,7 @@ public Performance orchestral() {
 测试类：
 
 ```java
-package soundsystem;
+package concert;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -4406,3 +4417,1877 @@ Final Encore!
 如果我们没有源码的话，或者不想将AspectJ注解放到你的代码之中，Spring为切面提供了另外一种可选方案，即使用XML声明切面。
 
 ### 4.4 在XML中声明切面
+
+*以下内容代码在工程sia4e-P1_Core_Spring-C04_Aspect-oriented_Spring-02_xml中。*
+
+在前面的内容中，我们曾经建立过这样一种原则，那就是基于注解的配置要优于基于Java的配置，基于Java的配置要优于基于XML的配置。**但是，如果你需要声明切面，但是又不能为通知类添加注解的时候，那么就必须转向XML配置了**。
+
+Spring的aop命名空间提供了多个元素用来在XML中声明切面，如下表所示：
+
+AOP配置元素 | 用途
+-----|-----
+`<aop:config>` | 顶层的AOP配置元素。大多数的`<aop:*>`元素必须包含在`<aop:config>`元素内
+`<aop:advisor>` | 定义AOP通知器
+`<aop:before>` | 定义一个AOP前置通知
+`<aop:after>` | 定义AOP后置通知（不管被通知的方法是否执行成功）
+`<aop:after-returning>` | 定义AOP返回通知
+`<aop:after-throwing>` | 定义AOP异常通知
+`<aop:around>` | 定义AOP环绕通知
+`<aop:aspect>` | 定义一个切面
+`<aop:aspectj-autoproxy>` | 启用`@AspectJ`注解驱动的切面
+`<aop:declare-parents>` | 以透明的方式为被通知的对象引入额外的接口
+`<aop:pointcut>` | 定义一个切点
+
+我们已经看过了`<aop:aspectj-autoproxy>`元素，它能够自动代理AspectJ注解的通知类。aop命名空间的其他元素能够让我们直接在Spring配置中声明切面，而不需要使用注解。
+
+例如，我们重新看一下`Audience`类，这一次我们将注解全部去掉：
+
+```java
+public class Audience {
+    
+    // 表演之前
+    public void silenceCellPhones() {
+        System.out.println("Silencing cell phones");
+    }
+
+    // 表演之前
+    public void takeSeats() {
+        System.out.println("Taking seats");
+    }
+
+    // 表演之后
+    public void applause() {
+        System.out.println("CLAP CLAP CLAP!!!");
+    }
+
+    // 表演失败之后
+    public void demandRefund() {
+        System.out.println("Demanding a refund");
+    }
+}
+```
+
+此时，这个类没有任何的特别之处，他就是有几个方法的简单Java类。尽管看起来并没有什么差别，但`Audience`已经具备了成为AOP通知的所有条件。
+
+#### 4.4.1 声明前置通知和后置通知
+
+使用Spring aop命名空间中的一些元素，将没有注解的`Audience`类转换为切面：
+
+```xml
+<!-- 声明Audience -->
+<bean id="audience" class="concert.Audience" />
+
+<aop:config>
+    <!-- 定义切面，引用audience -->
+    <aop:aspect ref="audience">
+        <!-- 前置通知 -->
+        <aop:before 
+            pointcut="execution(** concert.Performance.perform(..))"
+            method="silenceCellPhones" />
+        <!-- 前置通知 -->
+        <aop:before 
+            pointcut="execution(** concert.Performance.perform(..))"
+            method="takeSeats" />
+        <!-- 返回通知 -->
+        <aop:after-returning
+            pointcut="execution(** concert.Performance.perform(..))" 
+            method="applause" />
+        <!-- 异常通知 -->
+        <aop:after-throwing
+            pointcut="execution(** concert.Performance.perform(..))" 
+            method="demandRefund" />
+    </aop:aspect>
+</aop:config>
+```
+
+关于Spring AOP配置元素，第一个需要注意的事项是大多数的AOP配置元素必须在`<aop:config>`元素的上下文内使用。这条规则有几种例外场景，但是把bean声明为一个切面时，我们总是从`<aop:config>`元素开始配置的。
+
+在`<aop:config>`元素内，我们可以声明一个或多个通知器、切面或者切点。这里我们使用`<aop:aspect>`元素声明了一个简单的切面。`ref`元素引用了一个POJO bean，该bean实现了切面的功能。`ref`元素所引用的bean提供了在切面中通知所调用的方法。
+
+该切面应用了四个不同的通知。两个`<aop:before>`元素定义了匹配切点的方法执行之前调用前置通知方法，也就是`Audience` bean的`takeSeats()`和`turnOffCellPhones()`方法（由method属性所声明）。`<aop:after-returning>`元素定义了一个返回（after-returning）通知，在切点所匹配的方法调用之后再调用`applause()`方法。同样，`<aop:after-throwing>`元素定义了异常（after-throwing）通知，如果所匹配的方法执行时抛出任何的异常，都将会调用`demandRefund()`方法。
+
+下图展示了通知逻辑如何织入到业务逻辑中：
+
+<center>
+    ![图4.8-Audience方法包含的4种通知](images\图4.8-Audience方法包含的4种通知.PNG)
+    **Audience切面包含四种通知，它们把通知逻辑织入进匹配切面切点的方法中**
+</center>
+
+注意到所有通知元素中的`pointcut`属性的值都是一样的，这是因为所有的通知都要应用到相同的切点上。在基于AspectJ注解的通知中，当发现这种类型的重复时，我们使用`@Pointcut`注解消除了这些重复的内容。而在基于XML的切面声明中，我们需要使用`<aop:pointcut>`元素。
+
+下面将通用的起点表达式抽取到一个切点声明种，这样这个声明就能在所有通知中使用了：
+
+```xml
+<aop:config>
+    <!-- 定义切面，引用audience -->
+    <aop:aspect ref="audience">
+        <!-- 定义切点 -->
+        <aop:pointcut 
+            expression="execution(** concert.Performance.perform(..))"
+            id="performance" />
+        <!-- 前置通知，引用切点 -->
+        <aop:before pointcut-ref="performance" method="silenceCellPhones" />
+        <!-- 前置通知，引用切点 -->
+        <aop:before pointcut-ref="performance" method="takeSeats" />
+        <!-- 返回通知，引用切点 -->
+        <aop:after-returning pointcut-ref="performance" method="applause" />
+        <!-- 异常通知，引用切点 -->
+        <aop:after-throwing pointcut-ref="performance" method="demandRefund" />
+    </aop:aspect>
+</aop:config>
+```
+
+现在切点是在一个地方定义的，并且被多个通知元素所引用。`<aop:pointcut>`元素定义了一个`id`为performance的切点。同时修改所有的通知元素，用`pointcut-ref`属性来引用这个命名切点。
+
+`<aop:pointcut>`元素所定义的切点可以被同一个`<aop:aspect>`元素之内的所有通知元素引用。如果想让定义的切点能够在多个切面使用，我们可以把`<aop:pointcut`>元素放在`<aop:config>`元素的范围内。
+
+#### 4.4.2 声明环绕通知
+
+目前`Audience`的实现工作得非常棒，但是前置通知和后置通知有一些限制。具体来说，如果不使用成员变量存储信息的话，在前置通知和后置通知之间共享信息非常麻烦。
+
+假设除了进场关闭手机和表演结束后鼓掌，我们还希望观众确保一直关注演出，并报告每个参赛者表演了多长时间。使用前置通知和后置通知实现该功能的唯一方式是在前置通知中记录开始时间并在某个后置通知中报告表演耗费的时间。但这样的话我们必须在一个成员变量中保存开始时间。因为`Audience`是单例的，如果像这样保存状态的话，将会存在线程安全问题。
+
+相对于前置通知和后置通知，环绕通知在这点上有明显的优势。使用环绕通知，我们可以完成前置通知和后置通知所实现的相同功能，而且只需要在一个方法中 实现。因为整个通知逻辑是在一个方法内实现的，所以不需要使用成员变量保存状态。
+
+修改`Audience`类：
+
+```java
+package concert;
+
+import org.aspectj.lang.ProceedingJoinPoint;
+
+public class Audience {  
+
+    public void watchPerformance(ProceedingJoinPoint jp) {
+        System.out.println("Silencing cell phones");
+        System.out.println("Taking seats");
+        try {
+            jp.proceed();
+        } catch (Throwable e) {
+            System.out.println("Demanding a refund");
+        }
+        System.out.println("CLAP CLAP CLAP!!!");
+    }
+}
+```
+
+在观众切面中，`watchPerformance()`方法包含了之前四个通知方法的所有功能。
+
+声明环绕通知与声明其他类型的通知并没有太大区别。我们所需要做的仅仅是使用`<aop:around>`元素。
+
+```xml
+<aop:config>
+    <!-- 定义切面，引用audience -->
+    <aop:aspect ref="audience">
+        <!-- 定义切点 -->
+        <aop:pointcut 
+            expression="execution(** concert.Performance.perform(..))"
+            id="performance" />
+        <!-- 声明环绕通知 -->
+        <aop:around method="watchPerformance" pointcut-ref="performance"/>
+    </aop:aspect>
+</aop:config>
+```
+
+#### 4.4.3 为通知传递参数
+
+现在我们不用注解来配置`TrackCounter`切面，无注解的TrackCounter类：
+
+```java
+package soundsystem;
+
+import java.util.HashMap;
+import java.util.Map;
+
+public class TrackCounter {
+
+    private Map<Integer, Integer> trackCounts = new HashMap<>();
+
+    public void trackPlayed(int trackNumber) {
+
+    }
+
+    public void countTrack(int trackNumber) {
+        int currentCount = getPlayCount(trackNumber);
+        trackCounts.put(trackNumber, currentCount + 1);
+    }
+
+    public int getPlayCount(int trackNumber) {
+        return trackCounts.containsKey(trackNumber) ? trackCounts.get(trackNumber) : 0;
+    }
+}
+```
+
+使用XML配置，让`TrackCounter`重新变为切面：
+
+```xml
+<!-- 声明TrackCounter -->
+<bean id="trackCounter" class="soundsystem.TrackCounter" />
+
+<!-- 声明BlankDisc -->
+<bean id="sgtPeppers" class="soundsystem.BlankDisc">
+    <property name="title" value="Sgt. Pepper's Lonely Hearts Club Band" />
+    <property name="artist" value="The Beatles" />
+    <property name="tracks">
+        <list>
+            <value>Sgt. Pepper's Lonely Hearts Club Band</value>
+            <value>With a Little Help from My Friends</value>
+            <value>Lucy in the Sky with Diamonds</value>
+            <value>Getting Better</value>
+            <value>Fixing a Hole</value>
+        </list>
+    </property>
+</bean>
+
+<aop:config>
+    <aop:aspect ref="trackCounter">
+        <aop:pointcut
+            expression="execution(* soundsystem.CompactDisc.playTrack(int)) and args(trackNumber)"
+            id="trackPlayed" />
+        <aop:before method="countTrack" pointcut-ref="trackPlayed" />
+    </aop:aspect>
+</aop:config>
+```
+
+这里注意在切点表达式中使用的是“and”而不是“&&”，因为在XML中“&”会被解析为实体的开始。
+
+#### 4.4.4 通过切面引入新功能
+
+在使用注解的配置中，我们使用了`@DeclareParents`注解为被通知当方法引入新的方法。使用aop命名空间中的`<aop:declare-parents>`元素，我们可以实现相同的功能。
+
+```xml
+<aop:aspect>
+    <aop:declare-parents 
+        types-matching="concert.Performance+" 
+        implement-interface="concert.Encoreable"
+        default-impl="concert.DefaultEncoreable" />
+</aop:aspect>
+```
+
+`<aop:declare-parents>`声明了此切面所通知的bean要在它的对象层次结构中拥有新的父类型。具体到本例中，类型匹配`Performance`接口（由`types-matching`属性指定）的那些bean在父类结构中会增加`Encoreable`接口（由`implement-interface`属性指定）。最后要解决的问题是`Encoreable`接口中的方法实现要来自于何处。
+
+这里有两种方式标识要引入接口的实现，上述配置使用`default-impl`属性通过指定全限定类名来显式指定`Encorable`的实现。我们还可以使用`delegate-ref`属性来标识：
+
+```xml
+<aop:aspect>
+    <aop:declare-parents 
+        types-matching="concert.Performance+" 
+        implement-interface="concert.Encoreable"
+        delegate-ref="encorableDelegate" />
+</aop:aspect>
+```
+
+`delegate-ref`属性引用了一个Spring bean作为引入的委托。这需要在Spring上下文中存在一个ID为`encoreableDelegate`的bean。
+
+```xml
+<bean id="encorableDelegate" class="concert.DefaultEncoreable" />
+```
+
+完整的配置：
+
+soundsystem.xml：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:aop="http://www.springframework.org/schema/aop"
+    xsi:schemaLocation="http://www.springframework.org/schema/beans 
+    http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/aop 
+        http://www.springframework.org/schema/aop/spring-aop.xsd">
+
+    <!-- 声明TrackCounter -->
+    <bean id="trackCounter" class="soundsystem.TrackCounter" />
+
+    <!-- 声明BlankDisc -->
+    <bean id="sgtPeppers" class="soundsystem.BlankDisc">
+        <property name="title" value="Sgt. Pepper's Lonely Hearts Club Band" />
+        <property name="artist" value="The Beatles" />
+        <property name="tracks">
+            <list>
+                <value>Sgt. Pepper's Lonely Hearts Club Band</value>
+                <value>With a Little Help from My Friends</value>
+                <value>Lucy in the Sky with Diamonds</value>
+                <value>Getting Better</value>
+                <value>Fixing a Hole</value>
+            </list>
+        </property>
+    </bean>
+    
+    <aop:config>
+        <!-- 声明切面 -->
+        <aop:aspect ref="trackCounter">
+            <!-- 声明切点 -->
+            <aop:pointcut
+                expression="execution(* soundsystem.CompactDisc.playTrack(int)) and args(trackNumber)"
+                id="trackPlayed" />
+            <!-- 声明前置通知 -->
+            <aop:before method="countTrack" pointcut-ref="trackPlayed" />
+        </aop:aspect>
+    </aop:config>
+</beans> 
+```
+
+concert.xml:：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:aop="http://www.springframework.org/schema/aop"
+    xsi:schemaLocation="http://www.springframework.org/schema/beans 
+    http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/aop 
+        http://www.springframework.org/schema/aop/spring-aop.xsd">
+
+    <!-- 声明Audience -->
+    <bean id="audience" class="concert.Audience" />
+
+    <!-- 声明DefaultEncoreable -->
+    <bean id="encorableDelegate" class="concert.DefaultEncoreable" />
+    
+    <!-- 声明Performance的实现类 -->
+    <bean id="orchestra" class="concert.OrchestralPerformance" />
+
+    <aop:config>
+        <!-- 声明切面，引用audience -->
+        <aop:aspect ref="audience">
+            <!-- 声明切点 -->
+            <aop:pointcut expression="execution(** concert.Performance.perform(..))"
+                id="performance" />
+            <!-- 声明环绕通知 -->
+            <aop:around method="watchPerformance" pointcut-ref="performance" />
+        </aop:aspect>
+
+        <aop:aspect>
+            <!-- 声明引入 -->
+            <aop:declare-parents 
+                types-matching="concert.Performance+"
+                implement-interface="concert.Encoreable" 
+                delegate-ref="encorableDelegate" />
+        </aop:aspect>
+    </aop:config>
+</beans>
+```
+
+使用上述XML配置，去掉JavaConfig和注解，测试依然全部正常通过。
+
+### 4.5 注入AspectJ切面
+
+*以下内容代码在工程sia4e-P1_Core_Spring-C04_Aspect-oriented_Spring-03_aspectj中。*
+
+虽然Spring AOP能够满足许多应用的切面需求，但是与AspectJ相比，Spring AOP 是一个功能比较弱的AOP解决方案。AspectJ提供了SpringAOP所不能支持的许多类型的切点。
+
+例如，当我们需要在创建对象时应用通知，构造器切点就非常方便。不像某些其他面向对象语言中的构造器，Java构造器不同于其他的正常方法。这使得Spring基于代理的AOP无法把通知应用于对象的创建过程。
+
+对于大部分功能来讲，AspectJ切面与Spring是相互独立的。虽然它们可以织入到任意的Java应用中，这也包括了Spring应用，但是在应用AspectJ切面时几乎不会涉及到Spring。
+
+但是精心设计且有意义的切面很可能依赖其他类来完成它们的工作。如果在执行通知时，切面依赖于一个或多个类，我们可以在切面内部实例化这些协作的对象。但更好的方式是，我们可以借助Spring的依赖注入把bean装配进AspectJ切面中。
+
+为了演示，我们为上面的演出创建一个新切面。具体来讲，我们以切面的方式创建一个评论员的角色，他会观看演出并且会在演出之后提供一些批评意见。
+
+```java
+package concert;
+
+import com.springinaction.springidol.CriticismEngine;
+
+// 注意不是class是aspect
+// 工程环境为Gradle + Spring + AspectJ
+public aspect CriticAspect {
+
+    public CriticAspect() {
+    }
+
+    // 定义切点
+    pointcut performance() : execution(* perform(..));
+
+    // 定义返回通知
+    after() returning : performance()  {
+        System.out.println(criticismEngine.getCriticism());
+    }
+
+    private CriticismEngine criticismEngine;
+
+    // 注入CriticismEngine
+    public void setCriticismEngine(CriticismEngine criticismEngine) {
+        this.criticismEngine = criticismEngine;
+    }
+}
+```
+
+
+`performance()`切点匹配`perform()`方法。当它与`after() returning`通知一起配合使用时，我们可以让该切面在表演结束时起作用。
+
+实际上，`CriticAspect`与一个`CriticismEngine`对象相协作，在表演结束时，调用该对象的getCriticism()方法来发表一个苛刻的评论。为了避免`CriticAspect`和`CriticismEngine`之间产生不必要的耦合，我们通过Setter依赖注入为`CriticAspect`设置`CriticismEngine`。
+
+它们的关系如下图：
+
+<center>
+    ![图4.9-切面也需要注入](images\图4.9-切面也需要注入.PNG)
+    **切面也需要注入。像其他的bean一样，Spring可以为AspectJ切面注入依赖**
+</center>
+
+`CriticismEngine`及实现类：
+
+```java
+package com.springinaction.springidol;
+
+public interface CriticismEngine {
+    String getCriticism();
+}
+```
+
+```java
+package com.springinaction.springidol;
+
+public class CriticismEngineImpl implements CriticismEngine {
+
+    private String[] criticismPool;
+
+    // 注入criticismPool
+    public void setCriticismPool(String[] criticismPool) {
+        this.criticismPool = criticismPool;
+    }
+
+    @Override
+    public String getCriticism() {
+        int criticismIndex = (int) (Math.random() * criticismPool.length);
+        return criticismPool[criticismIndex];
+    }
+
+}
+```
+
+`CriticismEngineImpl`实现了`CriticismEngine`接口，通过从注入的评论池中随机选择一个苛刻的评论。
+
+将`CriticismEngineImpl`注册为bean：
+
+```xml
+<!-- 声明CriticismEngineImpl -->
+<bean id="criticismEngine" class="com.springinaction.springidol.CriticismEngineImpl">
+    <property name="criticismPool">
+        <list>
+            <value>Worst performance ever!</value>
+            <value>I laughed, I cried, then I realized I was at the wrong show.</value>
+            <value>A must see show!</value>
+        </list>
+    </property>
+</bean>
+```
+
+我们现在有了一个要赋予`CriticAspect`的`CriticismEngine`实现。剩下的就是为`CriticAspect`装配`CriticismEngineImple`。
+
+在展示如何实现注入之前，我们必须清楚AspectJ切面根本不需要Spring就可以织入到我们的应用中。如果想使用Spring的依赖注入为AspectJ切面注入协作者，那我们就需要在Spring配置中把切面声明为一个Spring配置中的`<bean>`。如下的`<bean>`声明会把`criticismEngine` bean注入到`CriticAspect`中：
+
+```xml
+<bean class="concert.CriticAspect" factory-method="aspectOf">
+    <property name="criticismEngine" ref="criticismEngine" />
+</bean>
+```
+
+很大程度上，`<bean>`的声明与我们在Spring中所看到的其他`<bean>`配置并没有太多的区别，但是最大的不同在于使用了`factory-method`属性。通常情况下，Spring bean由Spring容器初始化，但是AspectJ切面是由AspectJ在运行期创建的。等到Spring有机会为`CriticAspect`注入`CriticismEngine`时，`CriticAspect`已经被实例化了。
+
+因为Spring不能负责创建`CriticAspect`，那就不能在 Spring中简单地把`CriticAspect`声明为一个bean。相反，我们需要一种方式为Spring获得已经由AspectJ创建的`CriticAspect`实例的句柄，从而可以注入`CriticismEngine`。幸好，所有的AspectJ切面都提供了一个静态的`aspectOf()`方法，该方法返回切面的一个单例。所以为了获得切面的实例，我们必须使用`factory-method`来调用`aspectOf()`方法而不是调用`CriticAspect`的构造器方法。    
+
+简而言之，Spring不能像之前那样使用`<bean>`声明来创建一个`CriticAspect`实例——它已经在运行时由AspectJ创建完成了。Spring需要通过`aspectOf()`工厂方法获得切面的引用，然后像`<bean>`元素规定的那样在该对象上执行依赖注入。
+
+综上所述，完整的配置如下：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:aop="http://www.springframework.org/schema/aop"
+    xsi:schemaLocation="http://www.springframework.org/schema/beans 
+    http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/aop 
+        http://www.springframework.org/schema/aop/spring-aop.xsd">
+
+    <!-- 声明Audience -->
+    <bean id="audience" class="concert.Audience" />
+
+    <!-- 声明DefaultEncoreable -->
+    <bean id="encorableDelegate" class="concert.DefaultEncoreable" />
+
+    <!-- 声明Performance的实现类 -->
+    <bean id="orchestra" class="concert.OrchestralPerformance" />
+
+    <!-- 声明CriticismEngineImpl -->
+    <bean id="criticismEngine" class="com.springinaction.springidol.CriticismEngineImpl">
+        <property name="criticismPool">
+            <list>
+                <value>Worst performance ever!</value>
+                <value>I laughed, I cried, then I realized I was at the wrong show.</value>
+                <value>A must see show!</value>
+            </list>
+        </property>
+    </bean>
+    
+    <!-- 声明AspectJ切面 -->
+    <bean class="concert.CriticAspect" factory-method="aspectOf">
+        <property name="criticismEngine" ref="criticismEngine" />
+    </bean>
+
+    <aop:config>
+        <!-- 声明切面，引用audience -->
+        <aop:aspect ref="audience">
+            <!-- 声明切点 -->
+            <aop:pointcut expression="execution(** concert.Performance.perform(..))"
+                id="performance" />
+            <!-- 声明环绕通知 -->
+            <aop:around method="watchPerformance" pointcut-ref="performance" />
+        </aop:aspect>
+
+        <aop:aspect>
+            <!-- 声明引入 -->
+            <aop:declare-parents types-matching="concert.Performance+"
+                implement-interface="concert.Encoreable" delegate-ref="encorableDelegate" />
+        </aop:aspect>
+    </aop:config>
+</beans>
+```
+
+测试类：
+
+```java
+package concert;
+
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+
+import concert.Encoreable;
+import concert.Performance;
+
+@RunWith(SpringJUnit4ClassRunner.class)
+@ContextConfiguration(locations = "classpath:concert.xml")
+public class ConcertTest {
+
+    @Autowired
+    private Performance performance;
+
+    @Test
+    public void testEncore() {
+
+        // 测试Spring AOP和AspectJ AOP
+        performance.perform();
+
+        // 测试引入
+        Encoreable encoreable = (Encoreable) performance;
+
+        encoreable.performEncore();
+    }
+}
+```
+
+输出结果：
+
+```text
+Silencing cell phones
+Taking seats
+Orchestral performance now !
+I laughed, I cried, then I realized I was at the wrong show.
+CLAP CLAP CLAP!!!
+Final Encore!
+```
+
+### 4.6 小结
+
+>
+AOP是面向对象编程的一个强大补充。通过AspectJ，我们现在可以把之前分散在应用各处的行为放入可重用的模块中。我们显示地声明在何处如何应用该行为。这有效减少了代码冗余，并让我们的类关注自身的主要功能。
+>
+Spring提供了一个AOP框架，让我们把切面插入到方法执行的周围。现在我们已经学会如何把通知织入前置、后置和环绕方法的调用中，以及为处理异常增加自定义的行为。
+>
+关于在Spring应用中如何使用切面，我们可以有多种选择。通过使用@AspectJ注解和简化的配置命名空间，在Spring中装配通知和切点变得非常简单。
+>
+最后，当Spring AOP不能满足需求时，我们必须转向更为强大的AspectJ。对于这些场景，我们了解了如何使用Spring为AspectJ切面注入依赖。
+>
+此时此刻，我们已经覆盖了Spring框架的基础知识，了解到如何配置Spring容器以及如何为Spring管理的对象应用切面。正如我们所看到的，这些核心技术为创建松散耦合的应用奠定了坚实的基础。
+
+## 第五章 构建Spring Web应用程序
+
+本章内容：
+
+- 映射请求到Spring控制器
+- 透明地绑定表单参数
+- 校验表单提交
+
+对于很多Java开发人员来说，基于Web的应用程序是他们主要的关注点。如果你有这方面经验的话，你会意识到这种系统所面临的挑战。具体来讲，状态管理、工作流以及验证都是需要解决的重要特性。HTTP协议的无状态性决定了这些问题都不那么容易解决。
+
+Spring的Web框架就是为了帮你解决这些关注点而设计的。SpringMVC基于模型-视图-控制器（Model-View-Controller，MVC）模式实现，它能够帮你构建像Spring框架那样灵活和松耦合的Web应用程序。
+
+在本章中，我们将会介绍Spring MVC Web框架，并使用新的SpringMVC注解来构建处理各种Web请求、参数和表单输入的控制器。
+
+### 5.1 Spring MVC起步
+
+Spring MVC框架内含有多种组件，框架会把到来的请求在调度Servlet、处理器映射（handler mapping）、控制器以及视图解析器（view resolver）之间移动，每一个Spring MVC中的组件
+都有特定的目的，并且它也没有那么复杂。
+
+#### 5.1.1 跟踪Spring MVC的请求
+
+每当用户在Web浏览器中点击链接或提交表单的时候，请求就开始工作了。对请求的工作描述就像是快递投送员。与邮局投递员或FedEx投送员一样，请求会将信息从一个地方带到另一个地方。
+
+请求是一个十分繁忙的家伙。从离开浏览器开始到获取响应返回，它会经历好多站，在每站都会留下一些信息同时也会带上其他信息。
+
+下图展示了请求在Spring MVC中所经历的所有站点：
+
+<center>
+    ![图5.1-请求经过SpringMVC的各个组件](images\图5.1-请求经过SpringMVC的各个组件.PNG)
+    **一路上请求会将信息带到很多站点，并生产期望的结果**
+</center>
+
+在请求离开浏览器时**①**，会带有用户所请求内容的信息，至少会包含请求的URL。但是还可能带有其他的信息，例如用户提交的表单信息。
+
+请求到达的第一站是Spring的`DispatcherServlet`。与大多数基于Java的Web框架一样，Spring MVC所有的请求都会通过一个前端控制器（front controller）Servlet。前端控制器是常用的Web应用程序模式，在这里一个单实例的Servlet将请求委托给应用程序的其他组件来执行实际的处理。在Spring MVC中，`DispatcherServlet`就是前端控制器。
+
+`DispatcherServlet`的任务就是将请求发送给Spring MVC控制器（controller）。控制器是一个用于处理请求的Spring组件。在一个典型的应用程序中可能会有多个控制器，`DispatcherServlet`需要知道应该将请求发送给哪个控制器。所以`DispatcherServlet`会查询一个或多个处理器映射器（handler mapping）**②**来确定请求的下一站在哪里。处理器映射器会根据请求所携带的URL信息来进行决策。
+
+一旦选择了合适的控制器，`DispatcherServlet`会将请求发送给选中的控制器**③**。到了控制器，请求会卸下其负载（用户提交的信息）并等待控制器处理这些信息。（实际上，设计良好的控制器本身只处理很少甚至不处理工作，而是将业务逻辑委托给一个或多个服务对象进行处理。）
+
+控制器在完成逻辑处理后，通常会产生一些信息，这些信息需要返回给用户并在浏览器上显示。这些信息被称为模型（model）。不过仅仅给用户返回原始的信息是不够的——这些信息需要以用户友好的方式进行格式化，一般会是HTML。所以，信息需要发送给一个视图（view），通常会是JSP。（当然，现在可能更多的是页面通过Ajax与服务器进行交互，服务器返回JSON数据）
+
+控制器所做的最后一件事就是将模型数据打包，并且标示出用于渲染输出的视图名。它接下来会将请求连同模型和视图名发送回`DispatcherServlet`**④**。
+
+这样，控制器就不会与特定的视图相耦合，传递给`DispatcherServlet`的视图名并不直接表示某个特定的JSP。实际上，它甚至并不能确定视图就是JSP。相反，它仅仅传递了一个逻辑名称，这个名字将会用来查找产生结果的真正视图。`DispatcherServlet`将会使用视图解析器（view resolver）**⑤**来将逻辑视图名匹配为一个特定的视图实现，它可能是也可能不是JSP。
+
+既然`DispatcherServlet`已经知道由哪个视图渲染结果，那请求的任务基本上也就完成了。它的最后一站是视图的实现（可能是JSP）**⑥** ，在这里它交付模型数据。请求的任务就完成了。视图将使用模型数据渲染输出，这个输出会通过响应对象传递给客户端（不会像听上去那样硬编码）**⑦** 。
+
+可以看到，请求要经过很多的步骤，最终才能形成返回给客户端的响应。
+
+#### 5.1.2 搭建Spring MVC
+
+*以下内容代码在工程sia4e-P2_Spring_on_the_web-C05_Building_Spring_web_applications中*。
+
+看上去我们需要配置很多的组成部分。幸好，借助于最近几个Spring新版本的功能增强，开始使用Spring MVC变得非常简单了。现在，我们要使用最简单的方式来配置Spring MVC：所要实现的功能仅限于运行我们所创建的控制器。在第7章中，我们会看一些其他的配置选项。
+
+**配置DispatcherServlet**
+
+`DispatcherServlet`是Spring MVC的核心。在这里请求会第一次接触到框架，它要负责将请求路由到其它的组件中。
+
+按照传统的方式，像DispatcherServlet这样的Servlet会配置在web.xml文件中，这个文件会放到应用的WAR包里面。当然，这是配置DispatcherServlet的方法之一。
+
+例如：
+
+```xml
+<!-- 注册SpringMVC中央调度器 -->
+<servlet>
+    <servlet-name>springmvc</servlet-name>
+    <servlet-class>org.springframework.web.servlet.DispatcherServlet</servlet-class>
+    <!-- 指定配置文件的位置及文件名 -->
+    <init-param>
+        <param-name>contextConfigLocation</param-name>
+        <param-value>classpath:springmvc.xml</param-value>
+    </init-param>
+    <!-- 在Tomcat启动时就直接初始化当前Servlet -->
+    <load-on-startup>1</load-on-startup>
+</servlet>
+<servlet-mapping>
+    <servlet-name>springmvc</servlet-name>
+    <url-pattern>*.do</url-pattern>
+</servlet-mapping>
+```
+
+但是，借助于Servlet 3规范和Spring 3.1的功能增强，这种方式已经不是唯一的方案了，这也不是我们本章所使用的配置方法。
+
+这里使用JavaConfig的方式进行配置：
+
+```java
+package spittr.config;
+
+import org.springframework.web.servlet.support.AbstractAnnotationConfigDispatcherServletInitializer;
+
+public class SpittrWebAppInitializer extends AbstractAnnotationConfigDispatcherServletInitializer {
+
+    @Override
+    protected Class<?>[] getRootConfigClasses() {
+        return new Class<?>[] { RootConfig.class };
+    }
+
+    @Override
+    protected Class<?>[] getServletConfigClasses() {
+        // 指定的配置类
+        return new Class<?>[] { WebConfig.class };
+    }
+
+    @Override
+    protected String[] getServletMappings() {
+        // 将DispatcherServlet映射为“/”
+        return new String[] { "/" };
+    }
+}
+```
+
+这个类的名字是`SpittrWebAppInitializer`，它位于名为spittr.config的包中。
+
+我们稍后再对这个类进行介绍，但现在我们只需要知道我们所创建的应用名为Spittr。
+
+要理解`SpittrWebAppInitializer`这个类是如何工作的，我们需要知道继承`AbstractAnnotationConfigDispatcherServletInitializer`的任意类都会自动地配置`DispatcherServlet`和Spring应用上下文，Spring的应用上下问会位于应用程序的Servlet上下文中。
+
+在Servlet 3.0环境中，容器会在类路径中查找实现了`javax.servlet.ServletContainerInitializer`接口的类，如果能发现的话，就会用它来配置Servlet容器。
+
+Spring提供了这个接口的实现，名为`SpringServletContainerInitializer`，这个类反过来又会查找实现`WebApplicationInitializer`的类并将配置的任务交给它们来完成。Spring 3.2引入了一个便利的`WebApplicationInitializer`基础实现，也就是`AbstractAnnotationConfigDispatcherServletInitializer`因为我们的`SpittrWebAppInitializer`继承了`AbstractAnnotationConfigDispatcherServlet-Initializer`（同时也就实现了`WebApplicationInitializer`），因此当部署到Servlet 3.0容器中的时候，容器会自动发现它，并用它来配置Servlet上下文。
+
+尽管它的名字很长，但是`AbstractAnnotationConfigDispatcherServletInitializer`使用起来很简便。我们的`SpittrWebAppInitializer`类重写了三个方法：
+
+- Class<?>[] getRootConfigClasses()
+- Class<?>[] getServletConfigClasses()
+- String[] getServletMappings()
+
+`getServletMappings()`方法会将一个或多个路径映射到`DispatcherServlet`上。在本例中，**它映射的是“/”，这表示它会是应用的默认Servlet。他会处理进入应用的所有请求。**
+
+为了理解其他的两个方法，我们首先要理解`DispatcherServlet`和一个Servlet监听器（也就是`ContextLoaderListener`）的关系。
+
+当`DispatcherServlet`启动的时候，它会创建Spring应用上下文，并加载配置文件或配置类中所声明的bean。在`getServletConfigClasses()`方法中，我们要求`DispatcherServlet`加载应用上下文时，使用定义在`WebConfig`配置类（使用Java配置）中的bean。
+
+但是在Spring Web应用中，通常还会有另外一个应用上下文。另外的这个应用上下文是由`ContextLoaderListener`创建的。
+
+我们希望`DispatcherServlet`加载包含Web组件的bean，如控制器、视图解析器以及处理器映射，而`ContextLoaderListener`要加载应用中的其他bean。这些bean通常是驱动应用后端的中间层和数据层组件。
+
+实际上，`AbstractAnnotationConfigDispatcherServletInitializer`会同时创建`DispatcherServlet`和`ContextLoaderListener`。`getServletConfigClasses()`方法返回的带有`@Configuration`注解的类将会用来定义`DispatcherServlet`应用上下文中的bean。`getRootConfigClasses()`方法返回的带有`@Configuration`注解的类将会用来配置`ContextLoaderListener`创建的应用上下文中的bean。
+
+（通常情况下，如果我们只是单独使用Spring MVC，不使用IoC、DI、AOP等Spring提供的功能，则只需要配置`DispatcherServlet`即可，而无需配置`ContextLoaderListener`。）
+
+在本例中，根配置定义在`RootConfig`中，`DispatcherServlet`的配置声明在`WebConfig`中。
+
+**需要注意的是，通过`AbstractAnnotationConfigDispatcherServletInitializer`来配置`DispatcherServlet`是传统web.xml方式的替代方案。我们也可以同时包含web.xml和`AbstractAnnotationConfigDispatcherServletInitializer`，但这其实并没有必要。（我们当然可以只使用web.xml进行配置）**
+
+**启用Spring MVC**
+
+启用Spring MVC组件的方法也不仅一种。过去Spring是使用XML进行配置的，这需要使用元素`<mvc:annotation-driven />`来启用注解驱动的Spring MVC。
+
+由于这里我们尽量让搭建过程尽可能简单并基于Java，所以我们不使用这种方法。Spring MVC配置的可选项将在第七章再进行讨论。
+
+我们所能创建的最简单的Spring MVC配置就是一个带有`@EnableWebMvc`注解的类：
+
+```java
+package spittr.config;
+
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.EnableWebMvc;
+
+@Configuration
+@EnableWebMvc
+public class WebConfig {
+
+}
+```
+
+这样确实能够启用Spring MVC，但我们还有一些问题需要解决：
+
+- 没有配置视图解析器：如果我们没有配置视图解析器（以及处理器映射器、处理器适配器等），那么Spring MVC会提供默认的配置。
+- 没有启用组件扫描：这样的结果就是，Spring只能找到显式声明在配置类中的控制器。
+- 将`DispatcherServlet`映射为“/”：将`DispatcherServlet`映射为默认的Servlet，所以它会处理所有的默认Servlet，这包括了对静态资源的请求，如js、css、jpg等文件。
+
+`DispatcherServlet`的默认配置如下所示，它定义在spring-webmvc包的DispatcherServlet.properties文件中：
+
+（原书写到默认的视图解析器为`BeanNameViewResolver`，但根据配置文件，这个说法并不正确，默认的视图解析器应该为`InternalResourceViewResolver`）
+
+```text
+# Default implementation classes for DispatcherServlet's strategy interfaces.
+# Used as fallback when no matching beans are found in the DispatcherServlet context.
+# Not meant to be customized by application developers.
+
+org.springframework.web.servlet.LocaleResolver=org.springframework.web.servlet.i18n.AcceptHeaderLocaleResolver
+
+org.springframework.web.servlet.ThemeResolver=org.springframework.web.servlet.theme.FixedThemeResolver
+
+org.springframework.web.servlet.HandlerMapping=org.springframework.web.servlet.handler.BeanNameUrlHandlerMapping,\
+    org.springframework.web.servlet.mvc.annotation.DefaultAnnotationHandlerMapping
+
+org.springframework.web.servlet.HandlerAdapter=org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter,\
+    org.springframework.web.servlet.mvc.SimpleControllerHandlerAdapter,\
+    org.springframework.web.servlet.mvc.annotation.AnnotationMethodHandlerAdapter
+
+org.springframework.web.servlet.HandlerExceptionResolver=org.springframework.web.servlet.mvc.annotation.AnnotationMethodHandlerExceptionResolver,\
+    org.springframework.web.servlet.mvc.annotation.ResponseStatusExceptionResolver,\
+    org.springframework.web.servlet.mvc.support.DefaultHandlerExceptionResolver
+
+org.springframework.web.servlet.RequestToViewNameTranslator=org.springframework.web.servlet.view.DefaultRequestToViewNameTranslator
+
+org.springframework.web.servlet.ViewResolver=org.springframework.web.servlet.view.InternalResourceViewResolver
+
+org.springframework.web.servlet.FlashMapManager=org.springframework.web.servlet.support.SessionFlashMapManager
+```
+
+因此，我们需要在`WebConfig`这个最小的Spring MVC配置上增加一些内容，从而使它变得真正可用：
+
+```java
+package spittr.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.ViewResolver;
+import org.springframework.web.servlet.config.annotation.DefaultServletHandlerConfigurer;
+import org.springframework.web.servlet.config.annotation.EnableWebMvc;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurerAdapter;
+import org.springframework.web.servlet.view.InternalResourceViewResolver;
+
+@Configuration // 表明该类是一个配置类
+@EnableWebMvc // 启用Spring MVC
+@ComponentScan("spittr.web") // 启用组件扫描
+public class WebConfig extends WebMvcConfigurerAdapter {
+
+    // 配置JSP视图解析器
+    @Bean
+    public ViewResolver viewResolver() {
+        InternalResourceViewResolver resolver = new InternalResourceViewResolver();
+        resolver.setPrefix("/WEB-INF/views/");
+        resolver.setSuffix(".jsp");
+        resolver.setExposeContextBeansAsAttributes(true);
+        return resolver;
+    }
+    
+    // 配置静态资源的处理
+    @Override
+    public void configureDefaultServletHandling(DefaultServletHandlerConfigurer configurer) {
+        configurer.enable();
+    }
+}
+```
+
+现在我们配置了注解`@ComponentScan("spittr.web")`，因此框架会扫描spittr.web包及其子包来查找组件。我们所编写的控制器将会带有`@Controller`注解，这会使其成为组件扫描时的候选bean。因此，我们不需要在配置类中显式声明任何的控制器。
+
+接下来我们添加了一个视图解析器（ViewResolver）bean，这里使用`InternalResourceViewResolver`，并配置了查找视图（这里是JSP）时使用的前缀和后缀（例如我们要查找名为home的视图，那么视图解析器会自动去查找/WEB-INF/views/home.jsp）。关于视图解析器，我们会在第六章详细讨论。
+
+最后我们的`WebCondig`类继承了`WebMvcConfigurerAdapter`并重写了其`configureDefaultServletHandling()`方法。通过调用`DefaultServletHandlerConfigurer`的`enable()`方法，我们要求`DispatcherServlet`将对静态资源的请求转发到Servlet容器中的默认Servlet（`org.apache.catalina.servlets.DefaultServlet`）上，而不是其自身来处理。这样做避免了静态资源无法加载的问题。
+
+接下来配置`RootConfig`类。因为本章聚焦于Spring MVC的相关开发，所以这里`RootConfig`类比较简单：
+
+```java
+package spittr.config;
+
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.ComponentScan.Filter;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.FilterType;
+import org.springframework.web.servlet.config.annotation.EnableWebMvc;
+
+@Configuration
+@ComponentScan(basePackages = { "spittr" }, excludeFilters = {
+        @Filter(type = FilterType.ANNOTATION, value = EnableWebMvc.class) })
+public class RootConfig {
+
+}
+```
+
+#### 5.1.3 Spittr应用简介
+
+>
+因为从Twitter借鉴了灵感并且通过Spring来进行实现，所以它就有了一个名字：Spitter。再进一步，应用网站命名中流行的模式，如Flickr，我们去掉字母e，这样的话，我们就将这个应用称为Spittr。
+
+Spittr应用有两个有两个基本的领域概念：
+
+- Spitter：应用的用户
+- Spittle：用户发布的简短状态更新
+
+当我们在书中完善Spittr应用的功能时，将会介绍这两个领域概念。在本章中，我们会构建应用的Web层，创建展现Spittle的控制器以及处理用户注册成为Spitter的表单。
+
+下面进入本章的核心内容：使用Spring MVC控制器处理Web请求。
+
+### 5.2 编写基本的控制器
+
+在Spring MVC中，控制器只是方法上添加了`@RequestMapping`注解的类，这个注解声明了它们所要处理的请求。
+
+我们先从简单的控制器入手，假设这个控制器要处理对“/”的请求：
+
+```java
+package spittr.web;
+
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+
+// 声明该类为一个控制器
+@Controller
+public class HomeController {
+
+    // 处理对“/”的GET请求
+    @RequestMapping(value = "/", method = RequestMethod.GET)
+    public String home() {
+        // 返回的视图名为home
+        return "home";
+    }
+}
+```
+
+这个类使用了`@Controller`注解，这个注解是用来声明控制器的。`@Controller`是一个构造型（stereotype）注解，它基于`@Component`注解。在这里，它的目的就是辅助实现组件扫描。因为`HomeController`带有`@Controller`注解，因此组件扫描器会自动找到`HomeController`，并将其声明为Spring应用上下文中的一个bean。
+
+事实上我们也可以直接使用`@Component`，但在表意上会差很多，我们无法确定这个类究竟是什么类型的组件。
+
+`HomeController`唯一的一个方法，也就是`home()`方法，带有`@RequestMapping`注解。它的`value`属性指定了这个方法所要处理的请求路径，`method`属性细化了它所处理的HTTP方法。在本例中，当收到对“/”的HTTP GET请求时，就会调用`home()`方法。
+
+`home()`方法其实并没有做太多的事情：它返回了一个`String`类型的“home”。这个`String`将会被Spring MVC解读为要渲染的视图名称。`DispatcherServlet`会要求视图解析器将这个逻辑名称解析为实际的视图。
+
+鉴于我们配置`InternalResourceViewResolver`的方式，视图名“home”将会解析为“/WEB-INF/views/home.jsp”路径的JSP。
+
+下面定义Spittr应用的首页，home.jsp：
+
+```html
+<%@ taglib uri="http://java.sun.com/jsp/jstl/core" prefix="c"%>
+<%@ page language="java" contentType="text/html; charset=utf-8" pageEncoding="utf-8"%>
+<%
+    String path = request.getContextPath();
+    String basePath = request.getScheme() + "://" + request.getServerName() + ":" + request.getServerPort()
+            + path + "/";
+%>
+<!DOCTYPE html>
+<html>
+<head>
+<base href="<%=basePath%>">
+<meta charset="utf-8">
+<title>Spittr</title>
+<link rel="stylesheet" type="text/css" href="<c:url value="resources/style.css"/>">
+</head>
+<body>
+    <h1>Welcome to Spittr</h1>
+    <a href="<c:url value="spittles" />">Spittles</a> |
+    <a href="<c:url value="spitter/register" />">Register</a>
+</body>
+</html>
+```
+
+这个页面定义在/WEB-INF/views下，它只是欢迎应用的用户，并提供了两个链接：一个是查看Spittle列表，另一个是在应用中进行注册。
+
+#### 5.2.1 测试控制器
+
+下面对我们的控制器`HomeController`进行测试：
+
+```java
+package spittr.web;
+
+import static org.junit.Assert.assertEquals;
+
+import org.junit.Test;
+
+public class HomeControllerTest {
+    @Test
+    public void testHomePage() {
+        HomeController controller = new HomeController();
+        assertEquals("home", controller.home());
+    }
+}
+```
+
+这个测试很简单，但它只测试了`home()`方法的返回值。它没有站在Spring MVC控制器的视角进行测试。这个测试没有断言当接收到针对“/”的GET请求时会调用`home()`方法。因为它返回的值就是“home”，所以也没有真正判断home是视图的名称。
+
+从Spring 3.2开始，我们可以按照控制器的方式来测试Spring MVC中的控制器了，而不仅仅是作为POJO进行测试。Spring现在包含了一种mock Spring MVC并针对控制器执行HTTP请求的机制。这样的话，在测试控制器的时候，就没有必要再启动Web服务器和Web浏览器了。
+
+重写我们的测试类：
+
+```java
+package spittr.web;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.setup.MockMvcBuilders.*;
+
+import org.junit.Test;
+import org.springframework.test.web.servlet.MockMvc;
+
+public class HomeControllerTest {
+    
+    @Test
+    public void testHomePage() throws Exception {
+        
+        HomeController controller = new HomeController();
+        
+        // 搭建MockMvc
+        MockMvc mockMvc = standaloneSetup(controller).build();
+        
+        // 对“/”执行GET请求，预期得到“home”视图
+        mockMvc.perform(get("/")).andExpect(view().name("home"));
+        
+    }
+}
+```
+
+新版本的测试更加完整地测试了`HomeController`。这次我们不是直接调用`home()`方法并测试它的返回值，而是发起了对“/”的GET请求，并断言结果视图的名称为home。它首先传递一个`HomeController`实例到`MockMvcBuilders.standaloneSetup()`并调用`build()`来构建MockMvc实例。然后它使用MockMvc实例来执行针对“/”的GET请求并设置期望得到的视图名称。
+
+#### 5.2.2 定义类级别的请求处理
+
+现在对`HomeController`进行重构，我们可以做的一件事就是拆分`@RequestMapping`，并将其路径映射部分放到类级别上：
+
+```java
+package spittr.web;
+
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+
+// 声明该类为一个控制器
+@Controller
+// 将控制器映射到“/”
+@RequestMapping("/")
+public class HomeController {
+
+    // 处理GET请求
+    @RequestMapping(method = RequestMethod.GET)
+    public String home() {
+        // 返回的视图名为home
+        return "home";
+    }
+}
+```
+
+在这个新版本的`HomeController`中，路径现在被转移到类级别的`@RequestMapping`上，而HTTP方法依然映射在方法级别上。当控制器在类级别上添加`@RequestMapping`注解时，这个注解会应用到控制器的所有处理器方法上。处理器方法上的`@RequestMapping`注解会对类级别上的`@RequestMapping`的声明进行补充。
+
+就`HomeController`而言，这里只有一个控制器方法。与类级别的`@RequestMapping`合并之后，这个方法的`@RequestMapping`表明`home()`将会处理对“/”路径的GET请求。
+
+当前来看，我们其实并没有修改这个类的功能。
+
+我们还可以对`HomeController`做另外一个变更。`@RequestMapping`的`value`属性能够接受一个`String`类型的数组。到目前为止，我们给它设置的都是一个`String`类型的“/”。但是，我们还可以将它映射到对“/homepage”的请求，只需将类级别的`@RequestMapping`改为如下所示：
+
+```java
+package spittr.web;
+
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+
+// 声明该类为一个控制器
+@Controller
+// 将控制器映射到“/”和/homepage
+@RequestMapping({ "/", "/homepage" })
+public class HomeController {
+
+    // 处理GET请求
+    @RequestMapping(method = RequestMethod.GET)
+    public String home() {
+        // 返回的视图名为home
+        return "home";
+    }
+}
+```
+
+现在，`HomeController`的`home()`方法能够映射到对“/”和“/homepage”的GET请求。
+
+#### 5.2.3 传递模型数据到视图中
+
+就编写超级简单的控制器来说，`HomeController`已经是一个不错的样例了。但是大多数的控制器并不是这么简单。在Spittr应用中，我们需要有一个页面展现最近提交的Spittle列表。因此，我们需要一个新的方法来处理这个页面。
+
+我们首先需要定义一个数据访问的Respository，这里我们将定义一个接口：
+
+```java
+package spittr.data;
+
+import java.util.List;
+
+public interface SpittleRepository {
+    List<Spittle> findSpittles(long max, int count);
+}
+```
+
+`findSpittles()`方法接受两个参数。其中`max`参数代表所返回的Spittle中，Spittle ID属性的最大值，而`count`参数表明要返回多少个Spittle对象。为了获得最新的20个Spittle对象，我们可以这样调用`findSpittles()`：
+
+```java
+List<Spittle> recent = spittleRepository.findSpittles(Long.MAX_VALUE, 20);
+```
+
+接下来我们定义`Spittle`类，它的属性包括消息内容、时间戳以及Spittle发布时对应的经纬度：
+
+```java
+package spittr;
+
+import java.util.Date;
+
+import org.apache.commons.lang3.builder.EqualsBuilder;
+import org.apache.commons.lang3.builder.HashCodeBuilder;
+
+public class Spittle {
+    private final Long id;
+    private final String message;
+    private final Date time;
+    private Double latitude;
+    private Double longitude;
+
+    public Spittle(String message, Date time) {
+        this(message, time, null, null);
+    }
+
+    public Spittle(String message, Date time, Double latitude, Double longitude) {
+        this.id = null;
+        this.message = message;
+        this.time = time;
+        this.longitude = longitude;
+        this.latitude = latitude;
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public String getMessage() {
+        return message;
+    }
+
+    public Date getTime() {
+        return time;
+    }
+
+    public Double getLatitude() {
+        return latitude;
+    }
+
+    public Double getLongitude() {
+        return longitude;
+    }
+
+    @Override
+    public boolean equals(Object that) {
+        return EqualsBuilder.reflectionEquals(this, that, "id", "time");
+    }
+
+    @Override
+    public int hashCode() {
+        return HashCodeBuilder.reflectionHashCode(this, "id", "time");
+    }
+}
+```
+
+就大部分内容来看，`Spittle`就是一个基本的POJO数据对象——没有什么复杂的。唯一要注意的是，我们使用Apache Common Lang3包来实现`equals()`和`hashCode()`方法。这些方法除了常规的作用以外，当我们为控制器的处理器方法编写测试时，它们也是有用的。
+
+编写`SpittleController`，在模型中放入最新的spittle列表：
+
+```java
+package spittr.web;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.RequestMapping;
+
+import spittr.data.SpittleRepository;
+
+@Controller
+@RequestMapping("spittles")
+public class SpittleController {
+    
+    private SpittleRepository spittleRepository;
+    
+    // 注入SpittleRepository
+    @Autowired
+    public SpittleController(SpittleRepository spittleRepository) {
+        this.spittleRepository = spittleRepository;
+    }
+    
+    @RequestMapping(method = RequestMethod.GET)
+    public String spittles(Model model) {
+        // 将spittleList添加到模型中
+        model.addAttribute(spittleRepository.findSpittles(Long.MAX_VALUE, 20));
+        // 返回视图名
+        return "spittles";
+    }
+}
+```
+
+我们可以看到`SpittleController`有一个构造器，这个构造器使用了`@Autowired`注解，用来注入`SpittleRepository`。这个`SpittleRepository`随后又用在`spittles()`方法中，用来获取最新的spittle列表。
+
+需要注意的是，我们在`spittles()`方法中给定了一个`Model`作为参数。这样，`spittles()`方法就能将Repository中获取到的Spittle列表填充到模型中。`Model`实际上就是一个`Map`（也就是key-value对的集合），它会传递给视图，这样数据就能渲染到客户端了。**当调用`addAttribute()`方法并且不指定key的时候，那么key会根据值的对象类型推断确定。在本例中，因为它是一个`List<Spittle>`，因此，键将会推断为`spittleList`**。最后`spittles()`方法返回“spittles”作为视图的名字。
+
+下面是各个版本的`spittles()`方法：
+
+```java
+// 显式声明key
+public String spittles(Model model) {
+    // 将spittleList添加到模型中
+    model.addAttribute("spittleList", spittleRepository.findSpittles(Long.MAX_VALUE, 20));
+    // 返回视图名
+    return "spittles";
+}
+
+// 使用非Spring类型，用Map代替Model
+public String spittles(Map model) {
+    // 将spittleList添加到模型中
+    model.put("spittleList", spittleRepository.findSpittles(Long.MAX_VALUE, 20));
+    // 返回视图名
+    return "spittles";
+}
+
+// 隐式指定
+@RequestMapping(method = RequestMethod.GET)
+public List<Spittle> spittles() {
+    return spittleRepository.findSpittles(Long.MAX_VALUE, 20);
+}
+```
+
+最后这个版本与其他的版本有些差别。它并没有返回视图名称，也没有显式地设定模型，这个方法返回的是`Spittle`列表。当处理器方法像这样返回对象或集合时，这个值会放到模型中，模型的key会根据其类型推断得出（在本例中，也就是`spittleList`）。而逻辑视图的名称将会根据请求路径推断得出。因为这个方法处理针对“/spittles”的GET请求，因此视图的名称将会是spittles（去掉开头的斜线）。
+
+无论我们选择哪种方式编写`spittles()`方法，所达成的结果都是相同的。模型中会存储一个`Spittle`列表，key为`spittleList`，然后这个列表会发送到名为spittles的视图。
+
+现在，数据已经放到了模型中，在JSP中该如何访问它呢？实际上，当视图是JSP的时候，模型数据会作为请求属性放到请求（`request`）之中。因此，在spittles.jsp文件中可以使用JSTL（JavaServer PagesStandard Tag Library）的`<c:forEach>`标签渲染spittle列表：
+
+```html
+<c:forEach items="${spittleList}" var="spittle">
+    <li id="spittle_<c:out value="spittle.id"/>">
+        <div class="spittleMessage">
+            <c:out value="${spittle.message}" />
+        </div>
+        <div>
+            <span class="spittleTime"><c:out value="${spittle.time}" /></span> 
+            <span class="spittleLocation"> 
+                (<c:out value="${spittle.latitude}" />, <c:out value="${spittle.longitude}" />)
+            </span>
+        </div>
+    </li>
+</c:forEach>
+```
+
+尽管`SpittleController`很简单，但是它依然比`HomeController`更进一步了。不过，`SpittleController`和`HomeController`都没有处理任何形式的输入。现在，让我们扩展`SpittleController`，让它从客户端接受一些输入。
+
+编写测试类，测试`SpittleController`处理针对`/spittles`的GET请求：
+
+```java
+package spittr.web;
+
+import static org.hamcrest.CoreMatchers.hasItems;
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.setup.MockMvcBuilders.*;
+
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+
+import org.junit.Test;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.servlet.view.InternalResourceView;
+
+import spittr.Spittle;
+import spittr.data.SpittleRepository;
+
+public class SpittleControllerTest {
+
+    @Test
+    public void shouldShowRecentSpittles() throws Exception {
+
+        List<Spittle> expectedSpittles = createSpittleList(20);
+
+        // Mock Repository
+        SpittleRepository mockRepository = mock(SpittleRepository.class);
+
+        when(mockRepository.findSpittles(Long.MAX_VALUE, 20)).thenReturn(expectedSpittles);
+
+        SpittleController controller = new SpittleController(mockRepository);
+        
+        // Mock Spring MVC
+        MockMvc mockMvc = standaloneSetup(controller)
+                .setSingleView(new InternalResourceView("/WEB-INF/views/spittles.jsp"))
+                .build();
+
+        // 对“/spittles”发起GET请求
+        mockMvc.perform(get("/spittles"))
+                .andExpect(view().name("spittles")) // 期望视图的名称为“spittles”
+                .andExpect(model().attributeExists("spittleList")) // 期望模型中含有数据“spittleList”
+                .andExpect(model().attribute("spittleList", hasItems(expectedSpittles.toArray()))); // 期望“spittleList”中含有预期的数据
+    }
+
+    private List<Spittle> createSpittleList(int count) {
+        List<Spittle> spittles = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            spittles.add(new Spittle("Spittle " + i, new Date()));
+        }
+        return spittles;
+    }
+}
+```
+
+测试首先会创建`SpittleRepository`接口的mock实现，这个实现会从它的`findSpittles()`方法中返回20个`Spittle`对象。然后将这个Repo注入到一个`SpittleController`实例中，然后创建`MockMvc`。
+
+需要注意的是，与`HomeController`不同，这个测试在`MockMvc`构造器上调用了`setSingleView()`。这样的话，**mock框架就不用解析控制器中的视图名了**。在很多场景中，其实没有必要这样做。但是对于这个控制器方法，视图名与请求路径是非常相似的（视图名：spittles，请求路径：/spittles），这样按照默认的视图解析规则时，`MockMvc`就会发生失败（error, not failure），因为无法区分视图路径和控制器的路径。在这个测试中，构建`InternalResourceView`时所设置的实际路径是无关紧要的，但我们将其设置为与`InternalResourceViewResolver`配置一致。
+
+### 5.3 接收请求的输入
+
+Spring MVC允许以多种方式将客户端中的数据传送到控制器的处理器方法中：
+
+- 查询参数（Query Parameter）
+- 表单参数（Form Parameter）
+- 路径变量（Path Variable）
+
+#### 5.3.1 处理查询参数
+
+下面我们增加一个简单的分页的功能。
+
+在确定该如何实现时，假设我们要查看某一页`Spittle`列表，这个列表会按照最新的`Spittle`在前的方式进行排序。因此，下一页中第一条的ID肯定会早于当前页最后一条的ID。所以，为了显示下一页的`Spittle`，我们需要将一个`Spittle`的ID传入进来，这个ID要恰好小于当前页最后一条`Spittle`的ID。另外，你还可以传入一个参数来确定要展现的`Spittle`数量。
+
+为了实现这个分页的功能，我们所编写的处理器方法要接受如下的参数：
+
+- `max`参数（表明结果中所有Spittle的ID均应该在这个值之前）
+- `count`参数（表明在结果中要包含的Spittle数量）
+
+这里我们先编写测试方法，这个方法反映了新`spittles()`方法的功能：
+
+```java
+@Test
+public void shouldShowPagedSpittles() throws Exception {
+    
+    List<Spittle> expectedSpittles = createSpittleList(50);
+    
+    SpittleRepository mockRepository = mock(SpittleRepository.class);
+    
+    when(mockRepository.findSpittles(238900L, 50)).thenReturn(expectedSpittles);
+    
+    SpittleController controller = new SpittleController(mockRepository);
+    
+    // Mock Spring MVC
+    MockMvc mockMvc = standaloneSetup(controller)
+            .setSingleView(new InternalResourceView("/WEB-INF/views/spittles.jsp"))
+            .build();
+    
+    // 传入max和count参数
+    mockMvc.perform(get("/spittles?max=238900&count=50"))
+            .andExpect(view().name("spittles")) // 期望视图的名称为“spittles”
+            .andExpect(model().attributeExists("spittleList")) // 期望模型中含有数据“spittleList”
+            .andExpect(model().attribute("spittleList", hasItems(expectedSpittles.toArray()))); // 期望“spittleList”中含有预期的数据
+}
+```
+
+这个测试方法对“/spittles”发送GET请求，同时还传入了`max`和`count`参数。它测试
+了这些参数存在时的处理器方法，而原来的测试方法则测试了没有这些参数时的情景。这两个测试就绪后，我们就能确保不管控制器发生什么样的变化，它都能够处理这两种类型的请求。
+
+`SpittleController`中的处理器方法要同时处理有参数和没有参数的场景，那我们需要对其进行修改，让它能接受参数，同时，如果这些参数在请求中不存在的话，就使用默认值`Long.MAX_VALUE`和20。`@RequestParam`注解的`defaultValue`属性可以完成这项任务：
+
+```java
+@RequestMapping(method = RequestMethod.GET)
+public String spittles(
+            @RequestParam(value = "max", defaultValue = MAX_LONG_AS_STRING) long max,
+            @RequestParam(value = "count", defaultValue = "20") int count, 
+            Model model) {
+    // 将spittleList添加到模型中
+    model.addAttribute("spittleList", spittleRepository.findSpittles(max, count));
+    // 返回视图名
+    return "spittles";
+}
+```
+
+现在，如果`max`参数没有指定的话，它将会是`Long`类型的最大值。因为查询参数都是String类型的，因此`defaultValue`属性需要`String`类型的值。因此，使用`Long.MAX_VALUE`是不行的。我们可以将`Long.MAX_VALUE`转换为名为`MAX_LONG_AS_STRING`的`String`类型常量：
+
+```java
+// 原书中使用的是private static final String MAX_LONG_AS_STRING = Long.toString(Long.MAX_VALUE);
+// 但实际上这样会报错，不能通过编译。原因是@RequestParam的defaultValue属性的值必须是一个常量
+// The value for annotation attribute RequestParam.defaultValue must be a constant
+private final String MAX_LONG_AS_STRING = Long.MAX_VALUE + "";
+```
+
+尽管`defaultValue`属性给定的是`String`类型的值，但是当绑定到方法的`max`参数时，它会转换为`Long`类型。
+
+请求中的查询参数是往控制器中传递信息的常用手段。另外一种方式也很流行，尤其是在构建面向资源的控制器时，这种方式就是将传递参数作为请求路径的一部分。让我们看一下如何将路径变量作为请求路径的一部分，从而实现信息的输入。
+
+#### 5.3.2 通过路径参数接收输入
+
+假设我们的应用程序需要根据给定的ID来展现某一个`Spittle`记录。其中一种方案就是编写处理器方法，通过使用`@RequestParam`注解，让它接受ID作为查询参数：
+
+```java
+@RequestMapping(value = "/show", method = RequestMethod.GET)
+public String showSpittle(@RequestParam("spittle_id") long spittleId, Model model) {
+    model.addAttribute("spittleId", spittleRepository.findOne(spittleId));
+    return "spittle";
+}
+```
+
+这个处理器方法将会处理形如“/spittles/show?spittle_id=12345”这样的请求。尽管这也可以正常工作，但是从面向资源的角度来看这并不理想。在理想情况下，要识别的资源（`Spittle`）应该通过URL路径进行标示，而不是通过查询参数。对“/spittles/12345”发起GET请求要优于对“/spittles/show?spittle_id=12345”发起请求。前者能够识别出要查询的资源，而后者描述的是带有参数的一个操作——本质上是通过HTTP发起的RPC。
+
+将方法改为如下所示：
+
+```java
+@RequestMapping(value = "/{spittleId}", method = RequestMethod.GET)
+public String showSpittle(@PathVariable("spittleId") long spittleId, Model model) {
+    model.addAttribute("spittle", spittleRepository.findOne(spittleId));
+    return "spittle";
+}
+```
+
+这个方法能够处理形如“/spittles/12345”的请求。参数`spittleId`上添加了注解`@PathVariable("spittleId")`，这表明在请求路径中，不管占位符（{}内的内容）部分的值是什么都会传递到处理器方法的`spittleId`参数中作为它的值。
+
+需要注意的是：在样例中`spittleId`这个词出现了好几次：先是在`@RequestMapping`的路径中，然后作为`@PathVariable`属性的值，最后又作为方法的参数名称。因为方法的参数名碰巧与占位符的名称相同，因此我们可以去掉`@PathVariable`中的`value`属性：
+
+```java
+@RequestMapping(value = "/{spittleId}", method = RequestMethod.GET)
+public String showSpittle(@PathVariable long spittleId, Model model) {
+    model.addAttribute("spittle", spittleRepository.findOne(spittleId));
+    return "spittle";
+}
+```
+
+如果`@PathVariable`中没有`value`属性的话，它会假设占位符的名称与方法的参数名相同。这能够让代码稍微简洁一些，因为不必重复写占位符的名称了。但需要注意的是，如果你想要重命名参数时，必须要同时修改占位符的名称，使其互相匹配。
+
+下面针对形如“/spittles/12345”的请求编写测试方法：
+
+```java
+@Test
+public void testSpittle() throws Exception {
+    
+    Spittle expectedSpittle = new Spittle("Hello", new Date());
+    
+    SpittleRepository mockRepository = mock(SpittleRepository.class);
+    
+    when(mockRepository.findOne(12345)).thenReturn(expectedSpittle);
+    
+    SpittleController controller = new SpittleController(mockRepository);
+    
+    MockMvc mockMvc = standaloneSetup(controller).build();
+    
+    mockMvc.perform(get("/spittles/12345"))
+            .andExpect(view().name("spittle")) // 期望视图的名称为“spittle”
+            .andExpect(model().attributeExists("spittle")) // 期望模型中含有数据“spittle”
+            .andExpect(model().attribute("spittle", expectedSpittle)); // 期望“spittle”与expectedSpittle相等
+}
+```
+这个测试中最重要的部分是最后几行，它对“/spittles/12345”发起GET请求，然后断言视图的名称是`spittle`，并且预期的`Spittle`对象放到了模型之中。
+
+最后编写spittle视图：
+
+```html
+<body>
+    <div class="spittleView">
+        <div class="spittleMessage">
+            <c:out value="${spittle.message}" />
+        </div>
+        <div>
+            <span class="spittleTime"><c:out value="${spittle.time}" /></span>
+        </div>
+    </div>
+</body>
+```
+
+如果传递请求中少量的数据，那查询参数和路径变量是很合适的。但通常我们还需要传递很多的数据（也许是表单提交的数据），那查询参数显得有些笨拙和受限了。下面让我们来看一下如何编写控制器方法来处理表单提交。
+
+### 5.4 处理表单
+
+Web应用的功能通常并不局限于为用户推送内容。大多数的应用允许用户填充表单并将数据提交回应用中，通过这种方式实现与用户的交互。像提供内容一样，Spring MVC的控制器也为表单处理提供了良好的支持。
+
+在Spittr应用中，我们需要有个表单让新用户进行注册。`SpitterController`是一个新的控制器，目前只有一个请求处理的方法来展现注册表单：
+
+```java
+package spittr.web;
+
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+
+@Controller
+@RequestMapping("/spitter")
+public class SpitterController {
+    // 处理对“/spitter/register”的GET请求
+    @RequestMapping(value = "/register", method = RequestMethod.GET)
+    public String showRegistrationForm() {
+        return "registerForm";
+    }
+}
+```
+
+这是一个简单的方法，没有任何输入并且只是返回名为registerForm的逻辑视图。按照我们配置`InternalResourceViewResolver`的方式，这意味着将会使用“/WEB-INF/views/registerForm.jsp”这个JSP来渲染注册表单。
+
+对应的测试方法：
+
+```java
+@Test
+public void shouldShowRegistration() throws Exception {
+    
+    SpitterController controller = new SpitterController();
+    
+    MockMvc mockMvc = standaloneSetup(controller).build();
+    
+    mockMvc.perform(get("/spitter/register")).andExpect(view().name("registerForm"));
+}
+```
+
+这个测试方法与首页控制器的测试非常类似。它对“/spitter/register”发送GET请求，然后断言结果的视图名为registerForm。
+
+因为视图的名称为registerForm，所以JSP的名称需要是registerForm.jsp，下面创建这个JSP：
+
+```html
+<body>
+    <h1>Register</h1>
+    <form action="spitter/register" method="POST">
+        <label>
+            First Name:
+            <input type="text" name="firstName" />
+        </label>
+        <br>
+        <label>
+            Last Name:
+            <input type="text" name="lastName" />
+        </label>
+        <br>
+        <label>
+            Username:
+            <input type="text" name="username" />
+        </label>
+        <br>
+        <label>
+            Password:
+            <input type="text" name="password" />
+        </label>
+        <br>
+        <input type="submit" value="Register" />
+    </form>
+</body>
+```
+
+可以看到，这个JSP非常基础。它的HTML表单域中记录用户的名字、姓氏、用户名以及密码，然后还包含一个提交表单的按钮。
+
+（原书中的`<form>`标签没有设置`action`属性，当不设置时，表单会提交到与展现时相同的URL路径
+上。也就是说，它会提交到“/spitter/register”上。也就是说会回到我们的`SpitterController`，这里为了代码易读，添加了`action`属性）
+
+#### 5.4.1 编写表单的控制器
+
+控制器需要接受表单数据并将表单数据保存为`Spitter`对象。最后，为了防止重复提交（用户点击浏
+览器的刷新按钮有可能会发生这种情况），应该将浏览器重定向到新创建用户的基本信息页面。
+
+重新编写`SpitterController`：
+
+```java
+@Controller
+@RequestMapping("/spitter")
+public class SpitterController {
+    
+    private SpitterRepository spitterRepository;
+    
+    @Autowired
+    public SpitterController(SpitterRepository spitterRepository) {
+        this.spitterRepository = spitterRepository;
+    }
+    
+    // 处理对“/spitter/register”的GET请求
+    @RequestMapping(value = "/register", method = RequestMethod.GET)
+    public String showRegistrationForm() {
+        return "registerForm";
+    }
+    
+    // 处理对“/spitter/register”的POST请求
+    @RequestMapping(value = "/register", method = RequestMethod.POST)
+    public String processRegistration(Spitter spitter) {
+        
+        // 保存Spitter
+        spitterRepository.save(spitter);
+        
+        // 重定向到基本信息页
+        return "redirect:/spitter/" + spitter.getUsername();
+    }
+}
+```
+
+我们之前创建的`showRegistrationForm()`方法依然还在，不过请注意新创建的`processRegistration()`方法，它接受一个`Spitter`对象作为参数。这个对象有`firstName`、`lastName`、`username`和`password`属性，这些属性将会使用请求中同名的参数进行填充。
+
+`processRegistration()`方法会进而调用`SpitterRepository`的`save()`方法，`SpitterRepository`是在`SpitterController`的构造器中注入进来的。
+
+`processRegistration()`方法做的最后一件事就是返回一个`String`类型，用来指定视图。但是这个视图格式和以前我们所看到的视图有所不同。这里不仅返回了视图的名称供视图解析器查找目标视图，而且返回的值还带有重定向的格式。
+
+当`InternalResourceViewResolver`看到视图格式中的“redirect:”前缀时，它就知道要将其解析为重定向。在本例中，它将会重定向到用户基本信息的页面。例如，如果`Spitter.username`属性的值为“jbauer”，那么视图将会重定向到“/spitter/jbauer”。
+
+除了“redirect:”，`InternalResourceViewResolver`还能识别“forward:”前缀。当它发现视图格式中以“forward:”作为前缀时，请求将会前往（forward）指定的URL路径，而不再是重定向。
+
+下面编写测试类，由于我们的`SpitterController`没有显式定义无参构造器，所以测试方法`shouldShowRegistration()`也要重写：
+
+```java
+package spittr.web;
+
+import org.junit.Test;
+import org.springframework.test.web.servlet.MockMvc;
+
+import spittr.Spitter;
+import spittr.data.SpitterRepository;
+
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
+import static org.springframework.test.web.servlet.setup.MockMvcBuilders.*;
+
+public class SpitterControllerTest {
+
+    @Test
+    public void shouldShowRegistration() throws Exception {
+
+        SpitterRepository mockRepository = mock(SpitterRepository.class);
+
+        SpitterController controller = new SpitterController(mockRepository);
+
+        MockMvc mockMvc = standaloneSetup(controller).build();
+
+        mockMvc.perform(get("/spitter/register")).andExpect(view().name("registerForm"));
+    }
+
+    @Test
+    public void shouldProcessRegistration() throws Exception {
+        
+        SpitterRepository mockRepository = mock(SpitterRepository.class);
+        
+        Spitter unsaved = new Spitter("jbauer", "24hours", "Jack", "Bauer");
+        Spitter saved = new Spitter(24L, "jbauer", "24hours", "Jack", "Bauer");
+        when(mockRepository.save(unsaved)).thenReturn(saved);
+
+        SpitterController controller = new SpitterController(mockRepository);
+        MockMvc mockMvc = standaloneSetup(controller).build();
+
+        mockMvc.perform(post("/spitter/register")
+                .param("firstName", "Jack")
+                .param("lastName", "Bauer")
+                .param("username", "jbauer")
+                .param("password", "24hours")
+                .param("email", "jbauer@ctu.gov"))
+                .andExpect(redirectedUrl("/spitter/jbauer"));
+
+        verify(mockRepository, atLeastOnce()).save(unsaved);
+    }
+}
+```
+
+测试方法对“/spitter/register”发起了一个POST请求。作为请求的一部分，用户信息以参数的形式放到`request`中，从而模拟提交的表单。
+
+因为我们重定向到了用户基本信息页面，那么我们应该往`SpitterController`中添加一个处理器方法，用来处理对基本信息页面的请求。如下的`showSpitterProfile()`将会完成这项任务：
+
+```java
+// 处理显示用户信息的请求
+@RequestMapping(value = "/{username}", method = RequestMethod.GET)
+public String showSpitterProfile(@PathVariable String username, Model model) {
+    Spitter spitter = spitterRepository.findByUsername(username);
+    model.addAttribute("spitter", spitter);
+    return "profile";
+}
+```
+
+`SpitterRepository`通过用户名获取一个`Spitter`对象，`showSpitterProfile()`得到这个对象并将其添加到模型中，然后返回profile，也就是基本信息页面的逻辑视图名。像本章展现的其他视图一样，现在的基本信息视图非常简单：
+
+```html
+<body>
+    <h1>Your Profile</h1>
+    <c:out value="${spitter.username}" />
+    <br />
+    <c:out value="${spitter.firstName}" />
+    <c:out value="${spitter.lastName}" />
+    <br />
+    <c:out value="${spitter.email}" />
+</body>
+```
+
+如果表单中没有发送`username`或`password`的话，会发生什么情况呢？或者说，如果firstName或`lastName`的值为空或太长的话，又会怎么样呢？接下来，让我们看一下如何为表单提交添加校验，从而避免数据呈现的不一致性。
+
+#### 5.4.2 校验表单
+
+如果用户在提交表单的时候，`username`或`password`文本域为空的话，那么将会导致在新建`Spitter`对象中，username或`password`是空的`String`。至少这是一种怪异的行为。如果这种现象不处理的话，这将会出现安全问题，因为不管是谁只要提交一个空的表单就能登录应用。
+
+同时，我们还应该阻止用户提交空的`firstName`和（或）`lastName`，使应用仅在一定程度上保持匿名性。有个好的办法就是限制这些输入域值的长度，保持它们的值在一个合理的长度范围，避免这些输入域的误用。
+
+比较初级的校验方式是在`processRegistration()`方法中手工添加代码来检查值的合法性，如果值不合法，就将请求重新转会到注册页面。这种方法需要我们在方法中增加大量的if-else语句。
+
+与其让校验逻辑弄乱我们的处理器方法，还不如使用Spring对Java校验API（Java Validation API，又称JSR-303）的支持。从Spring 3.0开始，在Spring MVC中提供了对Java校验API的支持。在Spring MVC中要使用Java校验API的话，并不需要什么额外的配置。只要保证在类路径下包含这个Java API的实现即可，比如Hibernate Validator。
+
+Java校验API定义了多个注解，这些注解可以放到属性上，从而限制
+这些属性的值：
+
+常用验证注解：
+
+序号 | 注解 | 说明
+-----|-----|-----
+1 | @AssertFalse | 验证注解的元素值是false
+2 | @AssertTrue | 验证注解的元素值是true
+3 | @DecimalMax(value=x) | 验证注解的元素值小于等于指定的十进制value值
+4 | @DecimalMin(value=x) | 验证注解的元素值大于等于指定的十进制value值
+5 | @Digits(integer=整数位数, fraction=小数位数) | 验证注解的元素值的整数位数和小数位数上限
+6 | @Max(value=x) | 验证注解的元素值小于等于指定的value值
+7 | @Min(value=x) | 验证注解的元素值大于等于指定的value值
+8 | @NotNull | 验证注解的元素值不是null
+9 | @Null | 验证注解的元素值是null
+10 | @Future | 验证注解的元素值（日期类型）比当前时间晚
+11 | @Past | 验证注解的元素值（日期类型）比当前时间早
+12 | @Pattern(regex=正则表达式) | 验证注解的元素值与指定的正则表达式匹配
+13 | @Size(min=最小值, max=最大值) | 验证注解的元素值在min和max指定区间（包含）之内，如字符长度、集合大小
+14 | @Valid | 验证关联的对象，如账户对象里有一个订单对象，指定验证订单对象
+15 | @NotEmpty | 验证注解的元素值不为null且不为空（字符串长度不为0、集合大小不为0）
+16 | @Range(min=最小值, max=最大值) | 验证注解的元素值在最小值和最大值之间
+17 | @NotBlank | 验证注解的元素值不为空（不为null、去除首位空格后长度为0），不同于@NotEmpty，该注解只应用于字符串且在比较时会去除字符串两端的空格
+18 | @Length(min=下限 ,max=上限) | 验证注解的元素值长度在min和max区间内 
+19 | @Email | 验证注解的元素值是Email，也可以通过正则表达式和flag指定自定义的email格式
+
+上述的注解有些是Hibernate Validation提供的，有些是Java自己定义的。
+
+**`@NotNull`、`@NotEmpty`和`@NotBlank`的区别**：
+
+```java
+String name = null;
+@NotNull:  false
+@NotEmpty: false 
+@NotBlank: false 
+
+String name = "";
+@NotNull:  true
+@NotEmpty: false
+@NotBlank: false
+
+String name = " ";
+@NotNull:  true
+@NotEmpty: true
+@NotBlank: false
+
+String name = "Great answer!";
+@NotNull:  true
+@NotEmpty: true
+@NotBlank: true
+```
+
+通常情况下：
+
+- @NotNull 用在基本类型的包装类型上
+- @NotEmpty 用在集合类上面
+- @NotBlank 用在String上面
+
+请考虑要添加到`Spitter`域上的限制条件，似乎需要使用`@NotBlank`和`@Size`注解。我们所要做的事情就是将这些注解添加到`Spitter`的属性上。如下的程序清单展现了`Spitter`类，它的属性已经添加了校验注解。
+
+（原书这里使用的是`@NotNull`和`@Size`搭配来校验`username`等`String`类型的参数，但这样无法避免提交`"   "`也会通过的问题。）
+
+```java
+package spittr;
+
+import javax.validation.constraints.Size;
+
+import org.apache.commons.lang3.builder.EqualsBuilder;
+import org.apache.commons.lang3.builder.HashCodeBuilder;
+import org.hibernate.validator.constraints.NotBlank;
+
+public class Spitter {
+
+    private Long id;
+
+    @NotBlank
+    @Size(min = 5, max = 16)
+    private String username;
+
+    @NotBlank
+    @Size(min = 5, max = 25)
+    private String password;
+
+    @NotBlank
+    @Size(min = 2, max = 30)
+    private String firstName;
+
+    @NotBlank
+    @Size(min = 2, max = 30)
+    private String lastName;
+
+    public Spitter() {
+    }
+
+    public Spitter(String username, String password, String firstName, String lastName) {
+        this(null, username, password, firstName, lastName);
+    }
+
+    public Spitter(Long id, String username, String password, String firstName, String lastName) {
+        this.id = id;
+        this.username = username;
+        this.password = password;
+        this.firstName = firstName;
+        this.lastName = lastName;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getFirstName() {
+        return firstName;
+    }
+
+    public void setFirstName(String firstName) {
+        this.firstName = firstName;
+    }
+
+    public String getLastName() {
+        return lastName;
+    }
+
+    public void setLastName(String lastName) {
+        this.lastName = lastName;
+    }
+
+    @Override
+    public String toString() {
+        return "Spitter [id=" + id + ", username=" + username + ", password=" + password + ", firstName=" + firstName
+                + ", lastName=" + lastName + "]";
+    }
+
+    @Override
+    public boolean equals(Object that) {
+        return EqualsBuilder.reflectionEquals(this, that, "firstName", "lastName", "username", "password");
+    }
+
+    @Override
+    public int hashCode() {
+        return HashCodeBuilder.reflectionHashCode(this, "firstName", "lastName", "username", "password");
+    }
+}
+```
+
+添加完上述注解，对于我们的应用来说，这意味着用户必须要填完注册表单，且值的长度要在给定的范围内。
+
+接下来修改`processRegistration()`方法来应用校验功能：
+
+```java
+@RequestMapping(value = "/register", method = RequestMethod.POST)
+public String processRegistration(@Validated Spitter spitter, BindingResult br) {
+
+    List<ObjectError> errors = br.getAllErrors();
+
+    // 如果发生验证异常，则该List的size > 0
+    if (errors.size() > 0) {
+        return "registerForm";
+    }
+
+    // 保存Spitter
+    spitterRepository.save(spitter);
+
+    // 重定向到基本信息页
+    return "redirect:/spitter/" + spitter.getUsername();
+}
+```
+
+由于这里使用的验证器为bean对象验证器，所以对于要验证的参数数据需要打包后由处理器方法以bean形参类型的方式接收，并由`@Validated`注解标注。*注意，不能将该注解用于`String`类型与基本类型的形参前。*
+
+紧跟着`@Validated`所注解的形参后面是一个`BindingResult`类型的形参。通过该形参可获取到所有验证异常的信息。
+
+通过在代码中检查是否发生验证异常，从而决定是否要返回到注册页面。如果没有错误的话，`Spitter`对象将会通过`SpitterRepository`进行保存，控制器会像之前那样重定向到基本信息页面。
+
+（原书这里使用的注解是`@Valid`，这个注解与`@Validated`的区别在于前者是javax提供的，后者是Spring提供的，二者的大致用法相同。书中这里没有使用`BindingResult`，而是使用了一个`Errors`类型（不是Java中的`Error`，而是Spring框架内的一个接口）的形参，并在方法内检查`errors.hasErrors()`，从而判断是否要返回到注册页面。事实上`BindingResult`接口继承了`Errors`接口。）
+
+### 5.5 小结
+
+>
+在本章中，我们为编写应用程序的Web部分开了一个好头。可以看到，Spring有一个强大灵活的Web框架。借助于注解，Spring MVC提供了近似于POJO的开发模式，这使得开发处理请求的控制器变得非常简单，同时也易于测试。
+>
+当编写控制器的处理器方法时，Spring MVC极其灵活。概括来讲，如果你的处理器方法需要内容的话，只需将对应的对象作为参数，而它不需要的内容，则没有必要出现在参数列表中。这样，就为请求处理带来了无限的可能性，同时还能保持一种简单的编程模型。
+>
+尽管本章中的很多内容都是关于控制器的请求处理的，但是渲染响应同样也是很重要的。我们通过使用JSP的方式，简单了解了如何为控制器编写视图。但是就Spring MVC的视图来说，它并不限于本章所看到的简单JSP。
+>
+在接下来的第6章中，我们将会更深入地学习Spring视图，包括如何在JSP中使用Spring标签库。我们还会学习如何借助Apache Tiles为视图添加一致的布局结构。同时，还会了解Thymeleaf，这是一个很有意思的JSP替代方案，Spring为其提供了内置的支持。
+
+
+
