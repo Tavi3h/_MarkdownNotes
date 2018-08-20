@@ -315,7 +315,7 @@ org.springframework.web.servlet.FlashMapManager=org.springframework.web.servlet.
 
 示例，*以下内容在工程SpringMVC-03-urlpattern中。*
 
-将`&lt;url-pattern/&gt`;修改为/：
+将`<url-pattern/>`;修改为/：
 
 ```xml
 <servlet>
@@ -350,7 +350,7 @@ Index Page.
 
 **解决方法：**
 
-当`&lt;url-pattern/&gt;`为/时，可以通过一些配置使得静态资源可以被正常请求。
+当`<url-pattern/>`为/时，可以通过一些配置使得静态资源可以被正常请求。
 
 **方法（1）：使用Tomcat中名为default的Servlet**
 
@@ -427,7 +427,7 @@ The default servlet for all web applications, that serves static resources. It p
 <mvc:default-servlet-handler/>
 ```
 
-此时，`&lt;url-pattern/&gt;`为/也可以正常访问静态资源了。
+此时，`<url-pattern/>`为/也可以正常访问静态资源了。
 
 这里`&lt;mvc:default-servlet-handler/&gt;`会将对静态资源的访问请求添加到`SimpleUrlHandlerMapping`的urlMap中，key就是请求的URL，而value则为默认Servlet请求处理器`DefaultServletHttpRequestHandler`对象。而该处理器调用的正是Tomcat的`DefaultServlet`来处理静态资源的访问请求。
 
@@ -446,7 +446,7 @@ The default servlet for all web applications, that serves static resources. It p
 - location：表示静态资源所在目录，这里的目录可以是WEB-INF目录及其子目录。
 - mapping：表示对该资源的请求。**注意后面是两个星号**。
 
-该配置会把对该静态资源的访问请求添加到SimpleUrlHandlerMapping的urlMap中，key就是真正与mapping的URL匹配的URL，而value则为静态资源处理器对象ResourceHttpRequestHandler。
+该配置会把对该静态资源的访问请求添加到`SimpleUrlHandlerMapping`的`urlMap`中，key就是真正与`mapping`的URL匹配的URL，而value则为静态资源处理器对象`ResourceHttpRequestHandler`。
 
 ### 1.5 绝对路径与相对路径
 
@@ -3090,7 +3090,7 @@ public class MyController {
 
 参数逐个接收，要保证`addObject()`存入时使用的名称与目标`Controller`的参数名相同。
 
-在从重定向到`Controller`时，路径不能加/。
+在重定向到`Controller`时，路径不能加/。
 
 ```java
 @Controller
@@ -4652,9 +4652,9 @@ String name = "Great answer!";
 
 通常情况下：
 
+- @NotNull 用在基本类型的包装类型上
 - @NotEmpty 用在集合类上面
 - @NotBlank 用在String上面
-- @NotNull 用在基本类型的包装类型上
 
 ##### 4.4.2.3 修改处理器
 
