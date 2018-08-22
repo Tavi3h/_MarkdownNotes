@@ -5326,7 +5326,7 @@ public class HomeController {
 
 下面定义Spittr应用的首页，home.jsp：
 
-```html
+```jsp
 <%@ taglib uri="http://java.sun.com/jsp/jstl/core" prefix="c"%>
 <%@ page language="java" contentType="text/html; charset=utf-8" pageEncoding="utf-8"%>
 <%
@@ -5343,7 +5343,7 @@ public class HomeController {
 <link rel="stylesheet" type="text/css" href="<c:url value="resources/style.css"/>">
 </head>
 <body>
-    <h1>Welcome to Spittr</h1>
+    <h1>Welcome to Spittr!</h1>
     <a href="<c:url value="spittles" />">Spittles</a> |
     <a href="<c:url value="spitter/register" />">Register</a>
 </body>
@@ -5972,7 +5972,7 @@ public class SpitterController {
 }
 ```
 
-我们之前创建的`showRegistrationForm()`方法依然还在，不过请注意新创建的`processRegistration()`方法，它接受一个`Spitter`对象作为参数。这个对象有`firstName`、`lastName`、`username`和`password`属性，这些属性将会使用请求中同名的参数进行填充。
+我们之前创建的`showRegistrationForm()`方法依然还在，不过请注意新创建的`processRegistration()`方法，它接受一个`Spitter`对象作为参数。这个对象有`firstName`、`lastName`、`username`和`password`属性，这些属性将会使用请求中同名的参数进行填充。这种参数传递方法要求参数名和属性名必须相同。
 
 `processRegistration()`方法会进而调用`SpitterRepository`的`save()`方法，`SpitterRepository`是在`SpitterController`的构造器中注入进来的。
 
@@ -6289,5 +6289,1061 @@ public String processRegistration(@Validated Spitter spitter, BindingResult br) 
 >
 在接下来的第6章中，我们将会更深入地学习Spring视图，包括如何在JSP中使用Spring标签库。我们还会学习如何借助Apache Tiles为视图添加一致的布局结构。同时，还会了解Thymeleaf，这是一个很有意思的JSP替代方案，Spring为其提供了内置的支持。
 
+## 第六章 渲染Web视图
 
+本章内容：
+
+- 将模型数据渲染为HTML
+- 使用JSP视图
+- 通过tiles定义视图布局
+- 使用Thymeleaf视图
+
+上一章主要关注于如何编写处理Web请求的控制器。我们也创建了一些简单的视图，用来渲染控制器产生的模型数据，但我们并没有花太多时间讨论视图，也没有讨论控制器完成请求到结果渲染到用户的浏览器中的这段时间内到底发生了什么，而这正是本章的主要内容。
+
+### 6.1 理解视图解析
+
+上一章中，我们所编写的控制器方法没有直接产生浏览器中渲染所需的HTML。这些方法只是将一些数据填充到模型中，然后将模型传递给一个用来渲染的视图。这些方法会返回一个String类型的值，这个值是视图的逻辑名称，不会直接引用具体的视图实现。尽管我们也编写了几个简单的JavaServer Page（JSP）视图，但是控制器并不关心这些。
+
+将控制器中请求处理的逻辑和视图中的渲染实现解耦是Spring MVC的一个重要特性。如果控制器中的方法直接负责产生HTML的话，就很难在不影响请求处理逻辑的前提下，维护和更新视图。控制器方法和视图的实现会在模型内容上达成一致，这是两者的最大关联，除此之外，两者应该保持足够的距离。
+
+但是，如果控制器只通过逻辑视图名来了解视图的话，那Spring该如何确定使用哪一个视图实现来渲染模型呢？这就是Spring视图解析器的任务了。
+
+上一章中，我们使用了名为`InternalResourceViewResolver`的视图解析器。在它的配置中，为了得到视图的名字，会使用“/WEBINF/views/”前缀和“.jsp”后缀，从而确定来渲染模型的JSP文件的物理位置。
+
+下面我们来看一下视图解析的基础只是以及Spring提供的其它视图解析器。
+
+Spring MVC定义了一个名为`ViewResolver`的接口：
+
+```java
+public interface ViewResolver {
+    View resolveViewName(String viewName, Locale locale) throws Exception;
+}
+```
+
+当给`resolveViewName()`方法传入一个视图名和`Locale`对象时，它会返回一个`View`实例。`View`是另外一个接口：
+
+```java
+public interface View {
+
+    String RESPONSE_STATUS_ATTRIBUTE = View.class.getName() + ".responseStatus";
+
+    String PATH_VARIABLES = View.class.getName() + ".pathVariables";
+
+    String SELECTED_CONTENT_TYPE = View.class.getName() + ".selectedContentType";
+
+    String getContentType();
+
+    void render(Map<String, ?> model, HttpServletRequest request, HttpServletResponse response) throws Exception;
+
+}
+```
+
+`View`接口的任务就是接受模型以及`HttpServletRequest`、`HttpServletResponse`对象，并将输出结果渲染到响应中。
+
+这看起来非常简单。我们所需要做的就是编写`ViewResolver`和`View`的实现，将要渲染的内容放到响应中，进而展现到用户的浏览器中。对吧？
+
+实际上，我们并不需要这么麻烦。尽管我们可以编写`ViewResolver`和`View`的实现，在有些特定的场景下，这样做也是有必要的，但是一般来讲，我们并不需要关心这些接口。我在这里提及这些接口只是为了让你对视图解析内部如何工作有所了解。Spring提供了多个内置的实现，它们能够适应大多数的场景：
+
+视图解析器 | 描述
+-----|-----
+`BeanNameViewResolver` | 将视图解析为Spring应用上下文中的bean，其中bean的ID与视图的名字相同
+`ContentNegotiatingViewResolver` | 通过考虑客户端需要的内容类型来解析视图，委托给另外一个能够产生对应内容类型的视图解析器
+`FreeMarkerViewResolver` | 将视图解析为FreeMarker模板
+`InternalResourceViewResolver` | 将视图解析为Web应用的内部资源（一般为JSP）
+`JasperReportsViewResolver` | 将视图解析为JasperReports定义
+`ResourceBundleViewResolver` | 将视图解析为资源bundle（一般为属性文件）
+`TilesViewResolver` | 将视图解析为Apache Tile定义，其中tile ID与视图名称相同。
+`UrlBasedViewResolver` | 直接根据视图的名称解析视图，视图的名称会匹配一个物理视图的定义
+`VelocityLayoutViewResolver` | 将视图解析为Velocity布局，从不同的Velocity模板中组合页面
+`VelocityViewResolver` | 将视图解析为Velocity模板
+`XmlViewResolver` | 将视图解析为特定XML文件中的bean定义。
+`XsltViewResolver` | 将视图解析为XSLT转换后的结果
+
+这里我们不会逐一介绍上述所有的视图解析器，因为在大多数应用中，我们只会用到其中很少的一部分。
+
+### 6.2 创建JSP视图
+
+（JSP基本上快要死透了，现在的主流是使用Ajax和JSON进行前后端交互了）
+
+JavaServer Pages作为Java Web应用程序的视图技术已经超过15年了。尽管开始的时候它很丑陋，只是类似模板技术（如Microsoft的Active Server Pages）的Java版本，但JSP这些年在不断进化，包含了对表达式语言和自定义标签库的支持。
+
+Spring提供了两种支持JSP视图的方式：
+
+- `InternalResourceViewResolver`可以将视图名解析为JSP文件。另外，如果在你的JSP页面中使用了JSP标准标签库（JavaServer Pages Standard Tag Library，JSTL）的话，InternalResourceViewResolver能够将视图名解析为JstlView形式的JSP文件，从而将JSTL本地化和资源bundle变量暴露给JSTL的格式化（formatting）和信息（message）标签。
+- Spring提供了两个JSP标签库，一个用于表单到模型的绑定，另一个提供了通用的工具类特性。
+
+尽管Spring还有其他的几个视图解析器都能将视图名映射为JSP文件，但就这项任务来讲，`InternalResourceViewResolver`是最简单和最常用的视图解析器。
+
+接下来，我们将会更加仔细地了解`InternalResourceViewResolver`，看看如何让它完全听命于我们。
+
+#### 6.2.1 配置适用于JSP的视图解析器
+
+有一些视图解析器，如`ResourceBundleViewResolver`会直接将逻辑视图名映射为特定的`View`接口实现，而`InternalResourceViewResolver`所采取的方式并不那么直接。它遵循一种约定，会在视图名上添加前缀和后缀，进而确定一个Web应用中视图资源的物理路径（事实上我们也可以在控制器方法中使用视图的物理地址全名，例如“/WEB-INF/views/home.jsp”，而不定义前缀后缀，在此情况下，前后缀均为空字符串）。
+
+考虑一个简单的场景，假设逻辑视图名为home。通用的实践是将JSP文件放到Web应用的WEB-INF目录下，防止对它的直接访问。如果我们将所有的JSP文件都放在“/WEB-INF/views/”目录下，并且home页的JSP名为home.jsp，那么我们可以确定物理视图的路径就是逻辑视图名home再加上“/WEB-INF/views/”前缀和“.jsp”后缀。
+
+<center>
+    ![图6.1-InternalResourceViewResolver添加前后缀](images\图6.1-InternalResourceViewResolver添加前后缀.PNG)
+    **InternalResourceViewResolver解析视图时会在视图名上添加前缀和后缀.PNG**
+</center>
+
+当使用`@Bean`注解时，我们可以按照如下方式配置，使其在解析视图时遵循上述的约定：
+
+```java
+@Bean
+public ViewResolver viewResolver() {
+    InternalResourceViewResolver resolver = new InternalResourceViewResolver();
+    resolver.setPrefix("/WEB-INF/views/");
+    resolver.setSuffix(".jsp");
+    return resolver;
+}
+```
+
+如果使用XML的方式，可以进行如下配置：
+
+```xml
+<bean id="viewResolver" class="org.springframework.web.servlet.view.InternalResourceViewResolver">
+    <property name="prefix" value="/WEB-INF/views/" />
+    <property name="suffix" value=".jsp" />    
+</bean>
+```
+
+进行上述配置后，`InternalResourceViewResolver`就会将逻辑视图名解析为JSP文件。
+
+- home将会解析为“/WEB-INF/views/home.jsp”
+- productList将会解析为“/WEB-INF/views/productList.jsp”
+- books/detail将会解析为“/WEB-INF/views/books/detail.jsp”
+
+重点看一下最后一个样例。当逻辑视图名中包含斜线时，这个斜线也会带到资源的路径名中。因此，它会对应到`prefix`属性所引用目录的子目录下的JSP文件。这样的话，我们就可以很方便地将视图模板组织为层级目录结构，而不是将它们都放到同一个目录之中。
+
+**解析JSTL视图**
+
+到目前为止，我们对`InternalResourceViewResolver`的配置都很基础和简单。它最终会将逻辑视图名解析为`InternalResourceView`实例，这个实例会引用JSP文件。但是如果这些JSP使用JSTL标签来处理格式化和信息的话，那么我们会希望`InternalResourceViewResolver`将视图解析为`JstlView`。
+
+JSTL的格式化标签需要一个`Locale`对象，以便于恰当地格式化地域相关的值，如日期和货币。信息标签可以借助Spring的信息资源和`Locale`，从而选择适当的信息渲染到HTML之中。通过解析`JstlView`，JSTL能够获得`Locale`对象以及Spring中配置的信息资源。
+
+如果想让`InternalResourceViewResolver`将视图解析为`JstlView`，而不是`InternalResourceView`的话，那么我们只需设置它的`viewClass`属性即可：
+
+```java
+@Bean
+public ViewResolver viewResolver() {
+    InternalResourceViewResolver resolver = new InternalResourceViewResolver();
+    resolver.setPrefix("/WEB-INF/views/");
+    resolver.setSuffix(".jsp");
+    resolver.setViewClass("org.springframework.web.servlet.view.JstlView");
+    return resolver;
+}
+```
+
+使用XML配置：
+
+```xml
+<bean id="viewResolver" class="org.springframework.web.servlet.view.InternalResourceViewResolver">
+    <property name="prefix" value="/WEB-INF/views/" />
+    <property name="suffix" value=".jsp" />    
+    <property name="viewClass" value="org.springframework.web.servlet.view.JstlView" />
+</bean>
+```
+
+不管使用Java配置还是使用XML，都能确保JSTL的格式化和信息标签能够获得`Locale`对象以及Spring中配置的信息资源。
+
+#### 6.2.2 使用Spring的JSP库
+
+*以下内容代码在工程sia4e-P2_Spring_on_the_web-C06_Rendering_web_views-01_jsp中。*
+
+当为JSP添加功能时，标签库是一种很强大的方式，能够避免在脚本块中直接编写Java代码。Spring提供了两个JSP标签库，用来帮助定义Spring MVC Web的视图。其中一个标签库会用来渲染HTML表单标签，这些标签可以绑定模型中的某个属性。另外一个标签库包含了一些工具类标签，我们随时都可以非常便利地使用它们。
+
+**将表单绑定到模型上**
+
+Spring的表单绑定JSP标签库包含了14个标签，它们中的大多数都用来渲染HTML中的表单标签。但是，它们与原生HTML标签的区别在于它们会绑定模型中的一个对象，能够根据模型中对象的属性填充值。标签库中还包含了一个为用户展现错误的标签，它会将错误信息渲染到最终的HTML之中。
+
+为了使用表单绑定库，我们需要在JSP页面中对其进行声明：
+
+```jsp
+<%@ taglib uri="http://www.springframework.org/tags/form" prefix="sf" %>
+```
+
+这里使用前缀“sf”。
+
+下面时Spring提供的14个相关标签：
+
+JSP标签 | 描述
+----- | -----
+`<sf:checkbox>` | 渲染成一个HTML`<input>`标签，其中`type`属性设置为`checkbox`
+`<sf:checkboxes>` | 渲染成多个HTML`<input>`标签，其中`type`属性设置为`checkbox`
+`<sf:errors>` | 在一个HTML`<span>`中渲染输入域的错误
+`<sf:form>` | 渲染成一个HTML`<form>`标签，并为其内部标签暴露绑定路径，用于数据绑定
+`<sf:hidden>` | 渲染成一个HTML`<input>`标签，其中`type`属性设置为`hidden`
+`<sf:input>` | 渲染成一个HTML`<input>`标签，其中`type`属性设置为`text`
+`<sf:label>` | 渲染成一个HTML`<label>`标签
+`<sf:option>` | 渲染成一个HTML`<option>`标签，其`selected`属性根据所绑定的值进行设置
+`<sf:options>` | 按照绑定的集合、数组或`Map`，渲染成一个HTML`<option>`标签的列表
+`<sf:password>` | 渲染成一个HTML`<input>`标签，其中`type`属性设置为`password`
+`<sf:radiobutton>` | 渲染成一个HTML`<input>`标签，其中`type`属性设置为`radio`
+`<sf:radiobuttons>` | 渲染成多个HTML`<input>`标签，其中`type`属性设置为`radio`
+`<sf:select>` | 渲染为一个HTML`<select>`标签
+`<sf:textarea>` | 渲染为一个HTML`<textarea>`标签
+
+要在一个样例中介绍所有的这些标签是很困难的，如果一定要这样做的话，肯定也会非常牵强。就Spittr样例来说，我们只会用到适合于Spittr应用中注册表单的标签。具体来讲，也就是`<sf:form>`、`<sf:input>`和`<sf:password>`。
+
+修改registerForm.jsp的表单：
+
+```html
+<sf:form action="spitter/register" method="POST" commandName="spitter">
+    First Name:<sf:input path="firstName" />
+    <br/>
+    Last Name: <sf:input path="lastName" />
+    <br/>
+    Username: <sf:input path="username" />
+    <br/>
+    Password: <sf:password path="password" />
+    <br/>
+    <input type="submit" value="Register" />
+</sf:form>
+```
+
+`<sf:form>`会渲染会一个HTML`<form>`标签，但它也会通过`commandName`属性构建针对某个模型对象的上下文信息。在其他的表单绑定标签中，会引用这个模型对象的属性。
+
+我们在表单中将`commandName`属性设置为spitter，因此，在模型中必须要有一个key为spitter的对象，否则，表单不能正常渲染（报错）。这意味着我们需要修改一下`SpitterController`，以确保模型中存在以spitter为key的`Spitter`对象：
+
+```java
+@RequestMapping(value = "/register", method = RequestMethod.GET)
+public String showRegistrationForm(Model model) {
+    model.addAttribute("spitter", new Spitter());
+    return "registerForm";
+}
+```
+
+修改后的`showRegistrationForm()`方法中，新增了一个`Spitter`实例到模型中。
+
+回到表单，前四个输入域将HTML `<input>`标签改成了`<sf:input>`。这个标签会渲染成一个HTML`<input>`标签，并且`type`属性将会设置为`text`。我们在这里设置了`path`属性，`<input>`标签的`value`属性值将会设置为模型对象中`path`属性所对应的值。例如，如果在模型中`Spitter`对象的`firstName`属性值为Jack，那么`<sf:input path="firstName"/>`所渲染的`<input>`标签中，会存在`value="Jack"`。
+
+对于password输入域，我们使用`<sf:password>`来代替`<sf:input>`。`<sf:password>`与`<sf:input>`类似，但是它所渲染的HTML`<input>`标签中，会将`type`属性设置为`password`，这样当输入的时候，它的值不会直接明文显示。
+
+从Spring 3.1开始，`<sf:input>`标签能够允许我们指定`type`属性，这样的话，除了其他可选的类型外，还能指定HTML 5特定类型的文本域，如`date`、`range`和`email`。例如，我们可以按照如下的方式指定`email`域：
+
+```html
+Email: <sf:input path="email" type="email" /><br/>
+```
+
+现在假设有个用户提交表单，但其First Name不合法，校验失败后请求会回到注册表单，此时表单中的First Name部分会如下所示（假设在用户在First Name上只填写了一个字母“J”）：
+
+```html
+First Name:<input id="firstName" name="firstName" type="text" value="J"><br/>
+```
+
+相对于标准的HTML标签，使用Spring的表单绑定标签能够带来一定的功能提升，在校验失败后，表单中会预先填充之前输入的值。（当然，这个功能我们也可以用其它方法来实现）但是，这依然没有告诉用户错在什么地方。为了指导用户矫正错误，我们需要使用`<sf:errors>`。
+
+**展现错误**
+
+如果存在校验错误的话，请求中会包含错误的详细信息，这些信息是与模型数据放到一起的。我们所需要做的就是到模型中将这些数据抽取出来，并展现给用户。`<sf:errors>`能够让这项任务变得很简单。
+
+修改表单页面：
+
+```html
+<sf:form action="spitter/register" method="POST" commandName="spitter">
+    First Name: <sf:input path="firstName" />
+    <sf:errors path="firstName" />
+    <br />
+    Last Name: <sf:input path="lastName" />
+    <sf:errors path="lastName" />
+    <br />
+    Username: <sf:input path="username" />
+    <sf:errors path="username" />
+    <br />
+    Password: <sf:password path="password" />
+    <sf:errors path="password" />
+    <br />
+    <input type="submit" value="Register" />
+</sf:form>
+```
+
+在这里，它的`path`属性设置成了`firstName`，也就是指定了要显示`Spitter`模型对象中哪个属性的错误。如果`firstName`属性没有错误的话，那么`<sf:errors>`不会渲染任何内容。但如果有校验错误的话，那么它将会在一个HTML`<span>`标签中显示错误信息。
+
+例如，如果用户提交字母“J”作为名字的话，那么如下的HTML片段就是针对First Name输入域所显示的内容：
+
+```html
+First Name: <input id="firstName" name="firstName" type="text" value="J"/>
+<span id="firstName.errors">size must be between 2 and 30</span>
+```
+
+由于这里的信息会按照地区和语言设置给出，所以我们这里实际上得到的HTML代码应该为：
+
+```html
+First Name: <input id="firstName" name="firstName" type="text" value="J"/>
+<span id="firstName.errors">个数必须在2和30之间</span>
+```
+
+现在，我们已经可以为用户展现错误信息，这样他们就能修正这些错误了。我们可以更进一步，修改错误的样式，使其更加突出显示。为了做到这一点，可以设置`cssClass`属性：
+
+```html
+<sf:errors path="firstName" cssClass="error" />
+```
+
+现在errors的`<span>`会有一个值为`error`的`class`属性。剩下需要做的就是为这个类定义CSS样式（将如下代码添加到style.css中）。如下就是一个简单的CSS样式，它会将错误信息渲染为红色：
+
+```css
+span.error {
+    color: red
+}
+```
+
+在输入域的旁边展现错误信息是一种很好的方式（我们当前表单页面的布局就是这样的），这样能够引起用户的关注，提醒他们修正错误。但这样也会带来布局的问题。另外一种处理校验错误方式就是将所有的错误信息在同一个地方进行显示。为了做到这一点，我们可以移除每个输入域上的`<sf:errors>`元素，并将其放到表单的顶部，如下所示：
+
+```html
+<sf:form action="spitter/register" method="POST" commandName="spitter">
+    <sf:error path="*" element="div" cssClass="errors" />
+    <!-- ... -->
+</sf:form>
+```
+
+与之前相比，值得注意的地方在于它的`path`属性被设置为了“\*”，这是一个通配符选择器，它会告诉`<sf:errors>`显示所有错误。
+
+同样需要注意的是，我们将`element`属性设置成了`div`。默认情况下，错误都会渲染在一个HTML`<span>`标签中，如果只显示一个错误的话，这是不错的选择。但是，如果要渲染所有输入域的错误的话，很可能要展现不止一个错误，这时候使用`<span>`标签（行内元素）就不合适了。像`<div>`这样的块级元素会更为合适。因此，我们可以将`element`属性设置为`div`，这样的话，错误就会渲染在一个`<div>`标签中。
+
+像之前一样，`cssClass`属性被设置`errors`，这样我们就能为`<div>`设置样式。如下为`<div>`的CSS样式，它具有红色的边框和浅红色的背景：
+
+```css
+div.errors {
+    background-color: #ffcccc;
+    border: 2px solid red;
+}
+```
+
+现在，我们在表单的上方显示所有的错误，这样页面布局可能会更加容易一些。
+
+但是，我们还没有着重显示需要修正的输入域。通过为每个输入域设置`cssErrorClass`属性，这个问题很容易解决。我们也可以使用`<sf: label>`，并设置它的`cssErrorClass`属性：
+
+```html
+<sf:form action="spitter/register" method="POST" commandName="spitter">
+    <sf:errors path="*" element="div" cssClass="errors" />
+    <sf:label path="firstName" cssErrorClass="error">First Name</sf:label>: 
+    <sf:input path="firstName" cssErrorClass="error" />
+    <br />
+    <sf:label path="lastName" cssErrorClass="error">Last Name</sf:label>: 
+    <sf:input path="lastName" cssErrorClass="error" />
+    <br />
+    <sf:label path="username" cssErrorClass="error">Username</sf:label>: 
+    <sf:input path="username" cssErrorClass="error" />
+    <br />
+    <sf:label path="password" cssErrorClass="error">Password</sf:label>: 
+    <sf:password path="password" cssErrorClass="error" />
+    <br />
+    <input type="submit" value="Register" />
+</sf:form>
+```
+
+`<sf: label>`标签像其他的表单绑定标签一样，使用`path`来指定它属于模型对象中的哪个属性。假设校验First Name输入域没有任何错误，则其对应的`<sf:label>`会被渲染为HTML的`<label>`元素：
+
+```html
+<label for="firstName">First Name</label>
+```
+
+就其自身来说，设置`<sf:label>`的`path`属性并没有完成太多的功能。但是，我们还同时设置了`cssErrorClass`属性。如果它所绑定的属性有任何错误的话，在渲染得到的`<label>`元素中，`class`属性将会被设置为`error`，如下所示：
+
+```html
+<label for="firstName" class="error">First Name</label>
+```
+
+与之类似，`<sf:input>`标签的`cssErrorClass`属性被设置为`error`。如果有任何校验错误的话，在渲染得到的`<input>`标签中，`class`属性将会被设置为`error`。现在我们已经为文本标记和输入域设置了样式，这样当出现错误的时候，会将用户的注意力转移到此处。例如，如下的CSS会将文本标记渲染为红色，并将输入域设置为浅红色背景：
+
+```css
+label.error {
+    color: red;
+}
+
+input.error {
+    background-color: #ffcccc;
+}
+```
+
+现在，我们有了很好的方式为用户展现错误信息。不过，我们还可以做另外一件事情，能够让这些错误信息更加易读。重新看一下`Spitter`类，我们可以在校验注解上设置`message`属性，使其引
+用对用户更为友好的信息，而这些信息可以定义在属性文件中：
+
+```java
+@NotBlank(message = "{username.blank}")
+@Size(min = 5, max = 16, message = "{username.size}")
+private String username;
+
+@NotBlank(message = "{password.blank}")
+@Size(min = 5, max = 25, message = "{password.size}")
+private String password;
+
+@NotBlank(message = "{firstName.blank}")
+@Size(min = 2, max = 30, message = "{firstName.size}")
+private String firstName;
+
+@NotBlank(message = "{lastName.blank}")
+@Size(min = 2, max = 30, message = "{lastName.size}")
+private String lastName;
+```
+
+对于上面每个域，我们都将其`@NotBlank`、`@Size`注解的message设置为一个字符串，这个字符串是用大括号括起来的。如果没有大括号的话，`message`中的值将会作为展现给用户的错误信息。但是使用了大括号之后，我们使用的就是属性文件中的某一个属性，该属性包含了实际的信息。
+
+接下来我们需要做的就是创建一个名为ValidationMessages.properties的文件，并将其放在根类路径下：
+
+```text
+firstName.blank=First name must not be null.
+firstName.size=First name must be between {min} and {max} characters long.
+lastName.blank=Last name must not be null.
+lastName.size=Last name must be between {min} and {max} characters long.
+username.blank=Username must not be null.
+username.size=Username must be between {min} and {max} characters long.
+password.blank=Password must not be null.
+password.size=Password must be between {min} and {max} characters long.
+```
+
+**Spring通用标签库**
+
+除了表单绑定标签库之外，Spring还提供了更为通用的JSP标签库。实际上，这个标签库是Spring中最早的标签库。这么多年来，它有所变化，但是在最早版本的Spring中，它就已经存在了。
+
+要使用Spring通用的标签库，我们必须要在页面上对其进行声明：
+
+```jsp
+<%@ taglib uri="http://www.springframework.org/tags" prefix="s" %>
+```
+
+与其他JSP标签库一样，prefix可以是任意你所喜欢的值。在这里，
+通用的做法是将这个标签库的前缀设置为spring。但是，我将其设置为“s”，因为它更加简洁，更易于阅读和输入。
+
+Spring的JSP标签库提供的标签：
+
+JSP标签 | 描述
+----- | ----
+`<s:bind>` | 将绑定属性的状态导出到一个名为`status`的页面作用域属性中，与`<s:path>`组合使用获取绑定属性的值
+`<s:escapeBody>` | 将标签体中的内容进行HTML和（或）JavaScript转义
+`<s:hasBindErrors>` | 根据指定模型对象（在请求属性中）是否有绑定错误，有条件地渲染内容
+`<s:htmlEscape>` | 为当前页面设置默认的HTML转义值
+`<s:message>` | 根据给定的编码获取信息，然后要么进行渲染（默认行为），要么将其设置为页面作用域、请求作用域、会话作用域或应用作用域的变量（通过使用`var`和`scope`属性实现）
+`<s:nestedPath>` | 设置嵌入式的path，用于`<s:bind>`之中
+`<s:theme>` | 根据给定的编码获取主题信息，然后要么进行渲染（默认行为），要么将其设置为页面作用域、请求作用域、会话作用域或应用作用域的变量（通过使用`var`和`scope`属性实现）
+`<s:transform>` | 使用命令对象的属性编辑器转换命令对象中不包含的属性
+`<s:url>` | 创建相对于上下文的URL，支持URI模板变量以及HTML/XML/JavaScript转义。可以渲染URL（默认行为），也可以将其设置为页面作用域、请求作用域、会话作用域或应用作用域的变量（通过使用`var`和`scope`属性实现）
+`<s:eval>` | 计算符合Spring表达式语言（Spring Expression Language，SpEL）语法的某个表达式的值，然后要么进行渲染（默认行为），要么将其设置为页面作用域、请求作用域、会话作用域或应用作用域的变量（通过使用`var`和`scope`属性实现）
+
+上表中的一些标签已经被Spring表单绑定标签库淘汰了。例如，`<s:bind>`标签就是Spring最初所提供的表单绑定标签，它比我们在前面所介绍的标签复杂得多。
+
+**展现国际化信息**
+
+到现在为止，我们的JSP模板包含了很多硬编码的文本。这其实也算不上什么大问题，但是如果你要修改这些文本的话，就不那么容易了。而且，没有办法根据用户的语言设置国际化这些文本。
+
+例如，考虑首页中的欢迎信息：
+
+```html
+<h1>Welcome to Spittr!</h1>
+```
+
+修改这个信息的唯一办法是打开home.jsp，然后对其进行变更。我觉得，这算不上什么大事。但是，应用中的文本散布到多个模板中，如果要大规模修改应用的信息时，你需要修改大量的JSP文件。
+
+另外一个更为重要的问题在于，不管你选择什么样的欢迎信息，所有的用户都会看到同样的信息。Web是全球性的网络，你所构建的应用很可能会有全球化用户。因此，最好能够使用用户的语言与其进行交流，而不是只使用某一种语言。
+
+对于渲染文本来说，是很好的方案，文本能够位于一个或多个属性文件中。借助`<s:message>`，我们可以将硬编码的欢迎信息替换为如下的形式：
+
+```html
+<h1><s:message code="spittr.welcome" /></h1>
+```
+
+按照这里的方式，`<s:message>`将会根据key为spittr.welcome的信息源来渲染文本。因此，如果我们希望`<s:message>`能够正常完成任务的话，就需要配置一个这样的信息源。
+
+Spring有多个信息源的类，它们都实现了`MessageSource`接口。在这些类中，更为常见和有用的是`ResourceBundleMessageSource`。它会从一个属性文件中加载信息，这个属性文件的名称是根据基础名称（base name）衍生而来的。如下的`@Bean`方法配置了`ResourceBundleMessageSource`：
+
+```java
+@Bean
+public MessageSource messageSource() {
+    ResourceBundleMessageSource messageSource = new ResourceBundleMessageSource();
+    messageSource.setBasename("messages");
+    return messageSource;
+}
+```
+
+在这个bean声明中，核心在于设置`basename`属性。你可以将其设置为任意你喜欢的值，在这里，我将其设置为message。将其设置为message后，`ResourceBundleMessageSource`就会试图在根路径的属性文件中解析信息，这些属性文件的名称是根据这个基础名称衍生得到的。
+
+根据这个方法的注释，如果我们设置为“message”，那么messages.properties、messages_en.properties、messages.xml、messages_en.xml等都会被接受。
+
+```text
+/**
+ * Set an array of basenames, each following the basic ResourceBundle convention
+ * of not specifying file extension or language codes. The resource location
+ * format is up to the specific {@code MessageSource} implementation.
+ * <p>Regular and XMl properties files are supported: e.g. "messages" will find
+ * a "messages.properties", "messages_en.properties" etc arrangement as well
+ * as "messages.xml", "messages_en.xml" etc.
+ * <p>The associated resource bundles will be checked sequentially when resolving
+ * a message code. Note that message definitions in a <i>previous</i> resource
+ * bundle will override ones in a later bundle, due to the sequential lookup.
+ * <p>Note: In contrast to {@link #addBasenames}, this replaces existing entries
+ * with the given names and can therefore also be used to reset the configuration.
+ * @param basenames an array of basenames
+ * @see #setBasename
+ * @see java.util.ResourceBundle
+ */
+```
+
+令外的可选方案是使用`用ReloadableResourceBundleMessageSource`，它的工作方式与`ResourceBundleMessageSource`非常类似，但是它能够重新加载信息属性，而不必重新编译或重启应用。
+
+下面是一个配置示例：
+
+```java
+@Bean
+public MessageSource messageSource() {
+    ReloadableResourceBundleMessageSource messageSource = new ReloadableResourceBundleMessageSource();
+    messageSource.setBasename("file:///etc/spittr/messages");
+    messageSource.setCacheSeconds(10);
+    return messageSource;
+}
+```
+
+这里的关键区别在于`basename`属性设置为在应用的外部查找（而不是像`ResourceBundleMessageSource`那样在类路径下查找）。`basename`属性可以设置为在类路径下（以“classpath:”作为前缀）、文件系统中（以“file:”作为前缀）或Web应用的根路径下（没有前缀）查找属性。在这里，我将其配置为在服务器文件系统的“/etc/spittr”目录下的属性文件中查找信息，并且基础的文件名为“message”。
+
+**创建URL**
+
+`<s:url>`是一个很小的标签。它主要的任务就是创建URL，然后将其赋值给一个变量或者渲染到响应中。它是JSTL中`<c:url>`标签的替代者，但是它具备几项特殊的技巧。
+
+按照其最简单的形式，`<s:url>`会接受一个相对于Servlet上下文的URL，并在渲染的时候，预先添加上Servlet上下文路径。例如，考虑如下`<s:url>`的基本用法：
+
+```html
+<a href="<s:url href="/spitter/register" />">Register</a>
+```
+
+例如，这里我们的Servlet上下文为“spittr”，那么在响应中将会渲染如下的HTML：
+
+```html
+<a href="/spittr/spitter/register">Register</a>
+```
+
+这样，我们在创建URL的时候，就不必再担心Servlet上下文路径是什么了，`<s:url>`将会负责这件事。
+
+我们还可以使用`<s:url>`创建URL，并将其赋值给一个变量供模板在稍后使用：
+
+由于我们的工程代码的JSP中全部配置了如下代码：
+
+```jsp
+<%
+    String path = request.getContextPath();
+    String basePath = request.getScheme() + "://" + request.getServerName() + ":" + request.getServerPort()
+            + path + "/";
+%>
+<base href="<%=basePath%>">
+```
+
+并且之前的所有`<a>`元素的`href`属性均不以“/”开头。所以，下文中关于URL的路径，我们全部去掉了开头的“/”。不过从测试来看，在使用`<s:url>`时，加上“/”也不会出错（无论加不加上述的配置，`<a>`元素的`href`属性均不能以“/”开头，因为这样会导致其参照路径是Web容器的根），但为了保持代码的一致性，下文还是去掉了开头的“/”。
+
+```html
+<s:url value="spitter/register" var="registerUrl" />
+<a href="${registerUrl}">Register</a>
+```
+
+默认情况下，URL是在页面作用域内创建的。但是通过设置`scope`属性，我们可以让`<s:url>`在应用作用域内、会话作用域内或请求作用域内创建URL：
+
+```html
+<s:url value="spitter/register" var="registerUrl" scope="request" />
+```
+
+如果希望在URL上添加参数的话，那么你可以使用`<s:param>`标签。比如，如下的<s:url>使用两个内嵌的`<s:param>`标签，来设置“spittles”的max和count参数：
+
+```html
+<s:url href="spittles" var="spittlesUrl">
+    <s:param name="max" value="60" />
+    <s:param name="count" value="20" />
+</s:url>
+```
+
+到目前为止，我们还没有看到`<s:url>`能够实现，而JSTL的`<c:url>`无法实现的功能。但是，如果我们需要创建带有路径（path）参数的URL该怎么办呢？我们该如何设置`value`属性，使其具有路径变量的占位符呢？
+
+例如，假设我们需要为特定用户的基本信息页面创建一个URL。那没有问题，`<s:param>`标签可以承担此任：
+
+```html
+<s:url value="spitter/{username}" var="spitterUrl">
+    <s:param name="username" value="jbauer" />
+</s:url>
+```
+
+然后我们就可以使用`<a>`元素的`href`属性引用“spitterUrl”了。
+
+`<s:url>`标签还可以解决URL的转义需求。例如，如果你希望将渲染得到的URL内容展现在Web页面上（而不是作为超链接），那么你应该要求`<s:url>`进行HTML转义，这需要将`htmlEscape`属性设置为`true`。例如，如下的`<s:url>`将会渲染HTML转义后的URL：
+
+```html
+<s:url value="spittles" htmlEscape="true">
+    <s:param name="max" value="60" />
+    <s:param name="count" value="20" />
+</s:url>
+```
+
+在我们的工程下，上述代码被转义为“spittles?max=60&count=20”。（注意，这里如果`value`属性以“/”开头，即“/spittles”，则会被转义为“/sia4e-P2_Spring_on_the_web-C06_Rendering_web_views-01_jsp/spittles?max=60&count=20”）
+
+如果希望在JavaScript中使用URL，那么可以设置`javaScriptEscape`属性为`true`：
+
+```html
+<s:url value="spittles" var="spittlesJSUrl" javaScriptEscape="true">
+    <s:param name="max" value="60" />
+    <s:param name="count" value="20" />
+</s:url>
+<script>
+    var spittlesUrl = "${spittlesJSUrl}"
+</script>
+```
+
+此时，spittlesUrl的值为“spittles?max=60&count=20”。（如果是“/spittles”，则其值为“\/sia4e-P2_Spring_on_the_web-C06_Rendering_web_views-01_jsp\/spittles?max=60&count=20”）
+
+既然提到了转义，有一个标签专门用来转义内容，而不是转义标签。
+
+**转义内容**
+
+`<s:escapeBody>`标签是一个通用的转义标签。它会渲染标签体中内嵌的内容，并且在必要的时候进行转义。
+
+例如，假设你希望在页面上展现一个HTML代码片段。为了正确显示，我们需要将“<”和“>”字符替换为`&lt;`和`&gt;`，否则的话，浏览器将会像解析页面上其他HTML那样解析这段HTML内容。
+
+当然，没有人禁止我们手动将其转义为`&lt;`和`&gt;`，但是这很烦琐，并且代码难以阅读。我们可以使用`<s:escapeBody>`，并让Spring完成这项任务：
+
+```html
+<s:escapeBody htmlEscape="true">
+    <h1>Hello</h1>
+</s:escapeBody>
+```
+
+上述内容在浏览器中会被显示为：
+
+```text
+<h1>Hello</h1>
+```
+
+通过设置`javaScriptEscape`属性为`true`，`<s:escapeBody>`标签还支持对JavaScript代码的转义。
+
+现在，我们已经看到了如何使用JSP来定义Spring视图，现在让我们考虑一下如何使其在审美上更加有吸引力。我们可以在页面上增加一些通用的元素，比如添加包含站点Logo的头部、使用样式并在底部展现版权信息。我们不会在Spittr应用中的每个JSP都进行这样的修改，而是借助Apache Tiles来为模板实现一些通用且可重用的布局。
+
+### 6.3 使用Apache Tiles视图定义布局
+
+*以下内容代码在工程sia4e-P2_Spring_on_the_web-C06_Rendering_web_views-02_tiles中*。
+
+到现在为止，我们很少关心应用中Web页面的布局问题。每个JSP完全负责定义自身的布局，在这方面其实这些JSP也没有做太多工作。
+
+假设我们想为应用中的所有页面定义一个通用的头部和底部。最原始的方式就是查找每个JSP模板，并为其添加头部和底部的HTML。但是这种方法的扩展性并不好，也难以维护。为每个页面添加这些元素会有一些初始成本，而后续的每次变更都会耗费类似的成本。
+
+更好的方式是使用布局引擎，如Apache Tiles，定义适用于所有页面的通用页面布局。Spring MVC以视图解析器的形式为Apache Tiles提供了支持，这个视图解析器能够将逻辑视图名解析为Tiles定义。
+
+#### 6.3.1 配置Tiles视图解析器
+
+为了在Spring中使用Tiles，需要配置几个bean。我们需要一个`TilesConfigurer`bean，它会负责定位和加载Tile定义并协调生成Tiles。除此之外，`还需要TilesViewResolver`bean将逻辑视图名称解析为Tile定义。
+
+这里使用Tiles3：
+
+```java
+// 配置TileConfigurer
+@Bean
+public TilesConfigurer tilesConfigurer() {
+    TilesConfigurer tiles = new TilesConfigurer();
+    // 指定Tiles定义的位置
+    tiles.setDefinitions(new String[] { "/WEB-INF/layout/tiles.xml" });
+    // 启用刷新功能
+    tiles.setCheckRefresh(true);
+    return tiles;
+}
+```
+
+当配置`TilesConfigurer`的时候，所要设置的最重要的属性就是`definitions`。这个属性接受一个`String`类型的数组，其中每个条目都指定一个Tile定义的XML文件。对于Spittr应用来讲，我们让它在“/WEB-INF/layout/”目录下查找tiles.xml。
+
+我们还可以指定多个Tile定义文件，甚至能够在路径位置上使用通配符，当然在上例中我们没有使用该功能。例如，我们要求TilesConfigurer加载“/WEB-INF/”目录下的所有名字为tiles.xml的文件，那么可以按照如下的方式设置definitions属性：
+
+```java
+tiles.setDefinitions(new String[] {"/WEB-INF/**/tiles.xml"});
+```
+
+配置Tiles视图解析器：
+
+```java
+@Bean
+public ViewResolver viewResolver() {
+    TilesViewResolver tilesViewResolver = new TilesViewResolver();
+    return tilesViewResolver;
+}
+```
+
+使用XML配置：
+
+```xml
+<bean id="tilesConfigurer" class=
+"org.springframework.web.servlet.view.tiles3.TilesConfigurer">
+    <property name="definitions">
+        <list>
+            <value>/WEB-INF/layout/tiles.xml</value>
+        </list>
+    </property>
+</bean>
+
+<bean id="viewResolver" class=
+"org.springframework.web.servlet.view.tiles3.TilesViewResolver">
+    <property name="order" value="1" />
+</bean>
+```
+
+`TilesConfigurer`会加载Tile定义并与Apache Tiles协作，而`TilesViewResolver`会将逻辑视图名称解析为引用Tile定义的视图。它是通过查找与逻辑视图名称相匹配的Tile定义实现该功能的。
+
+定义Tiles：
+
+Apache Tiles提供了一个文档类型定义（document type definition，DTD），用来在XML文件中指定Tile的定义。每个定义中需要包含一个`<definition>`元素，这个元素会有一个或多个`<put-attribute>`元素。例如，如下的XML文档为Spittr应用定义了几个Tile：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE tiles-definitions PUBLIC
+    "-//Apache Software Foundation//DTD Tiles Configuration 3.0//EN"
+    "http://tiles.apache.org/dtds/tiles-config_3_0.dtd">
+<tiles-definitions>
+
+    <!-- 定义base Tile -->
+    <definition name="base" template="/WEB-INF/layout/page.jsp">
+        <!-- 设置属性 -->
+        <put-attribute name="header" value="/WEB-INF/layout/header.jsp" />
+        <put-attribute name="footer" value="/WEB-INF/layout/footer.jsp" />
+    </definition>
+
+    <!-- 扩展base Tile -->
+    <definition name="home" extends="base">
+        <put-attribute name="body" value="/WEB-INF/views/home.jsp" />
+    </definition>
+
+    <definition name="registerForm" extends="base">
+        <put-attribute name="body" value="/WEB-INF/views/registerForm.jsp" />
+    </definition>
+
+    <definition name="profile" extends="base">
+        <put-attribute name="body" value="/WEB-INF/views/profile.jsp" />
+    </definition>
+
+    <definition name="spittles" extends="base">
+        <put-attribute name="body" value="/WEB-INF/views/spittles.jsp" />
+    </definition>
+
+    <definition name="spittle" extends="base">
+        <put-attribute name="body" value="/WEB-INF/views/spittle.jsp" />
+    </definition>
+</tiles-definitions>
+```
+
+每个<definition>元素都定义了一个Tile，它最终引用的是一个JSP模板。在名为base的Tile中，模板引用的是“/WEBINF/layout/page.jsp”。某个Tile可能还会引用其他的JSP模板，使这些JSP模板嵌入到主模板中。对于base Tile来讲，它引用的是一个头部JSP模板和一个底部JSP模板。
+
+编写主配置模板page.jsp：
+
+```jsp
+<%@ page language="java" contentType="text/html; charset=utf-8" pageEncoding="utf-8"%>
+<%@ taglib uri="http://www.springframework.org/tags" prefix="s"%>
+<%@ taglib uri="http://tiles.apache.org/tags-tiles" prefix="t"%>
+<%
+    String path = request.getContextPath();
+    String basePath = request.getScheme() + "://" + request.getServerName() + ":" + request.getServerPort()
+            + path + "/";
+%>
+<!DOCTYPE html>
+<html>
+<head>
+<base href="<%=basePath%>">
+<meta charset="utf-8">
+<title>Spittr</title>
+<link rel="stylesheet" type="text/css" href="<s:url value="resources/style.css"/>">
+</head>
+<body>
+    <!-- 插入头部 -->
+    <div id="header">
+        <t:insertAttribute name="header" />
+    </div>
+
+    <!-- 插入主体内容 -->
+    <div id="content">
+        <t:insertAttribute name="body" />
+    </div>
+
+    <!-- 插入底部 -->
+    <div id="footer">
+        <t:insertAttribute name="footer" />
+    </div>
+</body>
+</html>
+```
+
+需要重点关注的事情就是如何使用Tile标签库中的`<t:insertAttribute>` JSP标签来插入其他的模板。在这里，用它来插入名为header、body和footer的模板。
+
+在base Tile定义中，`header`和`footer`属性分别被设置为引用“/WEB-INF/layout/header. jsp”和“/WEB-INF/layout/footer.jsp”。但是body属性呢？它是在哪里设置的呢？
+
+在这里，base Tile不会期望单独使用。它会作为基础定义，供其他的Tile定义扩展。我们可以看到其他的Tile定义都是扩展自base Tile。它意味着它们会继承其`header`和`footer`属性的设置（当然，Tile定义中也可以覆盖掉这些属性），但是每一个都设置了`body`属性，用来指定每个Tile特有的JSP模板。
+
+现在，我们关注一下home Tile，它扩展了base。因为它扩展了base，因此它会继承base中的模板和所有的属性。尽管home Tile定义相对来说很简单，但是它实际上包含了如下的定义：
+
+```xml
+<definition name="home" extends="base">
+    <put-attribute name="header" value="/WEB-INF/layout/header.jsp" />
+    <put-attribute name="footer" value="/WEB-INF/layout/footer.jsp" />
+    <put-attribute name="body" value="/WEB-INF/views/home.jsp" />
+</definition>
+```
+
+下面配置header.jsp和footer.jsp。
+
+header.jsp：
+
+```jsp
+<%@ taglib uri="http://www.springframework.org/tags" prefix="s"%>
+<a href="<s:url value="/" />">
+    <img src="<s:url value="/resources" />/images/logo.png" border="0" />
+</a>
+```
+
+footer:
+
+```jsp
+<br/>Copyright &copy; Tavish
+```
+
+每个扩展自base的Tile都定义了自己的主体区模板，所以每个都会与其他的有所区别。但是为了完整地了解home Tile，如下展现了home.jsp：
+
+```jsp
+<%@ taglib uri="http://java.sun.com/jsp/jstl/core" prefix="c"%>
+<%@ taglib uri="http://www.springframework.org/tags" prefix="s" %>
+
+<h1><s:message code="spittr.welcome" /></h1>
+<a href="<c:url value="spittles" />">Spittles</a> |
+<a href="<c:url value="spitter/register" />">Register</a>
+```
+
+这里的关键点在于通用的元素放到了page.jsp、header.jsp以及footer.jsp中，其他的Tile模板中不再包含这部分内容。这使得它们能够跨页面重用，这些元素的维护也得以简化。
+
+### 6.4 使用Thymeleaf
+
+*以下内容代码在工程sia4e-P2_Spring_on_the_web-C06_Rendering_web_views-03_thymeleaf中*。
+
+尽管JSP已经存在了很长的时间，并且在Java Web服务器中无处不在，但是它却存在一些缺陷。JSP最明显的问题在于它看起来像HTML或XML，但它其实上并不是。大多数的JSP模板都是采用HTML的形式，但是又掺杂上了各种JSP标签库的标签，使其变得很混乱。这些标签库能够以很便利的方式为JSP带来动态渲染的强大功能，但是它也摧毁了我们想维持一个格式良好的文档的可能性。作为一个极端的样例，如下的JSP标签甚至作为HTML参数的值：
+
+```html
+<input type="text" value="<c:out value="${thing.name}" />" />
+```
+
+标签库和JSP缺乏良好格式的一个副作用就是它很少能够与其产生的HTML类似。所以，在Web浏览器或HTML编辑器中查看未经渲染的JSP模板是非常令人困惑的，而且得到的结果看上去也非常丑陋。这个结果是不完整的——在视觉上这简直就是一场灾难！因为JSP不是真正的HTML，很多浏览器和编辑器展现的效果都很难在审美上接近模板最终渲染出来的效果。
+
+同时，JSP规范是与Servlet规范紧密耦合的。这意味着它只能用在基于Servlet的Web应用之中。JSP模板不能作为通用的模板（如格式化Email），也不能用于非Servlet的Web应用。
+
+多年来，在Java应用中，有多个项目试图挑战JSP在视图领域的统治性地位。最新的挑战者是Thymeleaf，它展现了一些切实的承诺，是一项很令人兴奋的可选方案。Thymeleaf模板是原生的，不依赖于标签库。它能在接受原始HTML的地方进行编辑和渲染。因为它没有与Servlet规范耦合，因此Thymeleaf模板能够进入JSP所无法涉足的领域。现在，我们看一下如何在Spring MVC中使用Thymeleaf。
+
+#### 6.4.1 配置Thymeleaf视图解析器
+
+为了要在Spring中使用Thymeleaf，我们需要配置三个启用Thymeleaf与Spring集成的bean：
+
+- `ThymeleafViewResolver`：将逻辑视图名称解析为Thymeleaf模板视图
+- `SpringTemplateEngine`：处理模板并渲染结果
+- `TemplateResolver`：加载Thymeleaf模板
+
+配置如下：
+
+```java
+// 配置Thymeleaf视图解析器
+@Bean
+public ViewResolver viewResolver(TemplateEngine templateEngine) {
+    ThymeleafViewResolver viewResolver = new ThymeleafViewResolver();
+    viewResolver.setTemplateEngine(templateEngine);
+    return viewResolver;
+}
+
+// 配置模板引擎
+@Bean
+public TemplateEngine templateEngine(ITemplateResolver templateResolver) {
+    SpringTemplateEngine templateEngine = new SpringTemplateEngine();
+    templateEngine.setTemplateResolver(templateResolver);
+    return templateEngine;
+}
+
+// 配置模板解析器
+@Bean
+public ITemplateResolver templateResolver() {
+
+    WebApplicationContext webApplicationContext = ContextLoader.getCurrentWebApplicationContext();
+
+    ServletContextTemplateResolver templateResolver = new ServletContextTemplateResolver(
+            webApplicationContext.getServletContext());
+    
+    templateResolver.setPrefix("/WEB-INF/templates/");
+    templateResolver.setSuffix(".html");
+    templateResolver.setTemplateMode(TemplateMode.HTML);
+    return templateResolver;
+}
+```
+
+这里如果使用XML配置，需要获取`ServletContext`，然后通过构造器注入给`ServletContextTemplateResolver`。而使用XML配置方式获取`ServletContext`需要我们定义一个类来实现`BeanFactory<ServletContext>`、`ServletContextAware`两个接口，然后将这个类当作`ServletContext`使用。完成此步骤后，剩下的就只是处理三个bean之间的关系了。
+
+创建代表`ServletContext`的类的代码如下：
+
+```java
+public class ServletContextFactory implements FactoryBean<ServletContext>, ServletContextAware {
+    
+    private ServletContext servletContext;
+
+    @Override
+    public ServletContext getObject() throws Exception {
+        return servletContext;
+    }
+
+    @Override
+    public Class<?> getObjectType() {
+        return ServletContext.class;
+    }
+
+    @Override
+    public boolean isSingleton() {
+        return true;
+    }
+
+    @Override
+    public void setServletContext(ServletContext servletContext) {
+        this.servletContext = servletContext;
+    }
+}
+```
+
+XML配置如下：
+
+```xml
+<!-- 配置ServletContext -->
+<bean id="servletContext" class="foo.bar.ServletContextFactory" />
+
+<!-- 配置模板解析器 -->
+<bean id="templateResolver" class="org.thymeleaf.templateresolver.ServletContextTemplateResolver">
+    <constructor-arg ref="servletContext"/> 
+    <property name="prefix" value="/WEB-INF/templates/" />
+    <property name="suffix" value=".html" />
+    <property name="templateMode" value="HTML" />
+</bean>
+
+<!-- 配置模板引擎 -->
+<bean id="templateEngine" class="org.thymeleaf.spring4.SpringTemplateEngine">
+    <property name="templateResolver" ref="templateResolver" />
+</bean>
+
+<!-- 视图解析器 -->
+<bean id="viewResolver" class="org.thymeleaf.spring4.view.ThymeleafViewResolver">
+    <property name="templateEngine" ref="templateEngine" />
+</bean>
+```
+
+不管使用哪种配置方式，Thymeleaf都已经准备就绪了，它可以将响应中的模板渲染到Spring MVC控制器所处理的请求中。
+
+`ThymeleafViewResolver`是Spring MVC中`ViewResolver`的一个实现类。像其他的视图解析器一样，它会接受一个逻辑视图名称，并将其解析为视图。不过在该场景下，视图会是一个Thymeleaf模板。
+
+这里模板解析器会最终定位和查找模板。它使用了`prefix`和`suffix`属性，前后缀会与逻辑视图名组合使用。它的`templateMode`属性被设置成了HTML（原书是设置成HTML5，但是`TemplateMode.HTML5`已经被标记为`@Deprecated`，并推荐使用`TemplateMode.HTML`了），这表明我们预期要解析的模板会渲染成HTML输出。
+
+所有的Thymeleaf bean都已经配置完成了，那么接下来我们该创建几个视图了。
+
+#### 6.4.2 定义Thymeleaf模板
+
+Thymeleaf在很大程度上就是HTML文件，与JSP不同，它没有什么特殊的标签或标签库。Thymeleaf之所以能够发挥作用，是因为它通过自定义的命名空间，为标准的HTML标签集合添加Thymeleaf属性。
+
+如下的程序清单展现了home.html，也就是使用Thymeleaf命名空间的首页模板：
+
+```html
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="UTF-8">
+<title>Spittr</title>
+<link rel="stylesheet" type="text/css" th:href="@{/resources/style.css}"><link>
+</head>
+<body>
+    <h1>Welcome to Spittr</h1>
+    <a th:href="@{/spittle}">Spittles</a> |
+    <a th:href="@{/spitter/register}">Register</a>
+</body>
+</html>
+```
+
+首页模板相对来讲很简单，只使用了`th:href`属性。这个属性与对应的原生HTML属性很类似，也就是`href`属性，并且可以按照相同的方式来使用。`th:href`属性的特殊之处在于它的值中可以包含Thymeleaf表达式，用来计算动态的值。它会渲染成一个标准的`href`属性，其中会包含在渲染时动态创建得到的值。这是Thymeleaf命名空间中很多属性的运行方式：它们对应标准的HTML属性，并且具有相同的名称，但是会渲染一些计算后得到的值。在本例中，使用`th:href`属性的三个地方都用到了“@{}”表达式，用来计算相对于URL的路径。
+
+上述代码在网页中查看源代码变为：
+
+```html
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Spittr</title>
+<link rel="stylesheet" type="text/css" href="/sia4e-P2_Spring_on_the_web-C06_Rendering_web_views-03_thymeleaf/resources/style.css"><link>
+</head>
+<body>
+    <h1>Welcome to Spittr</h1>
+    <a href="/sia4e-P2_Spring_on_the_web-C06_Rendering_web_views-03_thymeleaf/spittle">Spittles</a> |
+    <a href="/sia4e-P2_Spring_on_the_web-C06_Rendering_web_views-03_thymeleaf/spitter/register">Register</a>
+</body>
+</html>
+```
+
+尽管home.html是一个相当简单的Thymeleaf模板，但是它依然很有价值，这在于它与纯HTML模板非常接近。唯一的区别之处在于`th:href`属性，否则的话，它就是基础且功能丰富的HTML文件。
+
+这意味着Thymeleaf模板与JSP不同，它能够按照原始的方式进行编辑甚至渲染，而不必经过任何类型的处理器。当然，我们需要Thymeleaf来处理模板并渲染得到最终期望的输出。即便如此，如果没有任何特殊的处理，home.html也能够加载到Web浏览器中，并且看上去与完整渲染的效果很类似。
+
+但是Spring的JSP标签所擅长的是表单绑定。如果我们抛弃JSP的话，那是不是也要抛弃表单绑定呢？不必担心。Thymeleaf提供了与之相匹敌的功能。
+
+**借助Thymeleaf实现表单绑定**
+
+表单绑定是Spring MVC的一项重要特性。它能够将表单提交的数据填充到命令对象中，并将其传递给控制器，而在展现表单的时候，表单中也会填充命令对象中的值。如果没有表单绑定功能的话，我们需要确保HTML表单域要映射后端命令对象中的属性，并且在校验失败后展现表单的时候，还要负责确保输入域中值要设置为命令对象的属性。
+
+作为阐述的样例，请参考如下的Thymeleaf模板片段，它会渲染First Name输入域：
+
+```html
+<label th:class="${#fields.hasErrors('firstName')}? 'error'">First Name</label>:
+<input type="text" th:field="*{firstName}" th:class="${#fields.hasErrors('firstName')}? 'error'" /><br/>
+```
+
+在这里，我们不再使用Spring JSP标签中的`cssClassName`属性，而是在标准的HTML标签上使用`th:class`属性。`th:class`属性会渲染为一个`class`属性，它的值是根据给定的表达式计算得到的。在上面的这两个`th:class`属性中，它会直接检查`firstName`域有没有校验错误。如果有的话，`class`属性在渲染时的值为`error`。如果这个域没有错误的话，将不会渲染`class`属性。
+
+`<input>`标签使用了`th:field`属性，用来引用后端对象的`firstName`域。因为我们是在将这个输入域绑定到后端对象的`firstName`属性上，因此使用`th:field`属性引用`firstName`域。通过使用`th:field`，我们将`value`属性设置为`firstName`的值，同时还会将`name`属性设置为`firstName`。
+
+完整的表单页面：
+
+```html
+<form method="POST" th:action="@{/spitter/register}" th:object="${spitter}">
+    <!-- 展示错误 -->
+    <div class="errors" th:if="${#fields.hasErrors('*')}">
+        <ul>
+            <li th:each="err : ${#fields.errors('*')}" th:text="${err}">Input is incorrect</li>
+        </ul>
+    </div>
+    
+    <!-- First Name -->
+    <label th:class="${#fields.hasErrors('firstName')}? 'error'"> First Name</label>
+    :
+    <input type="text" th:field="*{firstName}" th:class="${#fields.hasErrors('firstName')}? 'error'" />
+    <br />
+    
+    <!-- Last Name -->
+    <label th:class="${#fields.hasErrors('lastName')}? 'error'"> Last Name</label>
+    :
+    <input type="text" th:field="*{lastName}" th:class="${#fields.hasErrors('lastName')}? 'error'" />
+    <br />
+    
+    <!-- Username -->
+    <label th:class="${#fields.hasErrors('username')}? 'error'"> Username</label>
+    :
+    <input type="text" th:field="*{username}" th:class="${#fields.hasErrors('username')}? 'error'" />
+    <br />
+    
+    <!-- Password -->
+    <label th:class="${#fields.hasErrors('password')}? 'error'"> Password</label>
+    :
+    <input type="password" th:field="*{password}" th:class="${#fields.hasErrors('password')}? 'error'" />
+    <br />
+    
+    <input type="submit" value="Register" />
+</form>
+```
+
+上述表单使用了相同的Thymeleaf属性和“*{}”表达式，为所有的表单域绑定后端对象。这其实重复了我们在First Name域中所做的事情。
+
+我们在表单的顶部了也使用了Thymeleaf，它会用来渲染所有的错误。`<div>`元素使用`th:if`属性来检查是否有校验错误。如果有的话，会渲染`<div>`，否则的话，它将不会渲染。
+
+在`<div>`中，会使用一个无顺序的列表来展现每项错误。`<li>`标签上的`th:each`属性将会通知Thymeleaf为每项错误都渲染一个`<li>`，在每次迭代中会将当前错误设置到一个名为`err`的变量中。
+
+`<li>`标签还有一个`th:text`属性。这个命令会通知Thymeleaf计算某一个表达式（在本例中，也就是`err`变量）并将它的值渲染为`<li>`标签的内容体。实际上的效果就是每项错误对应一个`<li>`元素，并展现错误的文本。
+
+你可能会想知道`${}`和`*{}`括起来的表达式到底有什么区别。`${}`表达式（如`${spitter}`）是变量表达式（variable expression）。一般来讲，它们会是对象图导航语言（Object-Graph Navigation Language，OGNL）表达式。但在使用Spring的时候，它们是SpEL表达式。在`${spitter}`这个例子中，它会解析为key为spitter的`model`属性。
+
+而对于`*{}`表达式，它们是选择表达式（selection expression）。变量表达式是基于整个SpEL上下文计算的，而选择表达式是基于某一个选中对象计算的。在本例的表单中，选中对象就是`<form>`标签中`th:object`属性所设置的对象：模型中的`Spitter`对象。因此，`*{firstName}`表达式就会计算为`Spitter`对象的`firstName`属性。
+
+（注意，因为此时工程中的数据库实现为Mock实现（没有实现接口的任何方法），所以不具备查询数据库的功能。所以，当我们在注册表单页面填写好参数并提交后，页面会跳转到“/spitter/username”，但是不会生成任何数据（查不了数据库）。这个时候，当前工程的后台会报错：“org.springframework.expression.spel.SpelEvaluationException: EL1007E: Property or field 'username' cannot be found on null”，其中username是我们页面中的第一个SpEL表达式`${spitter.username}`。但实际测试，jsp工程和tiles工程均不会报出该错误，推测为是由于三个工程配置了不同的视图解析器导致的区别。）
+
+### 6.5 小结
 
