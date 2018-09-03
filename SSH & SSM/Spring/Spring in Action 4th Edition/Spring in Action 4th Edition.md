@@ -5128,7 +5128,7 @@ public class SpittrWebAppInitializer extends AbstractAnnotationConfigDispatcherS
 
 在Servlet 3.0环境中，容器会在类路径中查找实现了`javax.servlet.ServletContainerInitializer`接口的类，如果能发现的话，就会用它来配置Servlet容器。
 
-Spring提供了这个接口的实现，名为`SpringServletContainerInitializer`，这个类反过来又会查找实现`WebApplicationInitializer`的类并将配置的任务交给它们来完成。Spring 3.2引入了一个便利的`WebApplicationInitializer`基础实现，也就是`AbstractAnnotationConfigDispatcherServletInitializer`因为我们的`SpittrWebAppInitializer`继承了`AbstractAnnotationConfigDispatcherServlet-Initializer`（同时也就实现了`WebApplicationInitializer`），因此当部署到Servlet 3.0容器中的时候，容器会自动发现它，并用它来配置Servlet上下文。
+Spring提供了这个接口的实现，名为`SpringServletContainerInitializer`，这个类反过来又会查找实现`WebApplicationInitializer`的类并将配置的任务交给它们来完成。Spring 3.2引入了一个便利的`WebApplicationInitializer`基础实现，也就是`AbstractAnnotationConfigDispatcherServletInitializer`。因为我们的`SpittrWebAppInitializer`继承了`AbstractAnnotationConfigDispatcherServlet-Initializer`（同时也就实现了`WebApplicationInitializer`），因此当部署到Servlet 3.0容器中的时候，容器会自动发现它，并用它来配置Servlet上下文。
 
 尽管它的名字很长，但是`AbstractAnnotationConfigDispatcherServletInitializer`使用起来很简便。我们的`SpittrWebAppInitializer`类重写了三个方法：
 
@@ -7347,3 +7347,4769 @@ Thymeleaf在很大程度上就是HTML文件，与JSP不同，它没有什么特�
 
 ### 6.5 小结
 
+>
+处理请求只是Spring MVC功能的一部分。如果控制器所产生的结果想要让人看到，那么它们产生的模型数据就要渲染到视图中，并展现到用户的Web浏览器中。Spring的视图渲染是很灵活的，并提供了多个内置的可选方案，包括传统的JavaServer Pages以及流行的ApacheTiles布局引擎。
+>
+在本章中，我们首先快速了解了一下Spring所提供的视图和视图解析可选方案。我们还深入学习了如何在Spring MVC中使用JSP和ApacheTiles。
+>
+我们还看到了如何使用Thymeleaf作为Spring MVC应用的视图层，它被视为JSP的替代方案。Thymeleaf是一项很有吸引力的技术，因为它能创建原始的模板，这些模板是纯HTML，能像静态HTML那样以原始的方式编写和预览，并且能够在运行时渲染动态模型数据。除此之外，Thymeleaf是与Servlet没有耦合关系的，这样它就能够用在JSP所不能使用的领域中。
+>
+Spittr应用的视图定义完成之后，我们已经具有了一个虽然微小但是可部署且具有一定功能的Spring MVC Web应用。还有一些其他的特性需要更新进来，如数据持久化和安全性，我们会在合适的时候关注这些特性。但现在，这个应用开始变得有模有样了。
+>
+在深入学习应用的技术栈之前，在下一章我们将会继续讨论SpringMVC，学习这个框架中一些更为有用和高级的功能。
+
+## 第七章 Spring MVC的高级技术
+
+本章内容：
+
+- Spring MVC配置的替代方案
+- 处理文件上传
+- 在控制器中处理异常
+- 使用flash属性
+
+在第5章中，我们学习了Spring MVC的基础知识，以及如何编写控制器来处理各种请求。基于这些知识，我们在第6章学习了如何创建JSP和Thymeleaf视图，这些视图会将模型数据展现给用户。你可能认为我们已经掌握了Spring MVC的全部知识。但是稍等！还没有结束！
+
+在本章中，我们会继续Spring MVC的话题，本章所介绍的特性已经超出了第5章和第6章基础知识的范畴。我们将会看到如何编写控制器来处理文件上传、如何处理控制器所抛出的异常，以及如何在模型中传递数据，使其能够在重定向（redirect）之后依然存活。
+
+前文中，我们是通过`AbstractAnnotationConfigDispatcherServletInitializer`搭建Spring MVC，在介绍本章内容之前，我们先花店时间探讨以下如何用其它方式搭建`DispatcherServlet`和`ContextLoaderListener`。
+
+### 7.1 Spring MVC配置的替代方案
+
+*以下内容代码在工程sia4e-P2_Spring_on_the_web-C07_Advanced_Spring_MVC中*。
+
+在第5章中，我们通过继承`AbstractAnnotationConfigDispatcherServletInitializer`快速搭建了Spring MVC环境。在这个便利的基础类中，假设我们需要基本的`DispatcherServlet`和`ContextLoaderListener`环境，并且Spring配置是使用Java的，而不是XML。
+
+尽管对很多Spring应用来说，这是一种安全的假设，但是并不一定总能满足我们的要求。除了`DispatcherServlet`以外，我们可能还需要额外的Servlet和Filter；我们可能还需要对`DispatcherServlet`本身做一些额外的配置；或者，如果我们需要将应用部署到Servlet 3.0之前的容器中，那么还需要将`DispatcherServlet`配置到传统的web.xml中。
+
+#### 7.1.1 自定义DispatcherServlet配置
+
+在`SpittrWebAppInitializer`中我们所编写的三个方法仅仅是必须要重载的abstract方法。但实际上还有更多的方法可以进行重载，从而实现额外的配置。
+
+此类的方法之一就是`customizeRegistration()`。在`AbstractAnnotationConfigDispatcherServletInitializer`将`DispatcherServlet`注册到Servlet容器中之后，就会调用`customizeRegistration()`，并将Servlet注册后得到的`ServletRegistration.Dynamic`传递进来。通过重载`customizeRegistration()`方法，我们可以对`DispatcherServlet`进行额外的配置。
+
+在稍后的内容中，我们会看到如何在Spring MVC中处理`multipart`请求和文件上传。如果计划使用Servlet 3.0对`multipart`配置的支持，那么需要使用`DispatcherServlet`的registration来启用multipart请求。我们可以重载`customizeRegistration()`方法来设置`MultipartConfigElement`，如下所示：
+
+```java
+@Override
+protected void customizeRegistration(Dynamic registration) {
+    resgistration.setMultipartConfig(new MultipartConfigElement("/tmp/spittr/uploads"));
+}
+```
+
+借助`customizeRegistration()`方法中的`ServletRegistration.Dynamic`，我们能够完成多项任务，包括通过调用`setLoadOnStartup()`设置`load-on-startup`优先级，通过`setInitParameter()`设置初始化参数，通过调用`setMultipartConfig()`配置Servlet 3.0对`multipart`的支持。在前面的样例中，我们设置了对`multipart`的支持，将上传文件的临时存储目录设置在“/tmp/spittr/uploads”中。
+
+#### 7.1.2 添加其它的Servlet和Filter
+
+按照`AbstractAnnotationConfigDispatcherServletInitializer`的定义，它会创建`DispatcherServlet`和`ContextLoaderListener`。但是，如果你想注册其他的Servlet、Filter或Listener的话，那该怎么办呢？
+
+基于Java的初始化器（initializer）的一个好处就在于**我们可以定义任意数量的初始化器类**。因此，如果我们想往Web容器中注册其他组件的话，只需创建一个新的初始化器就可以了。最简单的方式就是实现Spring的`WebApplicationInitializer`接口。
+
+例如，实现`WebApplicationInitializer`实现并注册一个Servlet：
+
+```java
+package spittr.config;
+
+import javax.servlet.ServletContext;
+import javax.servlet.ServletException;
+import javax.servlet.ServletRegistration;
+import org.springframework.web.WebApplicationInitializer;
+
+import spittr.web.MyServlet;
+
+public class MyServletInitializer implements WebApplicationInitializer {
+
+    @Override
+    public void onStartup(ServletContext servletContext) throws ServletException {
+        
+        ServletRegistration.Dynamic myServlet = servletContext.addServlet("myServlet", MyServlet.class);
+        
+        myServlet.addMapping("/custom/home");        
+    }
+}
+```
+
+MyServlet类：
+
+```java
+package spittr.web;
+
+import java.io.IOException;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+public class MyServlet extends HttpServlet {
+    
+    private static final long serialVersionUID = 1L;
+
+    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        request.getRequestDispatcher("/WEB-INF/templates/home.html").forward(request, response);
+    }
+
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        doGet(request, response);
+    }
+}
+```
+
+上述配置特别简单，我们配置了一个Servlet，并将它映射到“/custom/home”。在Servlet类中，我们定义它会把请求转发到home页面。
+
+通过上述配置，我们就注册了一个Servlet。这里`MyServletInitializer`不用使用任何Spring注解，也不用在任何配置文件或类中对其进行配置。根据`WebApplicationInitializer`接口的文档，任意实现了该接口的类都会被类`SpringServletContainerInitializer`检测，而任何Servlet 3.0+的容器都会自动引导该类。
+
+>
+ * Interface to be implemented in Servlet 3.0+ environments in order to configure the
+ * {@link ServletContext} programmatically -- as opposed to (or possibly in conjunction
+ * with) the traditional {@code web.xml}-based approach.
+ *
+ * <p>Implementations of this SPI will be detected automatically by {@link
+ * SpringServletContainerInitializer}, which itself is bootstrapped automatically
+ * by any Servlet 3.0 container. See {@linkplain SpringServletContainerInitializer its
+ * Javadoc} for details on this bootstrapping mechanism.
+
+类似地，我们还可以创建新的`WebApplicationInitializer`实现来注册Listener和Filter。
+
+示例，注册一个Filter：
+
+```java
+package spittr.config;
+
+import javax.servlet.FilterRegistration;
+import javax.servlet.ServletContext;
+import javax.servlet.ServletException;
+import javax.servlet.ServletRegistration;
+import org.springframework.web.WebApplicationInitializer;
+
+import spittr.web.MyServlet;
+
+public class MyServletInitializer implements WebApplicationInitializer {
+
+    @Override
+    public void onStartup(ServletContext servletContext) throws ServletException {
+        
+        // 注册Servlet
+        ServletRegistration.Dynamic myServlet = servletContext.addServlet("myServlet", MyServlet.class);
+        
+        // 添加映射
+        myServlet.addMapping("/custom/home");        
+        
+        // 注册Filter
+        FilterRegistration.Dynamic myFilter = servletContext.addFilter("myFilter", MyFilter.class);
+        
+        // 添加映射
+        myFilter.addMappingForUrlPatterns(null, false, "/custom/*");
+        
+    }
+}
+```
+
+如果要将应用部署到支持Servlet 3.0的容器中，那么`WebApplicationInitializer`提供了一种通用的方式，实现在Java中注册Servlet、Filter和Listener。不过，如果你只是注册Filter，并且该Filter只会映射到`DispatcherServlet`上的话，那么在`AbstractAnnotationConfigDispatcherServletInitializer`中还有一种快捷方式
+
+为了注册Filter并将其映射到`DispatcherServlet`，所需要做的仅仅是重载`AbstractAnnotationConfigDispatcherServletInitializer`的`getServletFilters()`方法。
+
+配置字符集过滤器CharacterEncodingFilter：
+
+```java
+@Override
+protected Filter[] getServletFilters() {
+    CharacterEncodingFilter filter = new CharacterEncodingFilter();
+    filter.setEncoding("UTF-8");
+    filter.setForceEncoding(true);
+    return new Filter[] { filter };
+}
+```
+
+这个方法返回的是一个`javax.servlet.Filter`的数组。在这里它只返回了一个Filter，但它实际上可以返回任意数量的Filter。在这里没有必要声明它的映射路径，`getServletFilters()`方法返回的所有Filter都会映射到`DispatcherServlet`上（也就是说我们无法配置映射）。
+
+如果要将应用部署到Servlet 3.0容器中，那么Spring提供了多种方式来注册Servlet（包括DispatcherServlet）、Filter和Listener，而不必创建web.xml文件。但是，如果你不想采取以上所述方案的话，也是可以的。假设你需要将应用部署到不支持Servlet 3.0的容器中（或者你只是希望使用web.xml文件），那么我们完全可以按照传统的方式，通过web.xml配置Spring MVC。让我们看一下该怎么做。
+
+#### 7.1.3 在web.xml中声明DispatcherServlet
+
+在典型的Spring MVC应用中，我们会需要`DispatcherServlet`和`ContextLoaderListener`。
+
+下面在XML中注册它们：
+
+```xml
+<!-- 注册Spring配置文件的位置 -->
+<context-param>
+    <param-name>contextConfigLocation</param-name>
+    <param-value>classpath:resources/spring-*.xml</param-value>
+</context-param>
+
+<!-- 注册ServletContext监听器 -->
+<listener>
+    <listener-class>
+        org.springframework.web.context.ContextLoaderListener
+    </listener-class>
+</listener>
+
+<!-- 注册DispatcherServlet -->
+<servlet>
+    <servlet-name>springmvc</servlet-name>
+    <servlet-class>
+        org.springframework.web.servlet.DispatcherServlet
+    </servlet-class>
+    <init-param>
+        <!-- 在这里指定其配置文件 -->
+        <!-- 通常我们将Spring的配置文件与Spring MVC的配置文件分开 -->
+        <param-name>contextConfigLocation</param-name>
+        <param-value>classpath:resources/spring-mvc.xml</param-value>
+    </init-param>
+    <load-on-startup>1</load-on-startup>
+</servlet>
+<servlet-mapping>
+    <servlet-name>springmvc</servlet-name>
+    <url-pattern>/</url-pattern>
+</servlet-mapping>
+```
+
+`ContextLoaderListener`和`DispatcherServlet`各自都会加载一个Spring应用上下文。上下文参数`contextConfigLocation`指定了一个XML文件的地址，这个文件（classpath:resources/spring-*.xml）定义了根应用上下文，它会被`ContextLoaderListener`加载。
+而文件（classpath:resources/spring-mvc.xml）会被`DispatcherServlet`加载。
+
+（`DispatcherServlet`会根据Servlet的名字找到一个文件，并基于该文件加载应用上下文。如果我们不对其`contextConfigLocation`进行配置，那么由于这里Servlet的名字是springmvc，因此`DispatcherServlet`默认会从`/WEBINF/springmvc-context.xml`文件中加载其应用上下文。）
+
+下面我们进行如下配置，使用web.xml但不使用诸如spring-*.xml之类的配置文件，而是从Java类中加载配置。（我们之前的搭建方式是不用web.xml，而是定义一个类`SpittrWebAppInitializer`，这个类继承了`AbstractAnnotationConfigDispatcherServletInitializer`。）
+
+要使用如上描述的配置方法，我们需要告诉`DispatcherServlet`和`ContextLoaderListener`使用`AnnotationConfigWebApplicationContext`，这是一个`WebApplicationContext`的实现类，它会加载Java配置类，而不是使用XML。要实现这种配置，我们可以设置`contextClass`上下文参数以及`DispatcherServlet`的初始化参数。
+
+```xml
+<!-- 设置contextClass属性，使用Java配置 -->
+<context-param>
+    <param-name>contextClass</param-name>
+    <param-value>
+        org.springframework.web.context.support.AnnotationConfigWebApplicationContext
+    </param-value>
+</context-param>
+
+<!-- 指定根配置类 -->
+<context-param>
+    <param-name>contextConfigLocation</param-name>
+    <param-value>foo.bar.config.RootConfig</param-value>
+</context-param>
+
+<!-- 注册ServletContext监听器 -->
+<listener>
+    <listener-class>
+        org.springframework.web.context.ContextLoaderListener
+    </listener-class>
+</listener>
+
+<!-- 注册DispatcherServlet -->
+<servlet>
+    <servlet-name>springmvc</servlet-name>
+    <servlet-class>
+        org.springframework.web.servlet.DispatcherServlet
+    </servlet-class>
+    <init-param>
+        <!-- 设置contextClass属性，使用Java配置 -->
+        <param-name>contextClass</param-name>
+        <param-value>
+            org.springframework.web.context.support.AnnotationConfigWebApplicationContext
+        </param-value>
+    </init-param>
+    <init-param>
+        <!-- 指定DispatcherServlet的配置类 -->
+        <param-name>contextConfigLocation</param-name>
+        <param-value>foo.bar.config.WebConfig</param-value>
+    </init-param>
+    <load-oun-startup>1</load-oun-startup>
+</servlet>
+<servlet-mapping>
+    <servlet-name>springmvc</servlet-name>
+    <url-pattern>/</url-pattern>
+</servlet-mapping>    
+```
+
+### 7.2 处理multipart形式的数据
+
+在Web应用中，允许用户上传内容是很常见的需求。
+
+Spittr应用在两个地方需要文件上传。当新用户注册应用的时候，我们希望他们能够上传一张图片，从而与他们的个人信息相关联。当用户提交新的Spittle时，除了文本消息以外，他们可能还会上传一张照片。
+
+`multipart`格式的数据会将一个表单拆分为多个部分（part），每个部分对应一个输入域。在一般的表单输入域中，它所对应的部分中会放置文本型数据，但是如果上传文件的话，它所对应的部分可以是二进制，下面展现了`multipart`的请求体：
+
+```text
+------WebKitFormBoundaryqgkaBn8IHJCuNmiW
+Content-Disposition: form-data; name="firstName"
+Charles
+------WebKitFormBoundaryqgkaBn8IHJCuNmiW
+Content-Disposition: form-data; name="lastName"
+Xavier
+------WebKitFormBoundaryqgkaBn8IHJCuNmiW
+Content-Disposition: form-data; name="email"
+charles@xmen.com
+------WebKitFormBoundaryqgkaBn8IHJCuNmiW
+Content-Disposition: form-data; name="username"
+professorx
+------WebKitFormBoundaryqgkaBn8IHJCuNmiW
+Content-Disposition: form-data; name="password"
+letmein01
+------WebKitFormBoundaryqgkaBn8IHJCuNmiW
+Content-Disposition: form-data; name="profilePicture"; filename="me.jpg"
+Content-Type: image/jpeg
+[[ Binary image data goes here ]]
+------WebKitFormBoundaryqgkaBn8IHJCuNmiW--
+```
+
+在这个`multipart`的请求中，我们可以看到`profilePicture`部分与其他部分明显不同。除了其他内容以外，它还有自己的`Content-Type`头，表明它是一个JPEG图片。
+
+尽管`multipart`请求看起来很复杂，但在Spring MVC中处理它们却很容易。在编写控制器方法处理文件上传之前，我们必须要配置一个`multipart`解析器，通过它来告诉`DispatcherServlet`该如何读取`multipart`请求。
+
+#### 7.2.1 配置multipart解析器
+
+`DispatcherServlet`并没有实现任何解析`multipart`请求数据的功能。它将该任务委托给了Spring中`MultipartResolver`策略接口的实现，通过这个实现类来解析`multipart`请求中的内容。从Spring 3.1开始，Spring内置了两个MultipartResolver的实现供我们选择：
+
+- CommonsMultipartResolver：使用commons-fileupload解析`multipart`请求
+- StandardServletMultipartResolver：依赖于Servlet 3.0对`multipart`请求的支持
+
+一般来讲，在这两者之间，`StandardServletMultipartResolver`可能会是优选的方案（注意：该类无法指定字符集，默认字符集不是UTF-8。这意味着当你的文件名为中文时，文件名会乱码，解决方案只能是自己写一个过滤器进行过滤）。它使用Servlet所提供的功能支持，并不需要依赖任何其他的项目。如果我们需要将应用部署到Servlet 3.0之前的容器中，或者还没有使用Spring 3.1或更高版本，那么可能就需要`CommonsMultipartResolver`了。
+
+兼容Servlet 3.0的`StandardServletMultipartResolver`没有构造器参数，也没有要设置的属性。这样，在Spring应用上下文中，将其声明为bean就会非常简单，如下所示：
+
+```java
+@Bean
+public MultipartResolver multipartResolver() {
+    return new StandardServletMultipartResolver();
+}
+```
+
+既然这个`@Bean`方法如此简单，你可能就会怀疑我们到底该如何限制`StandardServletMultipartResolver`的工作方式呢。如果我们想要限制用户上传文件的大小，该怎么实现？如果我们想要指定文件在上传时，临时写入目录在什么位置的话，该如何实现？因为没有属性和构造器参数，`StandardServletMultipartResolver`的功能看起来似乎有些受限。
+
+并不是这样的，我们是有办法配置`StandardServletMultipartResolver`的限制条件的。只不过不是在Spring中配置，而是要在Servlet中指定。具体来讲，我们必须要在web.xml或Servlet初始化类中，将`multipart`的具体细节作为`DispatcherServlet`配置的一部分。
+
+如果我们是采用Servlet初始化类的方式来配置DispatcherServlet的话，由于这个类已经实现了`WebApplicationInitializer`，那我们可以进行如下配置：
+
+```java
+public class MyServletInitializer implements WebApplicationInitializer {
+
+    @Override
+    public void onStartup(ServletContext servletContext) throws ServletException {
+
+        DispatcherServlet ds = new DispatcherServlet();
+
+        ServletRegistration.Dynamic registration = servletContext.addServlet("springmvc", ds);
+        registration.setLoadOnStartup(1);
+        registration.addMapping("/");
+        registration.setMultipartConfig(new MultipartConfigElement("/tmp/spittr/uploads"));
+    }
+}
+```
+
+如果我们配置`DispatcherServlet`的Servlet初始化类继承了`AbstractAnnotationConfigDispatcherServletInitializer`或`AbstractDispatcherServletInitializer`的话，那么我们不会直接创建`DispatcherServlet`实例并将其注册到Servlet上下文中。这样的话，将不会有对`ServletRegistration.Dynamic`的引用供我们使用了。但是，我们可以通过重载`customizeRegistration()`方法（它会得到一个Dynamic作为参数）来配置`multipart`的具体细节：
+
+```java
+package spittr.config;
+
+import javax.servlet.Filter;
+import javax.servlet.MultipartConfigElement;
+import javax.servlet.ServletRegistration.Dynamic;
+
+import org.springframework.web.filter.CharacterEncodingFilter;
+import org.springframework.web.servlet.support.AbstractAnnotationConfigDispatcherServletInitializer;
+
+public class SpittrWebAppInitializer extends AbstractAnnotationConfigDispatcherServletInitializer {
+
+    @Override
+    protected Class<?>[] getRootConfigClasses() {
+        return new Class<?>[] { RootConfig.class };
+    }
+
+    @Override
+    protected Class<?>[] getServletConfigClasses() {
+        // 指定的配置类
+        return new Class<?>[] { WebConfig.class };
+    }
+
+    @Override
+    protected String[] getServletMappings() {
+        // 将DispatcherServlet映射为“/”
+        return new String[] { "/" };
+    }
+
+    // 配置字符集过滤器
+    @Override
+    protected Filter[] getServletFilters() {
+        CharacterEncodingFilter filter = new CharacterEncodingFilter();
+        filter.setEncoding("UTF-8");
+        filter.setForceEncoding(true);
+        return new Filter[] { filter };
+    }
+    
+    // 配置Multipart请求的上传路径
+    @Override
+    protected void customizeRegistration(Dynamic registration) {
+        registration.setMultipartConfig(new MultipartConfigElement("/tmp/spittr/uploads"));
+    }
+}
+```
+
+除了临时路径的位置，我们还应该对接受的大小进行限制，假设我们想限制文件的大小不超过2MB，整个请求不超过4MB，而且所有的文件都要写到磁盘中。则应该使用如下配置：
+
+```java
+@Override
+protected void customizeRegistration(Dynamic registration) {
+    registration.setMultipartConfig(
+            new MultipartConfigElement("/tmp/spittr/uploads", 2 * 1024 * 1024, 4 * 1024 * 1024, 0));
+}
+```
+
+如果我们使用XML配置的话，则应该这样写：
+
+```xml
+<!-- 注册DispatcherServlet -->
+<servlet>
+    <servlet-name>springmvc</servlet-name>
+    <servlet-class>
+        org.springframework.web.servlet.DispatcherServlet
+    </servlet-class>
+    <init-param>
+        <!-- 在这里指定其配置文件 -->
+        <!-- 通常我们将Spring的配置文件与Spring MVC的配置文件分开 -->
+        <param-name>contextConfigLocation</param-name>
+        <param-value>classpath:resources/spring-mvc.xml</param-value>
+    </init-param>
+    <load-on-startup>1</load-on-startup>
+
+    <multipart-config>
+        <location>/tmp/spittr/uploads</location>
+        <max-file-size>2097152</max-file-size>
+        <max-request-size>20971520</max-request-size>
+        <file-size-threshold>0</file-size-threshold>
+    </multipart-config>
+</servlet>
+<servlet-mapping>
+    <servlet-name>springmvc</servlet-name>
+    <url-pattern>/</url-pattern>
+</servlet-mapping>
+```
+
+无论是通过`customizeRegistration()`方法配置还是使用XML配置，`location`属性是必须要配置的。
+
+**配置CommonsMultipartResolver**
+
+通常来讲，`StandardServletMultipartResolver`会是最佳的选择，但是如果我们需要将应用部署到非Servlet 3.0的容器中，那么就得需要替代的方案。如果喜欢的话，我们可以编写自己的MultipartResolver实现。不过，除非想要在处理multipart请求的时候执行特定的逻辑，否则的话，没有必要这样做。Spring内置了`CommonsMultipartResolver`，可以作为`StandardServletMultipartResolver`的替代方案。（需要导入commons-fileupload的Jar包）
+
+将`CommonsMultipartResolver`声明为Spring bean的最简单的方式如下：
+
+```java
+@Bean MultipartResolver multipartResolver() {
+    return new CommonsMultipartResolver();
+}
+```
+
+与`StandardServletMultipartResolver`有所不同，`CommonsMultipartResolver`不会强制要求设置临时文件路径。默认情况下，这个路径就是`Servlet`容器的临时目录。不过，通过设置`uploadTempDir`属性，我们可以将其指定为一个不同的位置：
+
+```java
+@Bean MultipartResolver multipartResolver() {
+    CommonsMultipartResolver multipartResolver = new CommonsMultipartResolver();
+    multipartResolver.setUploadTempDir(new FileSystemResources("/tmp/spittr/uploads"));
+    return multipartResolver;
+}
+```
+
+同样地，我们也可以指定上传文件的大小：
+
+```java
+@Bean MultipartResolver multipartResolver() {
+    CommonsMultipartResolver multipartResolver = new CommonsMultipartResolver();
+    multipartResolver.setUploadTempDir(new FileSystemResources("/tmp/spittr/uploads"));
+    multipartResolver.setMaxUploadSize(4 * 1024 * 1024);
+    multipartResolver.setMaxUploadSizePerFile(2 * 1024 * 1024);
+    multipartResolver.setMaxInMemorySize(0);
+    return multipartResolver;
+}
+```
+
+在这里，我们将设置一次`Multipart`请求最大可以上传总共4MB、多文件下单个文件不能超过2MB，最大的内存大小设置为0字节，且不管文件的大小如何，所有的文件都会写到磁盘中。
+
+#### 7.22 处理multipart请求
+
+接下来我们就可以编写控制器方法来接收上传的文件。要实现这一点，最常见的方式就是在某个控制器方法参数上添加`@RequestPart`注解。
+
+假设我们允许用户在注册Spittr应用的时候上传一张图片，那么我们需要修改表单，以允许用户选择要上传的图片，同时还需要修改`SpitterController`中的`processRegistration()`方法来接收上传的图片。
+
+修改后的表单：
+
+```html
+<form method="POST" th:action="@{/spitter/register}" th:object="${spitter}" enctype="multipart/form-data">
+    <!-- 展示错误 -->
+    <div class="errors" th:if="${#fields.hasErrors('*')}">
+        <ul>
+            <li th:each="err : ${#fields.errors('*')}" th:text="${err}">Input is incorrect</li>
+        </ul>
+    </div>
+    
+    <!-- First Name -->
+    <label th:class="${#fields.hasErrors('firstName')}? 'error'"> First Name</label>
+    :
+    <input type="text" th:field="*{firstName}" th:class="${#fields.hasErrors('firstName')}? 'error'" />
+    <br />
+    
+    <!-- Last Name -->
+    <label th:class="${#fields.hasErrors('lastName')}? 'error'"> Last Name</label>
+    :
+    <input type="text" th:field="*{lastName}" th:class="${#fields.hasErrors('lastName')}? 'error'" />
+    <br />
+    
+    <!-- Username -->
+    <label th:class="${#fields.hasErrors('username')}? 'error'"> Username</label>
+    :
+    <input type="text" th:field="*{username}" th:class="${#fields.hasErrors('username')}? 'error'" />
+    <br />
+    
+    <!-- Password -->
+    <label th:class="${#fields.hasErrors('password')}? 'error'"> Password</label>
+    :
+    <input type="password" th:field="*{password}" th:class="${#fields.hasErrors('password')}? 'error'" />
+    <br />
+    
+    <label>Profile Picture</label>:
+    <input type="file" name="profilePicture" accept="image/jpeg,image/png,image/gif" />
+    <br />
+    
+    <input type="submit" value="Register" />
+</form>
+```
+
+现在我们指定表单的`enctype`属性为`multipart/form-data`，这回告诉浏览器以`multipart`的形式提交表单，而不是以表单数据的形式提交。这里每个输入域都会对应一个part。
+
+我们还添加了一个新的`<input>`域，其`type`属性为`file`。这能让用户选择要上传的文件。`accept`属性用来将文件类型限制为jpeg、png以及gif图片。根据其`name`属性，图片数据将会发送到`multipart`请求中的`profilePicture`part中。
+
+现在我们需要修改`processRegistration()`方法，使其能够接受上传的图片。其中一种方式是添加`byte[]`参数，并为其添加`@RequestPart`注解：
+
+```java
+@RequestMapping(value = "/register", method = RequestMethod.POST)
+public String processRegistration(
+    @Validated Spitter spitter,
+    @RequestPart("profilePicture") byte[] profilePicture, 
+    BindingResult br) {
+
+    // ...
+}
+```
+
+当注册表单提交的时候，`profilePicture`属性将会给定一个`byte[]`，这个数组中包含了请求中对应part的数据（通过`@RequestPart`指定）。如果用户提交表单的时候没有选择文件，那么这个数组会是空（而不是`null`）。获取到图片数据后，`processRegistration()`方法剩下的任务就是将文件保存到某个位置。
+
+我们将会稍后讨论如何保存文件。但首先，想一下，对于提交的图片数据我们都了解哪些信息呢。或者，更为重要的是，我们还不知道些什么呢？尽管我们已经得到了`byte[]`形式的图片数据，并且根据它能够得到图片的大小，但是对于其他内容我们就一无所知了。我们不知道文件的类型是什么，甚至不知道原始的文件名是什么。你需要判断如何将`byte[]`转换为可存储的文件。
+
+**接受MultipartFile**
+
+事实上，这里使用`byte[]`作为参数功能很有限。因此，Spring还提供了`MultipartFile`接口，它为处理`multipart`数据提供了内容更为丰富的对象。
+
+`MultipartFile`接口：
+
+```java
+public interface MultipartFile extends InputStreamSource {
+
+    String getName();
+
+    String getOriginalFilename();
+
+    String getContentType();
+
+    boolean isEmpty();
+
+    long getSize();
+
+    byte[] getBytes() throws IOException;
+
+    @Override
+    InputStream getInputStream() throws IOException;
+
+    void transferTo(File dest) throws IOException, IllegalStateException;
+}
+```
+
+我们可以看到，`MultipartFile`提供了获取上传文件`byte[]`的方式，但是它所提供的功能并不仅限于此，还能获得原始的文件名、大小以及内容类型。它还提供了一个`InputStream`，用来将文件数据以流的方式进行读取。除此之外，`MultipartFile`还提供了一个便利的`transferTo()`方法，它能够帮助我们将上传的文件写入到文件系统中。
+
+```java
+profilePicture.transferTo(new File("/data/spittr/" + profilePicture.getOriginalFilename()));
+```
+
+完整代码如下：
+
+```java
+@RequestMapping(value = "/register", method = RequestMethod.POST)
+public String processRegistration(
+        @Validated Spitter spitter, 
+        BindingResult br, 
+        HttpSession session,
+        MultipartFile profilePicture ) throws IllegalStateException, IOException {
+
+    List<ObjectError> errors = br.getAllErrors();
+
+    if (errors.size() > 0) {
+        return "registerForm";
+    }
+    
+    if (!profilePicture.isEmpty()) {
+        
+        // 通过sesion获取profilePictures文件夹在项目里的真正目录
+        String path = session.getServletContext().getRealPath("/profilePictures");
+        
+        // 如果没有这个文件夹，则创建一个
+        File file = new File(path);
+        if (!file.exists()) {
+            file.mkdir();
+        }
+        
+        String filename = profilePicture.getOriginalFilename();
+        
+        if (filename.endsWith(".jpg") || filename.endsWith(".jpeg") || filename.endsWith(".png") || filename.endsWith(".gif")) {
+            profilePicture.transferTo(new File(path, filename));
+        } else {
+            // 文件格式不对，返回表单
+            return "registerForm";
+        }
+    }
+
+    // 保存Spitter
+    spitterRepository.save(spitter);
+
+    // 重定向到基本信息页
+    return "redirect:/spitter/" + spitter.getUsername();
+}
+```
+
+注意，在tomcat下，如果我们只是配置了上述代码，则上传文件时会报错：
+
+>
+org.springframework.web.multipart.MultipartException: Could not parse multipart servlet request; nested exception is java.io.IOException: The temporary upload location [D:\Program Files\apache-tomcat-9.0.0.M26\work\Catalina\localhost\sia4e-P2_Spring_on_the_web-C07_Advanced_Spring_MVC\tmp\spittr\uploads] is not valid
+
+也就是说，我们创建的临时目录不存在，即临时目录需要我们自己创建。
+
+创建临时目录后，再次提交表单，上传成功。
+
+**以Part的形式接受上传的文件**
+
+如果你需要将应用部署到Servlet 3.0的容器中，那么会有`MultipartFile`的一个替代方案。Spring MVC也能接受`javax.servlet.http.Part`作为控制器方法的参数。
+
+`Part`接口：
+
+```java
+/*
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS HEADER.
+ *
+ * Copyright (c) 1997-2013 Oracle and/or its affiliates. All rights reserved.
+ *
+ * The contents of this file are subject to the terms of either the GNU
+ * General Public License Version 2 only ("GPL") or the Common Development
+ * and Distribution License("CDDL") (collectively, the "License").  You
+ * may not use this file except in compliance with the License.  You can
+ * obtain a copy of the License at
+ * https://glassfish.dev.java.net/public/CDDL+GPL_1_1.html
+ * or packager/legal/LICENSE.txt.  See the License for the specific
+ * language governing permissions and limitations under the License.
+ *
+ * When distributing the software, include this License Header Notice in each
+ * file and include the License file at packager/legal/LICENSE.txt.
+ *
+ * GPL Classpath Exception:
+ * Oracle designates this particular file as subject to the "Classpath"
+ * exception as provided by Oracle in the GPL Version 2 section of the License
+ * file that accompanied this code.
+ *
+ * Modifications:
+ * If applicable, add the following below the License Header, with the fields
+ * enclosed by brackets [] replaced by your own identifying information:
+ * "Portions Copyright [year] [name of copyright owner]"
+ *
+ * Contributor(s):
+ * If you wish your version of this file to be governed by only the CDDL or
+ * only the GPL Version 2, indicate your decision by adding "[Contributor]
+ * elects to include this software in this distribution under the [CDDL or GPL
+ * Version 2] license."  If you don't indicate a single choice of license, a
+ * recipient has the option to distribute your version of this file under
+ * either the CDDL, the GPL Version 2 or to extend the choice of license to
+ * its licensees as provided above.  However, if you add GPL Version 2 code
+ * and therefore, elected the GPL Version 2 license, then the option applies
+ * only if the new code is made subject to such option by the copyright
+ * holder.
+ */
+
+package javax.servlet.http;
+
+import java.io.*;
+import java.util.*;
+
+/**
+ * <p> This class represents a part or form item that was received within a
+ * <code>multipart/form-data</code> POST request.
+ * 
+ * @since Servlet 3.0
+ */
+public interface Part {
+
+    public InputStream getInputStream() throws IOException;
+
+    public String getContentType();
+
+    public String getName();
+
+    public String getSubmittedFileName();
+
+    public long getSize();
+
+    public void write(String fileName) throws IOException;
+
+    public void delete() throws IOException;
+
+    public String getHeader(String name);
+
+    public Collection<String> getHeaders(String name);
+
+    public Collection<String> getHeaderNames();
+
+}
+```
+
+在很多情况下，`Part`方法的名称与`MultipartFile`方法的名称是完全相同的。有一些比较类似，但是稍有差异，比如`getSubmittedFileName()`对应于`getOriginalFilename()`。类似地，`write()`对应于`transferTo()`。
+
+使用`Part`作为参数的`processRegistration()`的代码：
+
+```java
+@RequestMapping(value = "/register", method = RequestMethod.POST)
+public String processRegistration(
+        @Validated Spitter spitter, 
+        BindingResult br, 
+        HttpSession session,
+        Part profilePicture ) throws IllegalStateException, IOException {
+
+    List<ObjectError> errors = br.getAllErrors();
+
+    if (errors.size() > 0) {
+        return "registerForm";
+    }
+    
+    if (profilePicture.getSize() != 0) {
+        
+        String path = session.getServletContext().getRealPath("/profilePictures");
+        
+        File file = new File(path);
+        if (!file.exists()) {
+            file.mkdir();
+        }
+        
+        String filename = profilePicture.getSubmittedFileName();
+        
+        if (filename.endsWith(".jpg") || filename.endsWith(".jpeg") || filename.endsWith(".png") || filename.endsWith(".gif")) {
+            profilePicture.write(new File(path, filename).toString());
+        } else {
+            return "registerForm";
+        }
+    }
+
+    // 保存Spitter
+    spitterRepository.save(spitter);
+
+    // 重定向到基本信息页
+    return "redirect:/spitter/" + spitter.getUsername();
+}
+```
+
+另外，如果我们使用`Part`作为参数，那么就没有必要配置`MultipartResolver`。只有使用`MultipartFile`时我们才需要配置`MultipartResolver`。（注意，测试时即使我们不配置`MultipartResolver`，但也要通过`customizeRegistration()`方法设置临时目录。否则会出错，而错误信息是“First name must not be null.”等，很奇怪。）
+
+### 7.3 处理异常
+
+到现在为止，在Spittr应用中，我们假设所有的功能都正常运行。但是如果某个地方出错的话，该怎么办呢？当处理请求的时候，抛出异常该怎么处理呢？如果发生了这样的情况，该给客户端什么响应呢？
+
+不管发生什么事情，不管是好的还是坏的，Servlet请求的输出都是一个Servlet响应。如果在请求处理的时候，出现了异常，那它的输出依然会是Servlet响应。异常必须要以某种方式转换为响应。
+
+Spring提供了多种方式将异常转换为响应：
+
+- 特定的Spring异常将会自动映射为指定的HTTP状态码；
+- 异常上可以添加@ResponseStatus注解，从而将其映射为某一个HTTP状态码；
+- 在方法上可以添加@ExceptionHandler注解，使其用来处理异常。
+
+处理异常的最简单方式就是将其映射到HTTP状态码上，进而放到响应之中。接下来，我们看一下如何将异常映射为某一个HTTP状态码。
+
+#### 7.3.1 将异常映射为HTTP状态码
+
+在默认情况下，Spring会将自身的一些异常自动转换为合适的状态码：
+
+Spring 异常 | HTTP状态码
+-----|-----
+`BindException` | 400 - Bad Request
+`ConversionNotSupportedException` | 500 - Internal Server Error
+`HttpMediaTypeNotAcceptableException` | 406 - Not Acceptable
+`HttpMediaTypeNotSupportedException` | 415 - Unsupported Media Type
+`HttpMessageNotReadableException` | 400 - Bad Request
+`HttpMessageNotWritableException` | 500 - Internal Server Error
+`HttpRequestMethodNotSupportedException` | 405 - Method Not Allowed
+`MethodArgumentNotValidException` | 400 - Bad Request
+`MissingServletRequestParameterException` | 400 - Bad Request
+`MissingServletRequestPartException` | 400 - Bad Request
+`NoSuchRequestHandlingMethodException` | 404 - Not Found
+`TypeMismatchException` | 400 - Bad Request
+
+上述异常一般会由Spring自身抛出，作为`DispatcherServlet`处理过程中或执行校验时出现问题的结果。例如，如果`DispatcherServlet`无法找到适合处理请求的控制器方法，那么将会抛出`NoSuchRequestHandlingMethodException`异常，最终的结果就是产生404状态码的响应（Not Found）。
+
+尽管这些内置的映射是很有用的，但是对于应用所抛出的异常它们就无能为力了。幸好，Spring提供了一种机制，能够通过`@ResponseStatus`注解将异常映射为HTTP状态码。
+
+参考以下代码：
+
+```java
+@RequestMapping(value = "/{spittleId}", method = RequestMethod.GET)
+public String showSpittle(@PathVariable long spittleId, Model model) {
+
+    Spittle spittle = spittleRepository.findOne(spittleId);
+
+    if (spittle == null) {
+        throw new SpittleNotFoundException();
+    }
+
+    model.addAttribute("spittle", spittleRepository.findOne(spittleId));
+    return "spittle";
+}
+```
+
+在这里，会从`SpittleRepository`中，通过ID检索`Spittle`对象。如果`findOne()`方法能够返回`Spittle`对象的话，那么会将`Spittle`放到模型中，然后名为`spittle`的视图会负责将其渲染到响应之中。但是如果`findOne()`方法返回`null`的话，那么将会抛出`SpittleNotFoundException`异常。
+
+`SpittleNotFoundException`非检查型异常：
+
+```java
+public class SpittleNotFoundException extends RuntimeException {
+
+}
+```
+
+在没有进行映射的情况下，如果发生了`SpittleNotFoundException`异常，那么会产生500状态码（Internal Server Error）响应。实际上，如果出现任何没有映射的异常，响应都会带有500状态码。
+
+当抛出`SpittleNotFoundException`异常时，这是一种请求资源没有找到的场景。如果资源没有找到的话，HTTP状态码404是最为精确的响应状态码。所以，我们要使用`@ResponseStatus`注解将`SpittleNotFoundException`映射为HTTP状态码404：
+
+```java
+@ResponseStatus(value = HttpStatus.NOT_FOUND, reason = "Spittle Not Found")
+public class SpittleNotFoundException extends RuntimeException {
+
+    private static final long serialVersionUID = -697725134282567926L;
+
+}
+```
+
+在引入`@ResponseStatus`注解之后，如果控制器方法抛出`SpittleNotFoundException`异常的话，响应将会具有404状态码，这是因为Spittle Not Found。
+
+#### 7.3.2 编写异常处理的方法
+
+在很多的场景下，将异常映射为状态码是很简单的方案，并且就功能来说也足够了。但是如果我们想在响应中不仅要包括状态码，还要包含所产生的错误，那该怎么办呢？此时的话，我们就不能将异常视为HTTP错误了，而是要按照处理请求的方式来处理异常了。
+
+作为样例，假设用户试图创建的`Spittle`与已创建的`Spittle`文本完全相同，那么`SpittleRepository`的`save()`方法将会抛出`DuplicateSpittleException`异常。这意味着`SpittleController`的`saveSpittle()`方法可能需要处理这个异常：
+
+```java
+@RequestMapping(method = RequestMethod.POST)
+public String saveSpittle(SpittleForm form, Model model) {
+    try {
+        spittleRepository.save(new Spittle(form.getMessage(), new Date(), form.getLatitude(), form.getLongitude()));
+        return "redirect:/spittles";
+    } catch (DuplicateSpittleException e) {
+        return "error/duplicate";
+    }
+}
+```
+
+它运行起来没什么问题，但是这个方法有些复杂。该方法可以有两个路径，每个路径会有不同的输出。如果能让`saveSpittle()`方法只关注正确的路径，而让其他方法处理异常的话，那么它就能简单一些。
+
+首先我们将方法中的异常处理逻辑剥离：
+
+```java
+@RequestMapping(method = RequestMethod.POST)
+public String saveSpittle(SpittleForm form, Model model) {
+    spittleRepository.save(new Spittle(form.getMessage(), new Date(), form.getLatitude(), form.getLongitude()));
+    return "redirect:/spittles";
+}
+```
+
+现在，我们为`SpittleController`添加一个新的方法，它会处理抛出`DuplicateSpittleException`的情况：
+
+```java
+@ExceptionHandler(DuplicateSpittleException.class) 
+public String handleDuplicateSpittle() {
+    return "error/duplicate";
+}
+```
+
+这个方法上添加了`@ExceptionHandler`注解，当抛出`DuplicateSpittleException`异常的时候，将会委托该方法来处理。它返回的是一个`String`，这与处理请求的方法是一致的，指定了要渲染的逻辑视图名，它能够告诉用户他们正在试图创建一条重复的条目。
+
+对于`@ExceptionHandler`注解标注的方法来说，比较有意思的一点在于它能处理同一个控制器中所有处理器方法所抛出的异常。所以，尽管我们从`saveSpittle()`中抽取代码创建了`handleDuplicateSpittle()`方法，但是它能够处理`SpittleController`中所有方法所抛出的`DuplicateSpittleException`异常。我们不用在每一个可能抛出`DuplicateSpittleException`的方法中添加异常处理代码，这一个方法就涵盖了所有的功能。
+
+既然@ExceptionHandler注解所标注的方法能够处理同一个控制器类中所有处理器方法的异常，那么你可能会问有没有一种方法能够处理所有控制器中处理器方法所抛出的异常呢。从Spring 3.2开始，这肯定是能够实现的，我们只需将其定义到控制器通知类中即可。
+
+### 7.4 为控制器添加通知
+
+如果控制器类的特定切面能够运用到整个应用程序的所有控制器中，那么这将会便利很多。举例来说，如果要在多个控制器中处理异常，那`@ExceptionHandler`注解所标注的方法是很有用的。不过，如果多个控制器类中都会抛出某个特定的异常，那么你可能会发现要在所有的控制器方法中重复相同的`@ExceptionHandler`方法。或者，为了避免重复，我们会创建一个基础的控制器类，所有控制器类要扩展这个类，从而继承通用的`@ExceptionHandler`方法。
+
+Spring 3.2为这类问题引入了一个新的解决方案：控制器通知。控制器通知（controller advice）是任意带有`@ControllerAdvice`注解的类，这个类会包含一个或多个如下类型的方法：
+
+- @ExceptionHandler注解标注的方法；
+- @InitBinder注解标注的方法；
+- @ModelAttribute注解标注的方法。
+
+在带有`@ControllerAdvice`注解的类中，以上所述的这些方法会运用到整个应用程序所有控制器中带有`@RequestMapping`注解的方法上。
+
+`@ControllerAdvice`注解本身已经使用了`@Component`，因此`@ControllerAdvice`注解所标注的类将会自动被组件扫描获取到，就像带有`@Component`注解的类一样。
+
+`@ControllerAdvice`最为实用的一个场景就是将所有的`@ExceptionHandler`方法收集到一个类中，这样所有控制器的异常就能在一个地方进行一致的处理。例如，我们想将`DuplicateSpittleException`的处理方法用到整个应用程序的所有控制器上：
+
+```java
+package spittr.web;
+
+import org.springframework.web.bind.annotation.ControllerAdvice;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+
+import spittr.web.exceptions.DuplicateSpittleException;
+
+@ControllerAdvice
+public class AppWideExceptionHandler {
+
+    @ExceptionHandler(DuplicateSpittleException.class)
+    public String duplicateSpittleHandler() {
+        return "error/duplicate";
+    }
+}
+```
+
+现在，如果任意的控制器方法抛出了`DuplicateSpittleException`，不管这个方法位于哪个控制器中，都会调用这个`duplicateSpittleHandler()`方法来处理异常。
+
+### 7.5 跨重定向请求传递数据
+
+在处理完POST请求后，通常来讲一个最佳实践就是执行一下重定向。除了其他的一些因素外，这样做能够防止用户点击浏览器的刷新按钮或后退箭头时，客户端重新执行危险的POST请求。
+
+在控制器方法返回的视图名称中，当控制器方法返回的String值以“redirect:”开头的话，那么这个`String`不是用来查找视图的，而是用来指导浏览器进行重定向的路径。
+
+“redirect:”前缀能够让重定向功能变得非常简单。你可能会想Spring很难再让重定向功能变得更简单了。但是，请稍等：Spring为重定向功能还提供了一些其他的辅助功能。
+
+具体来讲，正在发起重定向功能的方法该如何发送数据给重定向的目标方法呢？一般来讲，当一个处理器方法完成之后，该方法所指定的模型数据将会复制到请求中，并作为请求中的属性，请求会转发（forward是默认的，当然也可以显式指定“forward:”）到视图上进行渲染。因为控制器方法和视图所处理的是同一个请求，所以在转发的过程中，请求属性能够得以保存。
+
+但是，如下图所示，当控制器的结果是重定向的话，原始的请求就结束了，并且会发起一个新的GET请求。原始请求中所带有的模型数据也就随着请求一起消亡了。在新的请求属性中，没有任何的模型数据，这个请求必须要自己计算数据。
+
+<center>
+    ![图7.1-执行重定向](images\图7.1-执行重定向.PNG)
+    **模型的属性是以请求属性的形式存放在请求中的，在重定向后无法存活**
+</center>
+
+显然，对于重定向来说，模型并不能用来传递数据。但是我们也有一些其他方案，能够从发起重定向的方法传递数据给处理重定向方法中：
+
+- 使用UTL模板以路径变量和（或）查询参数的形式传递数据
+- 通过flash属性发送数据
+
+#### 7.5.1 通过URL模板进行重定向
+
+通过路径变量和查询参数传递数据看起来非常简单。例如，我们以路径变量的形式传递了新创建`Spitter`的`username`。但是按照现在的写法，`username`的值是直接连接到重定向`String`上的。这能够正常运行，但是还远远不能说没有问题。当构建URL或SQL查询语句的时候，使用`String`连接是很危险的。
+
+```java
+return "redirect:/spitter/" + spitter.getUsername();
+```
+
+除了连接`String`的方式来构建重定向URL，Spring还提供了使用模板的方式来定义重定向URL。例如， `processRegistration()`方法的最后几行可以改写为如下的形式：
+
+```java
+@RequestMapping(value = "/register", method = RequestMethod.POST)
+public String processRegistration(
+        @Validated Spitter spitter, 
+        BindingResult br, 
+        HttpSession session,
+        MultipartFile profilePicture,
+        Model model ) throws IllegalStateException, IOException {
+
+    // ..
+
+    spitterRespository.save(spitter);
+
+    model.addAttribute("username", spitter.getUsername());
+    return "redirect:/spitter/{username}";
+}
+```
+
+现在，`username`作为占位符填充到了URL模板中，而不是直接连接到重定向`String`中，所以`username`中所有的不安全字符都会进行转义。这样会更加安全，这里允许用户输入任何想要的内容作为`username`，并会将其附加到路径上。
+
+除此之外，模型中所有其他的原始类型值都可以添加到URL中作为查询参数。作为样例，假设除了`username`以外，模型中还要包含新创建`Spitter`对象的`id`属性，那`processRegistration()`方法可以改写为如下的形式：
+
+```java
+model.addAttribute("username", spitter.getUsername());
+model.addAttribute("spitterId", spitter.getId());
+return "redirect:/spitter/{username}";
+```
+
+所返回的重定向`String`并没有太大的变化。但是，因为模型中的`spitterId`属性没有匹配重定向URL中的任何占位符，所以它会自动以查询参数的形式附加到重定向URL上。
+
+如果`username`属性的值是habuma并且`spitterId`属性的值是42，那么结果得到的重定向URL路径将会是“/spitter/habuma?spitterId=42”。
+
+通过路径变量和查询参数的形式跨重定向传递数据是很简单直接的方式，但它也有一定的限制。它只能用来发送简单的值，如String和数字的值。在URL中，并没有办法发送更为复杂的值。
+
+#### 7.5.2 使用flash属性
+
+假设我们不想在重定向中发送username或ID了，而是要发送实际的`Spitter`对象。如果我们只发送ID的话，那么处理重定向的方法还需要从数据库中查找才能得到`Spitter`对象。但是，在重定向之前，我们其实已经得到了`Spitter`对象。为什么不将其发送给处理重定向的方法，并将其展现出来呢？
+
+`Spitter`对象要比`String`和`int`更为复杂。因此，我们不能像路径变量或查询参数那么容易地发送`Spitter`对象。它只能设置为模型中的属性。
+
+但是，正如我们前面所讨论的那样，模型数据最终是以请求参数的形式复制到请求中的，当重定向发生的时候，这些数据就会丢失。因此，我们需要将`Spitter`对象放到一个位置，使其能够在重定向的过程中存活下来。
+
+有个方案是将`Spitter`放到会话中。会话能够长期存在，并且能够跨多个请求。所以我们可以在重定向发生之前将`Spitter`放到会话中，并在重定向后，从会话中将其取出。当然，我们还要负责在重定向后在会话中将其清理掉。
+
+实际上，Spring也认为将跨重定向存活的数据放到会话中是一个很不错的方式。但是，Spring认为我们并不需要管理这些数据（当然，我们也可以用`HttpSession`来自己实现），相反，Spring提供了将数据发送为flash属性（flash attribute）的功能。按照定义，flash属性会一直携带这些数据直到下一次请求，然后才会消失。
+
+Spring提供了通过`RedirectAttributes`设置flash属性的方法，这是Spring 3.1引入的Model的一个子接口。`RedirectAttributes`提供了`Model`的所有功能，除此之外，还有几个方法是用来设置flash属性的。具体来讲，`RedirectAttributes`提供了一组`addFlashAttribute()`方法来添加flash属性
+
+```java
+model.addAttribute("username", spitter.getUsername());
+model.addFlashAttribute("spitter", spitter);
+return "redirect:/spitter/" + spitter.getUsername();
+```
+
+我们调用了`addFlashAttribute()`方法，并将spitter作为key，`Spitter`对象作为值。
+
+在重定向执行之前，所有的flash属性都会复制到会话中。在重定向后，存在会话中的flash属性会被取出，并从会话转移到模型之中。处理重定向的方法就能从模型中访问`Spitter`对象了，就像获取其他的模型对象一样。下图展示了它是如何运行的：
+
+<center>
+    ![图7.2-flash属性在请求之间传递](images\图7.2-flash属性在请求之间传递.PNG)
+    **flash属性保存在会话中，然后再放到模型中，因此能够在重定向的过程中存活**
+</center>
+
+为了完成flash属性的流程，如下展现了更新版本的`showSpitterProfile()`方法，在从数据库中查找之前，它会首先从模型中检查`Spitter`对象：
+
+```java
+@RequestMapping(value = "/{username}", method = RequestMethod.GET)
+public String showSpitterProfile(@PathVariable String username, Model model) {
+    
+    if (!model.containsAttribute("spitter")) {
+        Spitter spitter = spitterRepository.findByUsername(username);
+        model.addAttribute("spitter", spitter);
+    }
+    return "profile";
+}
+```
+
+可以看到，`showSpitterProfile()`方法所做的第一件事就是检查是否存有key为spitter的model属性。如果模型中包含spitter属性，那就什么都不用做了。这里面包含的`Spitter`对象将会传递到视图中进行渲染。但是如果模型中不包含spitter属性的话，那么`showSpitterProfile()`将会从Repository中查找`Spitter`，并将其存放到模型中。
+
+### 7.6 小结
+
+>
+在Spring中，总是会有“还没有结束”的感觉：更多的特性、更多的选择以及实现开发目标的更多方式。Spring MVC有很多功能和技巧。
+>
+当然，Spring MVC的环境搭建是有多种可选方案的一个领域。在本章中，我们首先看了一下搭建Spring MVC中`DispatcherServlet`和`ContextLoaderListener`的多种方式。我们还看到了如何调整`DispatcherServlet`的注册功能以及如何注册自定义的Servlet和Filter。如果你需要将应用部署到更老的应用服务器上，我们还快速了解了如何使用web.xml声明`DispatcherServlet`和`ContextLoaderListener`。
+>
+然后，我们了解了如何处理Spring MVC控制器所抛出的异常。尽管带有`@RequestMapping`注解的方法可以在自身的代码中处理异常，但是如果我们将异常处理的代码抽取到单独的方法中，那么控制器的代码会整洁得多。
+>
+为了采用一致的方式处理通用的任务，包括在应用的所有控制器中处理异常，Spring 3.2引入了`@ControllerAdvice`，它所创建的类能够将控制器的通用行为抽取到同一个地方。
+>
+最后，我们看了一下如何跨重定向传递数据，包括Spring对flash属性的支持：类似于模型的属性，但是能在重定向后存活下来。这样的话，就能采用非常恰当的方式为POST请求执行一个重定向回应，而且能够将处理POST请求时的模型数据传递过来，然后在重定向后使用或展现这些模型数据。
+>
+如果你还有疑惑的话，那么可以告诉你，这就是我所说的“更多的功能”！其实，我们并没有讨论到Spring MVC的每个方面。我们将会在第16章中重新讨论Spring MVC，到时你会看到如何使用它来创建REST API。
+>
+但现在，我们将会暂时放下Spring MVC，看一下Spring Web Flow，这是一个构建在Spring MVC之上的流程框架，它能够引导用户执行一系列向导步骤。
+
+## 第八章 使用Spring Web Flow
+
+本章内容：
+
+- 创建会话式的Web应用程序
+- 定义流程状态和行为
+- 保护Web流程
+
+Spring Web Flow是一个Web框架，它适用于元素按规定流程运行的程序。在本章中，我们将会探索Spring Web Flow并了解它如何应用于Spring Web框架平台。
+
+Spring Web Flow是Spring MVC的扩展，它支持开发基于流程的应用程序。它将流程的定义与实现流程行为的类和视图分离开来。
+
+### 8.1 在Spring中配置Web Flow
+
+*以下内容代码在工程sia4e-P2_Spring_on_the_web-C08_Working_with_Spring_Web_Flow中*。（原书中并没有完成该工程）
+
+Spring Web Flow是构建于Spring MVC基础之上的。这意味着所有的流程请求都需要首先经过Spring MVC的`DispatcherServlet`。我们需要在Spring应用上下文中配置一些bean来处理流程请求并执行流程。
+
+现在，还不支持在Java中配置Spring Web Flow，所以我们别无选择，只能在XML中对其进行配置。
+（事实上，从Spring Web Flow 2.4开始，已经支持了使用JavaConfig的方式进行配置，具体参见[Spring Web Flow-System Setup](https://docs.spring.io/spring-webflow/docs/2.5.0.RELEASE/reference/html/system-setup.html){:target="_blank"}。这里我们使用XML配置）
+
+要在XML中进行进行配置，我们需要引入命名空间：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:flow="http://www.springframework.org/schema/webflow-config"
+    xsi:schemaLocation="http://www.springframework.org/schema/beans 
+    http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/webflow-config 
+        http://www.springframework.org/schema/webflow-config/spring-webflow-config-2.4.xsd">
+
+
+</beans>
+```
+
+#### 8.1.1 装配流程执行器
+
+流程执行器（flow executor）驱动流程的执行。当用户进入一个流程时，流程执行器会为用户创建并启动一个流程执行实例。当流程暂停的时候（如为用户展示视图时），流程执行器会在用户执行操作后恢复流程。
+
+在Spring中，`<flow:flow-executor>`元素会创建一个流程执行器：
+
+```xml
+<flow:flow-executor id="flowExecutor" />
+```
+
+尽管流程执行器负责创建和执行流程，但它并不负责加载流程定义。这个责任落在了流程注册表（flow registry）身上，接下来我们会创建它。
+
+#### 8.1.2 配置流程注册表
+
+流程注册表（flow registry）的工作是加载流程定义并让流程执行器能够使用它们。我们可以在Spring中使用`<flow:flow-registry>`配置流程注册表，如下所示：
+
+```xml
+<!-- 配置流程注册表 -->
+<flow:flow-registry id="flowRegistry" base-path="/WEB-INF/flows">
+    <flow:flow-location-pattern value="*-flow.xml" />
+</flow:flow-registry>
+```
+
+在这里的声明中，流程注册表会在“/WEB-INF/flows”目录下查找流程定义，这是通过base-path属性指明的。依据`<flow:flow-location-pattern>`元素的值，任何文件名以“-flow.xml”结尾的XML文件都将视为流程定义。
+
+所有的流程都是通过其ID来引用的。这里我们使用了`<flow:flow-location-pattern>`元素，流程的ID就是相对于base-path的路径，或者双星号所代表的路径。下图展示了流程ID是如何计算的：
+
+<center>
+    ![图8.1-流程ID](images\图8.1-流程ID.PNG)
+    **在使用流程定位模式的时候，流程定义文件相对于基本路径的路径将被用作流程的ID**
+</center>
+
+作为另一种方式，我们可以去除`base-path`属性，而显式声明流程定义文件的位置：
+
+```xml
+<flow:flow-registry id="flowRegistry">
+    <flow:flow-location parh="/WEB-INF/flows/springpizza.xml" />
+</flow:flow-registry>
+```
+
+在这里，使用了`<flow:flow-location>`而不是`<flow:flowlocation-pattern>`，path属性直接指明了“/WEB-INF/flows/springpizza.xml”作为流程定义。当我们这样配置的话，流程的ID是从流程定义文件的文件名中获得的，在这里就是springpizza。
+
+如果我们希望更显式地指定流程ID，那么可以通过`<flow:flow-location>`元素的`id`属性来进行设置：
+
+```xml
+<flow:flow-registry id="flowRegistry">
+    <flow:flow-location id="pizza" parh="/WEB-INF/flows/springpizza.xml" />
+</flow:flow-registry>
+```
+
+#### 8.1.3 处理流程请求
+
+`DispatcherServlet`一般将请求分发给控制器。但是对于流程而言，我们需要一个`FlowHandlerMapping`来帮助`DispatcherServlet`将流程请求发送给Spring Web Flow。
+
+`FlowHandlerMapping`的配置如下：
+
+```xml
+<!-- 配置FlowHandlerMapping -->
+<bean class="org.springframework.webflow.mvc.servlet.FlowHandlerMapping">
+    <property name="flowRegistry" ref="flowRegistry" />
+</bean>
+```
+
+`FlowHandlerMapping`装配了流程注册表的引用，这样它就能知道如何将请求的URL匹配到流程上。例如，如果我们有一个ID为pizza的流程，`FlowHandlerMapping`就会知道如果请求的URL模式（相对于应用程序的上下文路径）是“/pizza”的话，就要将其匹配到这个流程上。
+
+然而，`FlowHandlerMapping`的工作仅仅是将流程请求定向到Spring Web Flow上，响应请求的是`FlowHandlerAdapter`。`FlowHandlerAdapter`可以像下面这样装配成一个Springbean，如下所示：
+
+```xml
+<!-- 配置FlowHandlerAdapter -->
+<bean class="org.springframework.webflow.mvc.servlet.FlowHandlerAdapter">
+    <property name="flowExecutor" ref="flowExecutor" />
+</bean>
+```
+
+这个处理适配器是`DispatcherServlet`和Spring Web Flow之间的桥梁。它会处理流程请求并管理基于这些请求的流程。在这里，它装配了流程执行器的引用，而后者是为所处理的请求执行流程的。
+
+我们已经配置了Spring WebFlow所需的bean和组件。剩下就是真正定义流程了。我们随后将会进行这项工作。但首先，让我们先了解一下组成流程的元素。
+
+### 8.2 流程的组件
+
+在Spring Web Flow中，流程是由三个主要元素定义的：
+
+- 状态
+- 转移
+- 流程数据
+
+状态（State）是流程中事件发生的地点。如果你将流程想象成公路旅行，那状态就是路途上的城镇、路边饭店以及风景点。流程中的状态是业务逻辑执行、做出决策或将页面展现给用户的地方。
+
+如果流程状态就像公路旅行中停下来的地点，那转移（transition）就是连接这些点的公路。在流程中，你通过转移的方式从一个状态到另一个状态。
+
+在流程处理中，它要收集一些数据：流程的当前状况。
+
+#### 8.2.1 状态
+
+Spring Web Flow定义了五种不同类型的状态，通过选择Spring Web Flow的状态几乎可以把任意的安排功能构造成会话式的Web应用。
+
+状态类型 | 它是用来做什么的
+----- | -----
+行为（Action） | 行为状态是流程逻辑发生的地方
+决策（Decision） | 决策状态将流程分成两个方向，它会基于流程数据的评估结果确定流程方向
+结束（End） | 结束状态是流程的最后一站。一旦进入End状态，流程就会终止
+子流程（Subflow） | 子流程状态会在当前正在运行的流程上下文中启动一个新的流程
+视图（View） | 视图状态会暂停流程并邀请用户参与流程
+
+首先我们了解一下这些流程元素在Spring Web Flow定义中是如何表现得。
+
+**视图状态**
+
+视图状态用于为用户展现信息并使用户在流程中发挥作用。实际的视图实现可以是Spring支持的任意视图类型。
+
+在流程定义的XML文件中，`<view-state>`用于定义视图状态：
+
+```xml
+<view-state id="welcome" />
+```
+
+在这个简单的示例中，`id`属性有两个含义。它在流程内标示这个状态。除此以外，因为在这里没有在其他地方指定视图，所以它也指定了流程到达这个状态时要展现的逻辑视图名为welcome。
+
+当然，我们可以显式的指定另外一个视图名，可以使用`view`属性：
+
+```xml
+<view-state id="welcome" view="greeting" />
+```
+
+如果流程为用户展现了一个表单，你可能希望指明表单所绑定的对象。为了做到这一点，可以设置model属性：
+
+```xml
+<view-state id="takePayment" model="flowScope.paymentDetails" />
+```
+
+这里我们指定takePayment视图中的表单将绑定流程作用域内的paymentDetails对象。
+
+**行为状态**
+
+视图状态会涉及到流程应用程序的用户，而行为状态则是应用程序自身在执行任务。行为状态一般会触发Spring所管理bean的一些方法并根据方法调用的执行结果转移到另一个状态。
+
+行为状态使用`<action-state>`元素来声明：
+
+```xml
+<action-state id="saveOrder">
+    <evalute expression="pizzaFlowActions.saveOrder(order)" />
+    <transition to="thankYou" />
+</action-state>
+```
+
+尽管不是严格需要的，但是`<action-state>`元素一般都会有一个`<evaluate>`作为子元素。`<evaluate>`元素给出了行为状态要做的事情。`expression`属性指定了进入这个状态时要评估的表达式。在本示例中，给出的`expression`是SpEL表达式，它表明将会找到ID为pizzaFlowActions的bean并调用其`saveOrder()`方法。
+
+Spring Web Flow支持多种表达式语言、OGNL、Unified EL以及SpEL。尽管可以使用上述的任意表达式语言来配置Spring Web Flow，但SpEL是默认和推荐使用的表达式语言。
+
+**决策状态**
+
+有可能流程会完全按照线性执行，从一个状态进入另一个状态，没有其他的替代路线。但是更常见的情况是流程在某一个点根据流程的当前情况进入不同的分支。
+
+决策状态能够在流程执行时产生两个分支。决策状态将评估一个布尔类型的表达式，然后在两个状态转移中选择一个，这要取决于表达式会计算出`true`还是`false`。在XML流程定义中，决策状态通过`<decision-state>`元素进行定义。典型的决策状态示例如下所示：
+
+```xml
+<decision-state id="checkDeliveryArea">
+    <if test="pizzaFlowActions.checkDeliveryArea(customer.zipCode)"
+        then="addCustomer"
+        else="deliveryWarning" />
+</decision-state>
+```
+
+可以看到`<decision-state>`并不是独立完成工作的。`<if>`元素是决策状态的核心。这是表达式进行评估的地方，如果表达式结果为`true`，流程将转移到`then`属性指定的状态中，如果结果为`false`，流程将会转移到`else`属性指定的状态中。
+
+**子流程状态**
+
+我们可能不会将应用程序的所有逻辑写在一个方法中，而是将其分散到多个类、方法以及其他结构中。
+
+同样地，将流程分成独立的部分是个不错的主意。`<subflow-state>`允许在一个正在执行的流程中调用另一个流程。这类似于在一个方法中调用另一个方法。
+
+`<subflow-state>`可以这样声明：
+
+```xml
+<subflow-state id="order" subflow="pizza/order">
+    <input name="order" value="order"/>
+    <transition on="orderCreated" to="payment" />
+</subflow-state>
+```
+
+在这里，`<input>`元素用于传递订单对象作为子流程的输入。如果子流程结束的`<end-state>`状态ID为orderCreated，那么流程将会转移到名为payment的状态。
+
+**结束状态**
+
+最后，所有的流程都要结束。这就是当流程转移到结束状态时所要做的。`<end-state>`元素指定了流程的结束，它一般会是这样声明的：
+
+```xml
+<end-state id="customerReady" />
+```
+
+当到达结束状态时，流程会结束。接下来会发生什么取决于几个因素：
+
+- 如果结束的流程是一个子流程，那调用它的流程将会从`<subflow-state>`处继续执行。`<end-state>`的ID将会用作事件触发从`<subflow-state>`开始的转移。
+- 如果`<end-state>`设置了`view`属性，指定的视图将会被渲染。视图可以是相对于流程路径的视图模板，如果添加“externalRedirect:”前缀的话，将会重定向到流程外部的页面，如果添加“flowRedirect:”将重定向到另一个流程中。
+- 如果结束的流程不是子流程，也没有指定view属性，那这个流程只是会结束而已。浏览器最后将会加载流程的基本URL地址，当前已没有活动的流程，所以会开始一个新的流程实例。
+
+需要意识到流程可能会有不止一个结束状态。子流程的结束状态ID确定了激活的事件，所以你可能会希望通过多种结束状态来结束子流程，从而能够在调用流程中触发不同的事件。即使不是在子流程中，也有可能在结束流程后，根据流程的执行情况有多个显示页面供选择。
+
+#### 8.2.2 转移
+
+正如我在前面所提到的，转移连接了流程中的状态。流程中除结束状态之外的每个状态，至少都需要一个转移，这样就能够知道一旦这个状态完成时流程要去向哪里。状态可以有多个转移，分别对应于当前状态结束时可以执行的不同的路径。
+
+转移使用`<transition>`元素来进行定义，它会作为各种状态元素（`<action-state>`、`<view-state>`、`<subflow-state>`）的子元素。最简单的形式就是`<transition>`元素在流程中指定下一个状态：
+
+```xml
+<transition to="customerReady" />
+```
+
+属性`to`用于指定流程的下一个状态。如果`<transition>`只使用了`to`属性，那这个转移就会是当前状态的默认转移选项，如果没有其他可用转移的话，就会使用它。
+
+更常见的转移定义是基于事件的触发来进行的。在视图状态，事件通常会是用户采取的动作。在行为状态，事件是评估表达式得到的结果。而在子流程状态，事件取决于子流程结束状态的ID。在任意的事件中，我们可以使用属性`on`来指定触发转移的事件：
+
+```xml
+<transition on="phoneEntered" to="lookupCustomer" />
+```
+
+在上述代码中，如果触发了phoneEntered事件，流程将会进入lookupCustomer状态。
+
+在抛出异常时，流程也可以进入另一个状态。例如，如果顾客的记录没有找到，你可能希望流程转移到一个展现注册表单的视图状态。以下的代码片段显示了这种类型的转移：
+
+```xml
+<transition on-exception="com.springinaction.pizza.service.CustomerNotFoundException" to="registrationForm" />
+```
+
+属性`on-exception`类似于`on`属性，只不过它指定了要发生转移的异常而不是一个事件。在本示例中，`CustomerNotFoundException`异常将导致流程转移到registrationForm状态。
+
+**全局转移**
+
+在创建完流程之后，你可能会发现有一些状态使用了一些通用的转移。
+
+例如，如果在整个流程中到处都有如下`<transition>`的话，我一点也不感觉意外：
+
+```xml
+<transition on="cancel" to="endState" />
+```
+
+与其在多个状态中都重复通用的转移，我们可以将`<transition>`元素作为`<global-transitions>`的子元素，把它们定义为全局转移：
+
+```xml
+<global-transitions>
+    <transition on="cancel" to="endState" />
+</global-transitions>
+```
+
+定义完这个全局转移后，流程中的所有状态都会默认拥有这个cancel转移。
+
+#### 8.2.3 流程数据
+
+当流程从一个状态进行到另一个状态时，它会带走一些数据。有时候，这些数据只需要很短的时间（可能只要展现页面给用户）。有时候，这些数据会在整个流程中传递并在流程结束的时候使用。
+
+**声明变量**
+
+流程数据保存在变量中，而变量可以在流程的各个地方进行引用。它能够以多种方式创建。在流程中创建变量的最简单形式是使用`<var>`元素：
+
+```xml
+<var name="customer" class="com.springinaction.pizza.domain.Customer" />
+```
+
+这里，创建了一个新的`Customer`实例并将其放在名为customer的变量中。这个变量可以在流程的任意状态进行访问。
+
+作为行为状态的一部分或者作为视图状态的入口，你有可能会使用`<evaluate>`元素来创建变量。例如：
+
+```xml
+<evaluate resulkt="viewScope.toppingsList" expression="T(com.springinaction.pizza.domain.Topping).asList()" />
+```
+
+在本例中，`<evaluate>`元素计算了一个表达式（SpEL表达式）并将结果放到了名为toppingsList的变量中。
+
+类似地，我们也可以使用`<set>`元素设置变量的值：
+
+```xml
+<set name="flowScope.pizza" value="new com.springinaction.pizza.domain.Pizza()" />
+```
+
+`<set>`元素与`<evaluate>`元素很类似，都是将变量设置为表达式计算的结果。这里，我们设置了一个流程作用域内的pizza变量，它的值是Pizza对象的新实例。
+
+**定义流程数据的作用域**
+
+流程中携带的数据会拥有不同的作用域和可见性，这取决于保存数据的变量本身的作用域。Spring Web Flow定义了5种不同的生命作用域：
+
+范围 | 生命作用域及可见性
+-----|-----
+Conversation | 最高层级的流程开始时创建，在最高层级的流程结束时销毁。被最高层级的流程和其所有的子流程所共享
+Flow | 当流程开始时创建，在流程结束时销毁。只有在创建它的流程中是可见的
+Request | 当一个请求进入流程时创建，在流程返回时销毁
+Flash | 当流程开始时创建，在流程结束时销毁。在视图状态渲染后，它也会被清除
+View | 当进入视图状态时创建，当这个状态退出时销毁。只在视图状态内是可见的
+
+**当使用`<var>`元素声明变量时，变量始终是流程作用域的，也就是在定义变量的流程内有效。当使用`<set>`或`<evaluate>`的时候，作用域通过`name`或`result`属性的前缀指定**。
+
+例如，将一个值赋给流程作用域的theAnswer变量：
+
+```xml
+<set name="flowScope.theAnswer" value="42" />
+```
+
+### 8.3 组合起来：披萨流程
+
+订购披萨的过程可以很好地定义在一个流程中。我们首先从构建一个高层次的流程开始，它定义了订购披萨的整体过程。接下来，我们会将这个流程拆分成子流程，这些子流程在较低的层次定义了细节。
+
+#### 8.3.1 定义基本流程
+
+一个新的披萨连锁店Spizza决定允许用户在线订购以减轻店面电话的压力。当顾客访问Spizza站点时，他们需要进行用户识别，选择一个或更多披萨添加到订单中，提供支付信息然后提交订单并等待热乎又新鲜的披萨送过来。
+
+<center>
+    ![图8.2-将订购披萨的过程归结为一个简单的流程](images\图8.2-将订购披萨的过程归结为一个简单的流程.PNG)
+    **将订购披萨的过程归结为一个简单的流程**
+</center>
+
+图中的方框代表了状态而箭头代表了转移。订购披萨的整个流程很简单且是线性的。在Spring Web Flow中，表示这个流程是很容易的。
+
+下面我们使用XML流程定义来实现披萨订单的整体流程：
+
+```xml
+<var name="order" class="com.springinaction.pizza.domain.Order" />
+
+<!-- 定义顾客子流程 -->
+<subflow-state id="identifyCustomer" subflow="pizza/customer">
+    <output name="customer" value="order.customer"/>
+    <transition on="customerReady" to="buildOrder" />
+</subflow-state>
+
+<!-- 调用订单子流程 -->
+<subflow-state id="buildOrder" subflow="pizza/order">
+    <input name="order" value="order" />
+    <transition on="orderCreated" to="takePayment" />
+</subflow-state>
+
+<!-- 调用支付子流程 -->
+<subflow-state id="takePayment" subflow="pizza/payment">
+    <input name="order" value="order" />
+    <transition on="paymentTaken" to="saveOrder" />
+</subflow-state>
+
+<!-- 保存订单 -->
+<action-state id="saveOrder">
+    <evaluate expression="pizzaFlowActions.saveOrder(order)" />
+    <transition to="thankCustomer" />
+</action-state>
+
+<!-- 感谢顾客 -->
+<view-state id="thankCustomer">
+    <transition to="endState" />
+</view-state>
+
+<!-- 全局取消转移 -->
+<global-transitions>
+    <transition on="cancel" to="endState" />
+</global-transitions>
+```
+
+在流程定义中，我们看到的第一件事就是order变量的声明。每次流程开始的时候，都会创建一个`Order`实例。`Order`类会带有关于订单的所有信息，包含顾客信息、订购的披萨列表以及支付详情，如下面所示：
+
+```java
+package com.springinaction.pizza.domain;
+
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
+
+public class Order implements Serializable {
+
+    private static final long serialVersionUID = 5500089874240597273L;
+
+    private Customer customer;
+    
+    private List<Pizza> pizzas;
+    
+    private Payment payment;
+    
+    public Order() {
+        pizzas = new ArrayList<>();
+        customer = new Customer();
+    }
+
+    public Customer getCustomer() {
+        return customer;
+    }
+
+    public void setCustomer(Customer customer) {
+        this.customer = customer;
+    }
+
+    public List<Pizza> getPizzas() {
+        return pizzas;
+    }
+
+    public void setPizzas(List<Pizza> pizzas) {
+        this.pizzas = pizzas;
+    }
+    
+    public void addPizza(Pizza pizza) {
+        pizzas.add(pizza);
+    }
+
+    public Payment getPayment() {
+        return payment;
+    }
+
+    public void setPayment(Payment payment) {
+        this.payment = payment;
+    }
+    
+    public float getTotal() {
+        return 0.0f;
+    }
+}
+```
+
+流程定义的主要组成部分是流程的状态。默认情况下，流程定义文件中的第一个状态也会是流程访问中的第一个状态。在本例中，也就是`identifyCustomer`状态（一个子流程）。但是如果你愿意的话，你可以通过`<flow>`元素的`start-state`属性将任意状态指定为开始状态：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<flow xmlns="http://www.springframework.org/schema/webflow"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.springframework.org/schema/webflow
+        http://www.springframework.org/schema/webflow/spring-webflow.xsd"
+        start-state="identifyCustomer">
+
+    <var name="order" class="com.springinaction.pizza.domain.Order" />
+
+    <!-- 定义顾客子流程 -->
+    <subflow-state id="identifyCustomer" subflow="pizza/customer">
+        <output name="customer" value="order.customer"/>
+        <transition on="customerReady" to="buildOrder" />
+    </subflow-state>
+    
+    <!-- 调用订单子流程 -->
+    <subflow-state id="buildOrder" subflow="pizza/order">
+        <input name="order" value="order" />
+        <transition on="orderCreated" to="takePayment" />
+    </subflow-state>
+    
+    <!-- 调用支付子流程 -->
+    <subflow-state id="takePayment" subflow="pizza/payment">
+        <input name="order" value="order" />
+        <transition on="paymentTaken" to="saveOrder" />
+    </subflow-state>
+    
+    <!-- 保存订单 -->
+    <action-state id="saveOrder">
+        <evaluate expression="pizzaFlowActions.saveOrder(order)" />
+        <transition to="thankCustomer" />
+    </action-state>
+    
+    <!-- 感谢顾客 -->
+    <view-state id="thankCustomer">
+        <transition to="endState" />
+    </view-state>
+    
+    <!-- 全局取消转移 -->
+    <global-transitions>
+        <transition on="cancel" to="endState" />
+    </global-transitions>
+</flow>
+```
+
+识别顾客、构造披萨订单以及支付这样的活动太复杂了，并不适合将其强行塞入一个状态。这是我们为何在后面将其单独定义为流程的原因。但是为了更好地整体了解披萨流程，这些活动都是以`<subflow-state>`元素来进行展现的。
+
+流程变量`order`将在前三个状态中进行填充并在第四个状态中进行保存。`identifyCustomer`子流程状态使用了`<output>`元素来填充order的`customer`属性。`buildOrder`和`takePayment`状态使用了不同的方式，它们使用`<input>`将`order`流程变量作为输入，这些子流程就能在其内部填充order对象。
+
+在订单得到顾客、一些披萨以及支付细节后，就可以对其进行保存了。saveOrder是处理这个任务的行为状态。它使用`<evaluate>`来调用ID为pizzaFlowActions的bean的`saveOrder()`方法，并将保存的订单对象传递进来。订单完成保存后，它会转移到thankCustomer。
+
+`thankCustomer`状态是一个简单的视图状态，后台使用了“/WEB-INF/flows/pizza/ thankCustomer.jsp”这个JSP文件，如下所示：
+
+```jsp
+<%@ page language="java" contentType="text/html; charset=utf-8" pageEncoding="utf-8"%>
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Spizza</title>
+</head>
+<body>
+    <h2>Thank you for your order!</h2>
+    <a href="${flowExecutionUrl}&_eventId=finished">Finish</a>
+</body>
+</html>
+```
+
+在“感谢”页面中，会感谢顾客的订购并为其提供一个完成流程的链接。
+
+Spring Web Flow为视图的用户提供了一个`flowExecutionUrl`变量，它包含了流程的URL。结束链接将一个“_eventId”参数关联到URL上，以便回到Web流程时触发finished事件。这个事件将会让流程到达结束状态。
+
+流程将会在结束状态完成。鉴于在流程结束后没有下一步做什么的具体信息，流程将会重新从`identifyCustomer`状态开始，以准备接受另一个披萨订单。
+
+#### 8.3.2 收集顾客信息
+
+如果你曾经订购过披萨，你可能会知道流程。他们首先会询问你的电话号码。电话号码除了能够让送货司机在找不到你家的时候打电话给你，还可以作为你在这个披萨店的标识。如果你是回头客，他们可以使用这个电话号码来查找你的地址，这样他们就知道将你的订单派送到什么地方了。
+
+对于一个新的顾客来讲，查询电话号码不会有什么结果。所以接下来，他们将询问你的地址。这样，披萨店的人就会知道你是谁以及将披萨送到哪里。但是在问你要哪种披萨之前，他们要确认你的地址在他们的配送范围之内。如果不在的话，你需要自己到店里并取走披萨。
+
+在每个披萨订单开始前的提问和回答阶段可以用下图来表示：
+
+<center>
+    ![图8.3-识别顾客流程](images\图8.3-识别顾客流程.PNG)
+    **识别顾客的流程比披萨流程有了更多的分支**
+</center>
+
+这个流程不是线性的而是在好几个地方根据不同的条件有了分支。例如，在查找顾客后，流程可能结束（如果找到了顾客），也有可能转移到注册表单（如果没有找到顾客）。同样，在`checkDeliveryArea`状态，顾客有可能会被警告也有可能不被警告他们的地址在配送范围之外。
+
+下面定义识别顾客的流程：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<flow xmlns="http://www.springframework.org/schema/webflow"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.springframework.org/schema/webflow
+        http://www.springframework.org/schema/webflow/spring-webflow.xsd">
+
+    <var name="customer" class="com.springinaction.pizza.domain.Customer" />
+
+    <!-- 欢迎顾客 -->
+    <view-state id="welcome">
+        <transition on="phoneEntered" to="lookupCustomer" />
+    </view-state>
+
+    <!-- 查找顾客 -->
+    <action-state id="lookupCustomer">
+        <evaluate result="customer"
+            expression="pizzaFlowActions.lookupCustomer(requestParameters.phoneNumber)" />
+        <transition to="registrationForm"
+            on-exception="com.springinaction.pizza.service.CustomerNotFoundException" />
+        <transition to="customerReady" />
+    </action-state>
+
+    <!-- 注册新顾客 -->
+    <view-state id="registrationForm" model="customer">
+        <on-entry>
+            <evaluate expression="customer.phoneNumber = requestParameters.phoneNumber" />
+        </on-entry>
+        <transition on="submit" to="checkDeliveryArea" />
+    </view-state>
+    
+    <!-- 检查配送区域 -->
+    <decision-state id="checkDeliveryArea">
+        <if test="pizzaFlowActions.checkDeliveryArea(customer.zipCode)" then="addCustomer" else="deliveryWarning" />
+    </decision-state>
+    
+    <!-- 显示配送警告 -->
+    <view-state id="deliveryWarning">
+        <transition on="accept" to="addCustomer" />
+    </view-state>
+    
+    <!-- 添加顾客 -->
+    <action-state id="addCustomer">
+        <evaluate expression="pizzaFlowActions.addCustomer(customer)" />
+        <transition to="customerReady" />
+    </action-state>
+
+    <!-- 流程结束 -->
+    <end-state id="cancel"/>
+    <end-state id="customerReady">
+        <output name="customer" />
+    </end-state>
+    
+    <global-transitions>
+        <transition on="cancel" to="cancel" />
+    </global-transitions>
+</flow>
+```
+
+这个流程包含了几个新的技巧，包括我们首次使用的`<decision-state>`元素。因为它是`pizza`流程的子流程，所以它也可以接受`Order`对象作为输入。
+
+与前面一样，我们还是将这个流程的定义分解成一个个的状态，让我们从`welcome`状态开始。
+
+**询问电话号码**
+
+`welcome`状态是一个很简单的视图状态，它欢迎访问Spizza站点的顾客并要求他们输入电话号码。这个状态并没有什么特殊的。它有两个转移：如果从视图触发`phoneEntered`事件的话，转移会将流程定向到`lookupCustomer`，另外一个就是在全局转移中定义的用来响应`cancel`事件的`cancel`转移。
+
+welcome.jsp视图：
+
+```jsp
+<%@ page language="java" contentType="text/html; charset=utf-8" pageEncoding="utf-8"%>
+<%@ taglib prefix="form" uri="http://www.springframework.org/tags/form" %>
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Welcome to Spizza</title>
+</head>
+<body>
+    <h2>Welcome to Spizza!</h2>
+    <form:form>
+        <!-- 激活流程执行的key -->
+        <input type="hidden" name="_flowExecutionKey" value="${flowExecutionKey}" />
+        <input type="text" name="phoneNumber" /> 
+        <!-- 触发phoneEntered事件 -->
+        <input type="submit" name="_eventId_phoneEntered" value="Lookup Customer" />
+    </form:form>
+</body>
+</html>
+```
+
+这个简单的表单提示用户输入其电话号码。表单中有两个特殊的部分来驱动流程继续。
+
+首先要注意的是隐藏的“\_flowExecutionKey”输入域。当进入视图状态时，流程暂停并等待用户采取一些行为。赋予视图的流程执行key（flow execution key）就是一种返回流程的“回程票”（claimticket）。当用户提交表单时，流程执行key会在“\_flowExecutionKey”输入域中返回并在流程暂停的位置进行恢复。
+
+还要注意的是提交按钮的名字。按钮名字的“\_eventId\_”部分是提供给Spring Web Flow的一个线索，它表明了接下来要触发事件。当点击这个按钮提交表单时，会触发`phoneEntered`事件进而转移到`lookupCustomer`。
+
+**查找顾客**
+
+当欢迎表单提交后，顾客的电话号码将包含在请求参数中并准备用于查询顾客。`lookupCustomer`状态的`<evaluate>`元素是查找发生的地方。它将电话号码从请求参数中抽取出来并传递到pizzaFlowActions bean的`lookupCustomer()`方法中。
+
+目前，`lookupCustomer()`的实现并不重要。只需知道它要么返回`Customer`对象，要么抛出`CustomerNotFoundException`异常。
+
+在前一种情况下，`Customer`对象将会设置到customer变量中（通过`result`属性）并且默认的转移将把流程带到`customerReady`状态。但是如果不能找到顾客的话，将抛出`CustomerNotFoundException`并且流程被转移到`registrationForm`状态。
+
+**注册新顾客**
+
+`registrationForm`状态是要求用户填写配送地址的。就像我们之前看到的其他视图状态，它将被渲染成JSP。
+
+```jsp
+<%@ page language="java" contentType="text/html; charset=utf-8" pageEncoding="utf-8"%>
+<%@ taglib prefix="form" uri="http://www.springframework.org/tags/form"%>
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Customer Registration</title>
+</head>
+<body>
+    <h2>Customer Registration</h2>
+    <form:form commanName="customer">
+        <input type="hidden" name="_flowExecutionKey" value="${flowExecutionKey}" />
+        <b>Phone number: </b>
+        <form:input path="name" />
+        <br />
+        <b>Name: </b>
+        <form:input path="name" />
+        <br />
+        <b>Address: </b>
+        <form:input path="address" />
+        <br />
+        <b>City: </b>
+        <form:input path="city" />
+        <br />
+        <b>State: </b>
+        <form:input path="state" />
+        <br />
+        <b>Zip Code: </b>
+        <form:input path="zipCode" />
+        <br />
+        <input type="submit" name="_eventId_submit" value="Submit" />
+        <input type="submit" name="_eventId_cancel" value="Cancel" />
+    </form:form>
+</body>
+</html>
+```
+
+这并非我们在流程中看到的第一个表单。welcome视图状态也为顾客展现了一个表单，那个表单很简单，并且只有一个输入域，从请求参数中获得输入域的值也很简单。但是注册表单就比较复杂了。
+
+在这里不是通过请求参数一个个地处理输入域，而是以更好的方式将表单绑定到`Customer`对象上。
+
+**检查配送区域**
+
+在顾客提供其地址后，我们需要确认他的住址在配送范围之内。如果Spizza不能派送给他们，那么我们要让顾客知道并建议他们自己到店面里取走披萨。
+
+为了做出这个判断，我们使用了决策状态。决策状态`checkDeliveryArea`有一个`<if>`元素，它将顾客的邮政编码传递到pizzaFlowActions bean的`checkDeliveryArea()`方法中。这个方法将会返回一个布尔值：如果顾客在配送区域内则为`true`，否则为`false`。
+
+如果顾客在配送区域内的话，那流程转移到`addCustomer`状态。否则，顾客被带入到`deliveryWarning`视图状态。`deliveryWarning`背后的视图就是“/WEBINF/flows/pizza/customer/deliveryWarning.jsp”：
+
+```jsp
+<%@ page language="java" contentType="text/html; charset=utf-8" pageEncoding="utf-8"%>
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Spizza</title>
+</head>
+<body>
+    <h2>Delivery Unavailable</h2>
+    <p>The address is outside of our delivery area. You may still place the order, but you will need to pick it up yourself.</p>
+    <a href="${flowExectuionUrl}&_eventId=accept">Contiune, I'll pick up the order</a> |
+    <a href="${flowExecutionUrl}&_eventId=cancel">Never mind</a>
+</body>
+</html>
+```
+
+在页面中与流程相关的两个关键点就是那两个连接，它们允许用户继续订单或者将其取消。通过使用与welcome状态相同的`flowExecurtionUrl`变量，这些链接分别触发流程中的`accept`或`cancel`事件。如果发送的是`accept`事件，那么流程会转移到`addCustomer`状态。否则，接下来会是全局的取消转移，子流程将会转移到`cancel`结束状态。
+
+**存储顾客数据**
+
+当流程抵达`addCustomer`状态时，用户已经输入了他们的地址。为了将来使用，这个地址需要以某种方式存储起来（可能会存储在数据库中）。`addCustomer`状态有一个`<evaluate>`元素，它会调用pizzaFlowActions bean的`addCustomer()`方法，并将`customer`流程参数传递进去。
+
+一旦这个过程完成，会执行默认的转移，流程将会转移到ID为`customerReady`的结束状态。
+
+**结束流程**
+
+一般来讲，流程的结束状态并不会那么有意思。但是这个流程中，它不仅仅只有一个结束状态，而是两个。当子流程完成时，它会触发一个与结束状态ID相同的流程事件。如果流程只有一个结束状态的话，那么它始终会触发相同的事件。但是如果有两个或更多的结束状态，流程能够影响到调用状态的执行方向。
+
+当customer流程走完所有正常的路径后，它最终会到达ID为`customerReady`的结束状态。当调用它的披萨流程恢复时，它会接收到一个`customerReady`事件，这个事件将使得流程转移到`buildOrder`状态。
+
+要注意的是`customerReady`结束状态包含了一个`<output>`元素。在流程中这个元素等同于Java中的`return`语句。它从子流程中传递一些数据到调用流程。在本示例中，`<output>`元素返回customer流程变量，这样在披萨流程中，就能够将`identifyCustomer`子流程的状态指定给订单。另一方面，如果在识别顾客流程的任意地方触发了`cancel`事件，将会通过ID为`cancel`的结束状态退出流程，这也会在披萨流程中触发`cancel`事件并导致转移（通过全局转移）到披萨流程的结束状态。
+
+#### 8.3.3 构建订单
+
+在识别完顾客之后，主流程的下一件事情就是确定他们想要什么类型的披萨。
+
+订单子流程就是用于提示用户创建披萨并将其放入订单中的，如图所示：
+
+<center>
+    ![图8.4-通过订单子流程添加披萨](images\图8.4-通过订单子流程添加披萨.PNG)
+    **通过订单子流程添加披萨**
+</center>
+
+`showOrder`状态位于订单子流程的中心位置。这是用户进入这个流程时看到的第一个状态，它也是用户在添加披萨到订单后要转移到的状态。它展现了订单的当前状态并允许用户添加其他的披萨到订单中。
+
+要添加披萨到订单时，流程会转移到`createPizza`状态。这是另外一个视图状态，允许用户选择披萨的尺寸和面饼上面的配料。在这里，用户可以添加或取消披萨，两种事件都会使流程转移回`showOrder`状态。
+
+从`showOrder`状态，用户可能提交订单也可能取消订单。两种选择都会结束订单子流程，但是主流程会根据选择不同进入不同的执行路径。
+
+下面定义创建订单子流程：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<flow xmlns="http://www.springframework.org/schema/webflow"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.springframework.org/schema/webflow
+        http://www.springframework.org/schema/webflow/spring-webflow.xsd">
+
+    <!-- 接收order作为输入 -->
+    <input name="order" required="true" />
+
+    <!-- 展现order的状态 -->
+    <view-state id="showOrder">
+        <transition on="createPizza" to="createPizza" />
+        <transition on="checkout" to="orderCreated" />
+        <transition on="cancel" to="cancel" />
+    </view-state>
+
+    <!-- 创建披萨的状态 -->
+    <view-state id="createPizza" model="flowScope.pizza">
+        <on-entry>
+            <set name="flowScope.pizza" value="new com.springinaction.pizza.domain.Pizza()" />
+            <evaluate result="viewScope.toppingsList"
+                expression="T(com.springinaction.pizza.domain.Topping).asList()" />
+        </on-entry>
+        <transition on="addPizza" to="showOrder">
+            <evaluate expression="order.addPizza(flowScope.pizza)" />
+        </transition>
+        <transition on="cancel" to="showOrder" />
+    </view-state>
+
+
+    <!-- 取消的结束状态 -->
+    <end-state id="cancel" />
+    <!-- 创建订单的结束状态 -->
+    <end-state id="orderCreated" />
+</flow>
+```
+
+这个子流程实际上会操作主流程创建的`Order`对象。因此，我们需要以某种方式将`Order`从主流程传到子流程。我们使用了`<input>`元素来将`Order`传递进流程。在这里，我们使用它来接收`Order`对象。如果你觉得这个流程与Java中的方法有些类似地话，那这里使用的`<input>`元素实际上就定义了这个子流程的签名。这个流程需要一个名为order的参数。
+
+接下来，我们会看到`showOrder`状态，它是一个基本的视图状态并具有三个不同的转移，分别用于创建披萨、提交订单以及取消订单。`showOrder`视图如下所示：
+
+```jsp
+<%@ page language="java" contentType="text/html; charset=utf-8" pageEncoding="utf-8"%>
+<%@ taglib prefix="fn" uri="http://java.sun.com/jsp/jstl/functions"%>
+<%@ taglib prefix="fmt" uri="http://java.sun.com/jsp/jstl/fmt"%>
+<%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core"%>
+<%@ taglib prefix="form" uri="http://www.springframework.org/tags/form"%>
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Spizza</title>
+</head>
+<body>
+    <h2>Your order</h2>
+
+    <h3>Deliver to:</h3>
+    <b>${order.customer.name}</b>
+    <br />
+    <b>${order.customer.address}</b>
+    <br />
+    <b>${order.customer.city}, ${order.customer.state} ${order.customer.zipCode}</b>
+    <br />
+    <b>${order.customer.phoneNumber}</b>
+    <br />
+    <hr />
+    <h3>
+        Order total:
+        <fmt:formatNumber type="currency" value="${order.total}" />
+    </h3>
+    <hr />
+    <h3>Pizzas:</h3>
+
+    <c:if test="${fn:length(order.pizzas) eq 0}">
+        <b>No pizzas in this order.</b>
+    </c:if>
+
+    <br />
+    <c:forEach items="${order.pizzas}" var="pizza">
+        <li>${pizza.size}: 
+          <c:forEach items="${pizza.toppings}" var="topping">
+                <c:out value="${topping}" />,
+          </c:forEach>
+        </li>
+    </c:forEach>
+
+    <form:form>
+        <input type="hidden" name="_flowExecutionKey" value="${flowExecutionKey}" />
+        <input type="submit" name="_eventId_createPizza" value="Create Pizza" />
+        <c:if test="${fn:length(order.pizzas) gt 0}">
+            <input type="submit" name="_eventId_checkout" value="Checkout" />
+        </c:if>
+        <input type="submit" name="_eventId_cancel" value="Cancel" />
+    </form:form>
+</body>
+</html>
+```
+
+`createPizza`状态的视图是一个表单，这个表单可以添加新的`Pizza`对象到订单中。`<on-entry>`元素添加了一个新的`Pizza`对象到流程作用域内，当表单提交时，表单的内容会填充到该对象中。需要注意的是，这个视图状态引用的`model`是流程作用域内的同一个`Pizza`对象。`Pizza`对象将绑定到创建披萨的表单中，如下所示：
+
+```jsp
+<div xmlns:form="http://www.springframework.org/tags/form">
+    <h2>Create Pizza</h2>
+    <form:form commandName="pizza">
+        <input type="hidden" name="_flowExecutionKey" value="${flowExecutionKey}" />
+        <b>Size: </b>
+        <br />
+        <form:radiobutton path="size" label="Small (12-inch)" value="SMALL" />
+        <br />
+        <form:radiobutton path="size" label="Medium (14-inch)" value="MEDIUM" />
+        <br />
+        <form:radiobutton path="size" label="Large (16-inch)" value="LARGE" />
+        <br />
+        <form:radiobutton path="size" label="Ginormous (20-inch)" value="GINORMOUS" />
+        <br />
+        <br />
+        <b>Toppings: </b>
+        <br />
+        <form:checkboxes path="toppings" items="${toppingsList}" delimiter="<br/>" />
+        <br />
+        <br />
+        <input type="submit" class="button" name="_eventId_addPizza" value="Continue" />
+        <input type="submit" class="button" name="_eventId_cancel" value="Cancel" />
+    </form:form>
+</div>
+```
+
+当通过Continue按钮提交订单时，尺寸和配料选择将会绑定到`Pizza`对象中并且触发`addPizza`转移。与这个转移关联的`<evaluate>`元素表明在转移到`showOrder`状态之前，流程作用域内的Pizza对象将会传递给订单的`addPizza()`方法中。
+
+有两种方法来结束这个流程。用户可以点击`showOrder`视图中的Cancel按钮或者Checkout按钮。这两种操作都会使流程转移到一个`<end-state>`。但是选择的结束状态id决定了退出这个流程时触发事件，进而最终确定了主流程的下一步行为。主流程要么基于`cancel`事件要么基于`orderCreated`事件进行状态转移。在前者情况下，外边的主流程会结束；在后者情况下，它将转移到`takePayment`子流程，这也是接下来我们要看的。
+
+#### 8.3.4 支付
+
+在披萨流程要结束的时候，最后的子流程提示用户输入他们的支付信息。这个简单的流程如下图所示：
+
+<center>
+    ![图8.5-通过支付子流程让用户进行支付](images\图8.5-通过支付子流程让用户进行支付.PNG)
+    **订购披萨的最后一步是通过支付子流程让用户进行支付**
+</center>
+
+像订单子流程一样，支付子流程也使用`<input>`元素接收一个`Order`对象作为输入。
+
+可以看到，进入支付子流程的时候，用户会到达`takePayment`状态。这是一个视图状态，在这里用户可以选择使用信用卡、支票或现金进行支付。提交支付信息后，将进入`verifyPayment`状态。这是一个行为状态，它将校验支付信息是否可以接受。
+
+定义支付流程：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<flow xmlns="http://www.springframework.org/schema/webflow"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.springframework.org/schema/webflow
+        http://www.springframework.org/schema/webflow/spring-webflow.xsd">
+
+    <!-- 接收order对象 -->
+    <input name="order" required="true" />
+
+    <view-state id="takePayment" model="flowScope.paymentDetails">
+        <on-entry>
+            <set name="flowScope.paymentDetails"
+                value="new com.springinaction.pizza.domain.PaymentDetails()" />
+            <evaluate result="viewScope.paymentTypeList"
+                expression="T(com.springinaction.pizza.domain.PaymentType).asList()" />
+        </on-entry>
+        <transition on="paymentSubmitted" to="verifyPayment" />
+        <transition on="cancel" to="cancel" />
+    </view-state>
+
+    <action-state id="verifyPayment">
+        <evaluate result="order.payment"
+            expression="pizzaFlowActions.verifyPayment(flowScope.paymentDetails)" />
+        <transition to="paymentTaken" />
+    </action-state>
+
+    <end-state id="cancel" />
+    <end-state id="paymentTaken" />
+</flow>
+```
+
+在流程进入`takePayment`视图时，`<on-entry>`元素将构建一个支付表单并使用SpEL表达式在流程作用域内创建一个`PaymentDetails`实例，这是支撑表单的对象。它也会创建视图作用域的paymentTypeList变量，这个变量是一个列表包含了`PaymentType`枚举的值。在这里，SpEL的`T()`操作用于获得`PaymentType`类，这样就可以调用静态的`asList()`方法。
+
+```java
+package com.springinaction.pizza.domain;
+
+import java.util.Arrays;
+import java.util.List;
+
+import org.apache.commons.text.WordUtils;
+
+public enum PaymentType {
+    
+    CASH, CHECK, CREDIT_CARD;
+
+    public static List<PaymentType> asList() {
+        PaymentType[] all = PaymentType.values();
+        return Arrays.asList(all);
+    }
+
+    @Override
+    public String toString() {
+        return WordUtils.capitalizeFully(name().replace('_', ' '));
+    }
+}
+```
+
+在面对支付表单的时候，用户可能提交支付也可能会取消。根据做出的选择，支付子流程将以名为`paymentTaken`或`cancel`的`<end-state>`结束。就像其他的子流程一样，不论哪种`<end-state>`都会结束子流程并将控制交给主流程。但是所采用`<end-state>`的id将决定主流程中接下来的转移。
+
+现在，我们已经依次介绍了披萨流程及其子流程，并看到了Spring Web Flow的很多功能。在我们结束Spring Web Flow话题之前，让我们快速了解一下如何对流程及其状态的访问增加安全保护。
+
+#### 8.4 保护Web流程
+
+在下一章中，我们将会看到如何使用Spring Security来保护Spring应用程序。但现在我们讨论的是Spring Web Flow，让我们快速地看一下Spring Web Flow是如何结合Spring Security支持流程级别的安全性的。Spring Web Flow中的状态、转移甚至整个流程都可以借助`<secured>`元素实现安全性，该元素会作为这些元素的子元素。例如，为了保护对一个视图状态的访问，你可以这样使用`<secured>`：
+
+```xml
+<view-state id="restricted">
+    <secured attributes="ROLE_ADMIN" match="all" />
+</view-state>
+```
+
+按照这里的配置，只有授予`ROLE_ADMIN`访问权限（借助`attributes`属性）的用户才能访问这个视图状态。`attributes`属性使用逗号分隔的权限列表来表明用户要访问指定状态、转移或流程所需要的权限。`match`属性可以设置为`any`或`all`。如果设置为`any`，那么用户必须至少具有一个`attributes`属性所列的权限。如果设置为`all`，那么用户必须具有所有的权限。你可能想知道用户如何具备`<secured>`元素所检验的权限，甚至最开始的时候用户是如何进行登录的？这些问题的答案将在第9章给出。
+
+### 8.5 小结
+
+>
+并不是所有的Web应用程序都是自由访问的。有时候，必须对用户进行指引、询问适当的问题并基于他们的响应将其引导到特定页面。在这些情况下，应用程序不太像一个菜单选项而更像应用程序与用户之间的对话。
+>
+在本章中，我们介绍了Spring Web Flow，它是能够构建会话式应用程序的Web框架。在介绍的同时，我们构建了一个基于流程的披萨订单应用。我们先定义了应用程序的整体流程，从收集顾客信息开始到保存订单到系统中结束。
+>
+流程由多个状态和转移组成，它们定义了会话如何从一个状态到另一个状态。状态本身分为好多种：行为状态执行业务逻辑，视图状态涉及到流程中的用户，决策状态动态地引导流程执行，结束状态表明流程的结束，除此之外，还有子流程状态，它们自身是通过流程来定义的。
+>
+最后，我们看到如何限制具有特定权限的用户才能访问流程、状态或转移。但是，我们还没有介绍应用程序对用户的认证以及如何授予用户权限。这就是Spring Security能够发挥作用的地方了，而Spring Security就是我们第9章将要介绍的内容。
+
+## 第九章 保护Web应用
+
+本章内容：
+
+- Spring Security介绍
+- 使用Servlet规范中的Filter保护Web应用
+- 基于数据库和LDAP进行认证
+
+现在，信息可能是我们最有价值的东西，一些不怀好意的人想尽办法试图偷偷进入不安全的应用程序来窃取我们的数据和身份信息。作为软件开发人员，我们必须采取措施来保护应用程序中的信息。无论你是通过用户名/密码来保护电子邮件账号，还是基于交易PIN来保护经纪账户，安全性都是绝大多数应用系统中的一个重要切面（aspect）。
+
+这里有意选择了“切面”这个词来描述应用系统的安全性。安全性是超越应用程序功能的一个关注点。应用系统的绝大部分内容都不应该参与到与自己相关的安全性处理中。尽管我们可以直接在应用程序中编写安全性功能相关的代码（这种情况并不少见），但更好的方式还是将安全性相关的关注点与应用程序本身的关注点进行分离。
+
+如果你觉得安全性听上去好像是使用面向切面技术实现的，那你猜对了。在本章中，我们将使用切面技术来探索保护应用程序的方式。不过我们不必自己开发这些切面，我们将介绍Spring Security，这是一种基于Spring AOP和Servlet规范中的Filter实现的安全框架。
+
+### 9.1 Spring Security简介
+
+Spring Security是为基于Spring的应用程序提供声明式安全保护的安全性框架。Spring Security提供了完整的安全性解决方案，它能够在Web请求级别和方法调用级别处理身份认证和授权。因为基于Spring框架，所以Spring Security充分利用了依赖注入（dependency injection，DI）和面向切面的技术。
+
+最初，Spring Security被称为Acegi Security。Acegi是一个强大的安全框架，但是它存在一个严重的问题：那就是需要大量的XML配置。我不会向你介绍这种复杂配置的细节。总之一句话，典型的Acegi配置有几百行XML是很常见的。
+
+到了2.0版本，Acegi Security更名为Spring Security。但是2.0发布版本所带来的不仅仅是表面上名字的变化。为了在Spring中配置安全性，Spring Security引入了一个全新的、与安全性相关的XML命名空间。这个新的命名空间连同注解和一些合理的默认设置，将典型的安全性配置从几百行XML减少到十几行。Spring Security 3.0融入了SpEL，这进一步简化了安全性的配置。
+
+Spring Security从两个角度来解决安全性问题。它使用Servlet规范中的Filter保护Web请求并限制URL级别的访问。Spring Security还能够使用Spring AOP保护方法调用——借助于对象代理和使用通知，能够确保只有具备适当权限的用户才能访问安全保护的方法。
+
+在本章中，我们将会关注如何将Spring Security用于Web层的安全性之中。在稍后的第14章中，我们会重新学习Spring Security，了解它如何保护方法的调用。
+
+（原书介绍并使用的是3.2版本，这里使用版本4.2.7。[[Spring Security 4.2.7 Reference](https://docs.spring.io/spring-security/site/docs/4.2.7.RELEASE/reference/htmlsingle/){:target="_blank"}|[Migrating from 3.x to 4.x](https://docs.spring.io/spring-security/site/docs/4.2.7.RELEASE/reference/htmlsingle/#m3to4){:target="_blank"}]）
+
+#### 9.1.1 理解Spring Security的模块
+
+不管你想使用Spring Security保护哪种类型的应用程序，第一件需要做的事就是将Spring Security模块添加到应用程序的类路径下。
+
+Spring Security的11个模块：
+
+模块 | 描述
+-----|-----
+ACL | 支持通过访问控制列表（access control list，ACL）为域对象提供安全性
+切面（Aspects） | 一个很小的模块，当使用Spring Security注解时，会使用基于AspectJ的切面，而不是使用标准的Spring AOP
+CAS客户端（CAS Client）| 提供与Jasig的中心认证服务（Central Authentication Service，CAS）进行集成的功能
+配置（Configuration） | 包含通过XML和Java配置Spring Security的功能支持
+核心（Core） | 提供Spring Security基本库
+加密（Cryptography） | 提供了加密和密码编码的功能
+LDAP | 支持基于LDAP进行认证
+OpenID | 支持使用OpenID进行集中式认证
+Remoting | 提供了对Spring Remoting的支持
+标签库（Tag Library）| Spring Security的JSP标签库
+Web | 提供了Spring Security基于Filter的Web安全性支持
+
+#### 9.1.2 过滤Web请求
+
+Spring Security借助一系列Servlet Filter来提供各种安全性功能。你可能会想，这是否意味着我们需要在web.xml或`WebApplicationInitializer`中配置多个Filter呢？实际上，借助于Spring的小技巧，我们只需配置一个Filter就可以了。
+
+`DelegatingFilterProxy`是一个特殊的Servlet Filter，它本身所做的工作并不多。只是将工作委托给一个`javax.servlet.Filter`实现类，这个实现类作为一个`<bean>`注册在Spring应用的上下文中：
+
+<center>
+    ![图9.1-DelegatingFilterProxy把Filter的处理逻辑委托给Spring应用上下文中所定义的一个代理Filter](images\图9.1-DelegatingFilterProxy把Filter的处理逻辑委托给Spring应用上下文中所定义的一个代理Filter.PNG)
+    **DelegatingFilterProxy把Filter的处理逻辑委托给Spring应用上下文中所定义的一个代理Filter bean**
+</center>
+
+如果我们要在web.xml中配置这个Filter：
+
+```xml
+<filter>
+    <filter-name>springSecurityFilterChain</filter-name>
+    <filter-class>
+        org.springframework.web.filter.DelegatingFilterProxy
+    </filter-class>
+</filter>
+```
+
+这里我们将`<filter-name>`设置为springSecurityFilterChain。这是因为我们马上就会将Spring Security配置在Web安全性之中，这里会有一个名为springSecurityFilterChain的Filter bean，`DelegatingFilterProxy`会将过滤逻辑委托给它。
+
+我国我们要以JavaConfig的方式来配置`DelegatingFilterProxy`，那么我们所要做的说就是创建一个类，这个类要继承`AbstractSecurityWebApplicationInitializer`：
+
+```java
+package spittr.config;
+
+import org.springframework.security.web.context.AbstractSecurityWebApplicationInitializer;
+
+public class SecurityWebInitializer extends AbstractSecurityWebApplicationInitializer {
+    
+}
+
+```
+
+`AbstractSecurityWebApplicationInitializer`类实现了`WebApplicationInitializer`接口，因此Spring会发现它，并用它在Web容器中注册`DelegatingFilterProxy`。尽管我们可以重载它的`appendFilters()`或`insertFilters()`方法来注册自己选择的Filter，但是要注册`DelegatingFilterProxy`的话，我们并不需要重载任何方法。
+
+不管我们通过web.xml还是通过`AbstractSecurityWebApplicationInitializer`的子类来配置`DelegatingFilterProxy`，它都会拦截发往应用中的请求，并将请求委托给ID为springSecurityFilterChain的bean。
+
+springSecurityFilterChain本身是另一个特殊的`Filter`，它也被称为FilterChainProxy。它可以链接任意一个或多个其他的`Filter`。Spring Security依赖一系列Servlet Filter来提供不同的安全特性。但是，你几乎不需要知道这些细节，因为你不需要显式声明springSecurityFilterChain以及它所链接在一起的其他`Filter`。当我们启用Web安全性的时候，会自动创建这些`Filter`。
+
+#### 9.1.3 编写简单的安全性配置
+
+在Spring Security的早期版本中（在其还被称为Acegi Security之时），为了在Web应用中启用简单的安全功能，我们需要编写上百行的XML配置。Spring Security 2.0提供了安全性相关的XML配置命名空间，让情况有了一些好转。
+
+Spring 3.2引入了新的Java配置方案，完全不再需要通过XML来配置安全性功能了。如下的程序清单展现了Spring Security最简单的Java配置。
+
+```java
+package spittr.config;
+
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+
+@Configuration
+@EnableWebSecurity // 启用Web安全性
+public class SecurityConfig extends WebSecurityConfigurerAdapter {
+
+}
+```
+
+`@EnableWebSecurity`注解将会启用Web安全功能。但它本身并没有什么用处，Spring Security必须配置在一个实现了WebSecurityConfigurer的bean中，或者（简单起见）扩展WebSecurityConfigurerAdapter。在Spring应用上下文中，任何实现了WebSecurityConfigurer的bean都可以用来配置Spring Security。
+
+`@EnableWebSecurity`可以启用任意Web应用的安全性功能，不过由于我们是使用Spring MVC的，所以可以使用注解`@EnableWebMvcSecurity`替代它：
+
+```java
+package spittr.config;
+
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+import org.springframework.security.config.annotation.web.servlet.configuration.EnableWebMvcSecurity;
+
+@Configuration
+@EnableWebMvcSecurity // 启用Web安全性
+public class SecurityConfig extends WebSecurityConfigurerAdapter {
+
+}
+```
+
+（但是，注解`@EnableWebMvcSecurity`已经被标注为`@deprecated`了，Spring推荐我们使用`@EnableWebSecurity`。根据`@EnableWebMvcSecurity`的注释：
+```text
+/**
+ * Add this annotation to an {@code @Configuration} class to have the Spring Security
+ * configuration integrate with Spring MVC.
+ *
+ * @deprecated Use EnableWebSecurity instead which will automatically add the * Spring MVC related Security items.
+ * @author Rob Winch
+ * @since 3.2
+ */
+```
+注解`@EnableWebSecurity`会自动添加与Spring MVC相关的安全事项。）
+
+（以下这段内容针对注解`@EnableWebMvcSecurity`）
+
+`@EnableWebMvcSecurity`注解还配置了一个Spring MVC参数解析解析器（argument resolver），这样的话处理器方法就能够通过带有`@AuthenticationPrincipal`注解的参数获得认证用户的principal（或username）。它同时还配置了一个bean，在使用Spring表单绑定标签库来定义表单时，这个bean会自动添加一个隐藏的跨站请求伪造（cross-site request forgery，CSRF）token输入域。
+
+我们可能希望指定Web安全的细节，这要通过重写`WebSecurityConfigurerAdapter`中的一个或多个方法来实现。我们可以通过重写`WebSecurityConfigurerAdapter`的三个`configure()`方法来配置Web安全性，这个过程中会使用传递进来的参数设置行为：
+
+- configure(WebSecurity)：通过重写，配置Spring Security的Filter链
+- configure(HttpSecurity)：通过重写，配置如何通过拦截器保护请求
+- configure(AuthenticationManagerBuilder)：通过重写，配置user-detail服务
+
+在`SecurityConfig`类中我们，我们没有用重写上述方法的任意一个，那么当前情况下，默认的方法如下：
+
+```java
+public void configure(WebSecurity web) throws Exception {}
+
+protected void configure(HttpSecurity http) throws Exception {
+    logger.debug("Using default configure(HttpSecurity). If subclassed this will potentially override subclass configure(HttpSecurity).");
+
+    http
+        .authorizeRequests()
+            .anyRequest().authenticated()
+            .and()
+        .formLogin().and()
+        .httpBasic();
+}
+
+protected void configure(AuthenticationManagerBuilder auth) throws Exception {
+    this.disableLocalConfigureAuthenticationBldr = true;
+}
+```
+
+这个简单的默认配置指定了该如何保护HTTP请求，以及客户端认证用户的方案。通过调用`authorizeRequests()`和`anyRequest().authenticated()`就会要求所有进入应用的HTTP请求都要进行认证。它也配置Spring Security支持基于表单的登录以及HTTP Basic方式的认证。
+
+**因为我们没有重写`configure(AuthenticationManagerBuilder)`方法，所以没有用户存储支撑认证过程。没有用户存储，实际上就等于没有用户。所以，在这里所有的请求都需要认证，但是没有人能够登录成功。**
+
+为了让Spring Security满足我们应用的需求，还需要再添加一点配置。具体来讲，我们需要：
+
+- 配置用户存储
+- 指定哪些请求需要认证，哪些请求不需要认证，以及所需要的权限
+- 提供一个自定义的登录页面，替代原来简单的默认登录页
+
+除了Spring Security的这些功能，我们可能还希望基于安全限制，有选择性地在Web视图上显示特定的内容。
+
+### 9.2 选择查询用户详细信息的服务
+
+我们所需要的是用户存储，也就是用户名、密码以及其他信息存储的地方，在进行认证决策的时候，会对其进行检索。
+
+Spring Security非常灵活，能够基于各种数据存储来认证用户。它内置了多种常见的用户存储场景，如内存、关系型数据库以及LDAP。
+
+借助Spring Security的Java配置，我们能够很容易地配置一个或多个数据存储方案。
+
+#### 9.2.1 使用基于内存的用户存储
+
+我们就从最简单的开始：在内存中维护用户存储。
+
+因为我们的安全配置类扩展了`WebSecurityConfigurerAdapter`，因此配置用户存储的最简单方式就是重写`configure(AuthenticationManagerBuilder)`方法。`AuthenticationManagerBuilder`有多个方法可以用来配置Spring Security对认证的支持。通过`inMemoryAuthentication()`
+方法，我们可以启用、配置并任意填充基于内存的用户存储。
+
+```java
+package spittr.config;
+
+
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+
+@Configuration
+@EnableWebSecurity // 启用Web安全性
+public class SecurityConfig extends WebSecurityConfigurerAdapter {
+
+    @Override
+    protected void configure(AuthenticationManagerBuilder auth) throws Exception {
+        auth.inMemoryAuthentication()
+            .withUser("user").password("password").roles("USER").and()
+            .withUser("admin").password("password").roles("USER", "ADMIN");
+    }
+    
+}
+```
+
+configure()方法中的`AuthenticationManagerBuilder`使用构造者（Builder设计模式）风格的接口来构建认证配置。通过简单地调用`inMemoryAuthentication()`就能启用内存用户存储。但是我们还需要有一些用户，否则的话，这和没有用户并没有什么区别。
+
+我们需要调用`withUser()`方法为内存用户存储添加新的用户，这个方法的参数是username。`withUser()`方法返回的是`UserDetailsBuilder`（这个类是`UserDetailsManagerConfigurer`类的一个内部类）对象，这个对象提供了多个进一步配置用户的方法，包括设置用户密码的`password()`方法以及为给定用户授予一个或多个角色权限的`role()`方法。
+
+上述代码中，我们添加了两个用户，“user”和“admin”，密码均为“password”。“user”用户具有角色“USER”，而“admin”用户具有“USER”和“ADMIN”两个角色。这里`and()`方法能够将多个用户的配置连接起来。
+
+`roles()`方法是`authorities()`方法的简写形式，二者有如下的对应关系：`builder.roles("USER","ADMIN");`等价于`builder.authorities("ROLE_USER","ROLE_ADMIN");`。
+
+根据`roles()`方法的注释，该方法所给定的值都会添加一个`ROLE_`前缀，并将其作为权限授予给用户。
+
+以下是配置用户详细信息的方法：
+
+方法 | 描述
+----- | -----
+`accountExpired(boolean)` | 定义账号是否已经过期
+`accountLocked(boolean)` | 定义账号是否已经锁定
+`and()` | 用来连接配置
+`authorities(GrantedAuthority...)` | 授予某个用户一项或多项权限
+`authorities(List<? extends GrantedAuthority>)` | 授予某个用户一项或多项权限
+`authorities(String...)` | 授予某个用户一项或多项权限
+`credentialsExpired(boolean)` | 定义凭证是否已经过期
+`disabled(boolean)` | 定义账号是否已被禁用
+`password(String)` | 定义用户的密码
+`roles(String...)` | 授予某个用户一项或多项角色
+
+对于调试和开发人员测试来讲，基于内存的用户存储是很有用的，但是对于生产级别的应用来讲，这就不是最理想的可选方案了。为了用于生产环境，通常最好将用户数据保存在某种类型的数据库之中。
+
+#### 9.2.2 基于数据库表进行认证
+
+用户数据通常会存储在关系型数据库中，并通过JDBC进行访问。为了配置Spring Security使用以JDBC为支撑的用户存储，我们可以使用`jdbcAuthentication()`方法：
+
+```java
+
+@Autowired
+private DataSource dataSource;
+
+@Override
+protected void configure(AuthenticationManagerBuilder auth) throws Exception {
+    auth.jdbcAuthentication().dataSource(dataSource);
+}
+```
+
+我们必须要配置的只是一个`DataSource`，这样的话，就能访问关系型数据库了。
+
+**重写默认的用户查询功能**
+
+尽管默认的最少配置能够让一切运转起来，但是它对我们的数据库模式有一些要求。它预期存在某些存储用户数据的表。更具体来说，下面的代码片段来源于Spring Security内部，这块代码展现了当查找用户信息时所执行的SQL查询语句：
+
+```java
+public static final String DEF_USERS_BY_USERNAME_QUERY =
+    "select username,password,enabled " +
+    "from users " +
+    "where username = ?";
+public static final String DEF_AUTHORITIES_BY_USERNAME_QUERY =
+    "select username,authority " +
+    "from authorities " +
+    "where username = ?";
+public static final String DEF_GROUP_AUTHORITIES_BY_USERNAME_QUERY =
+    "select g.id, g.group_name, ga.authority " +
+    "from groups g, group_members gm, group_authorities ga " +
+    "where gm.username = ? " +
+    "and g.id = ga.group_id " +
+    "and g.id = gm.group_id";
+```
+
+在第一个查询中，我们获取了用户的用户名、密码以及是否启用的信息，这些信息会用来进行用户认证。接下来的查询查找了用户所授予的权限，用来进行鉴权，最后一个查询中，查找了用户作为群组的成员所授予的权限。
+
+如果你能够在数据库中定义和填充满足这些查询的表，那么基本上就不需要你再做什么额外的事情了。但是，也有可能你的数据库与上面所述并不一致，那么你就会希望在查询上有更多的控制权。如果是这样的话，我们可以按照如下的方式配置自己的查询（基本上我们不会完全按照上述这种方式定义表）：
+
+```java
+@Override
+protected void configure(AuthenticationManagerBuilder auth) throws Exception {
+    auth.jdbcAuthentication()
+        .dataSource(dataSource)
+        .usersByUsernameQuery(
+            "select username, password, enabled from spitter where username=?"
+        ).authoritiesByUsernameQuery(
+            "select username, role from spitter where username=?"
+        );
+}
+```
+
+我们只重写了认证和基本权限的查询语句，但是通过调用`groupAuthoritiesByUsername()`方法，我们也能够将群组权限重写为自定义的查询语句。
+
+将默认的SQL查询替换为自定义的设计时，很重要的一点就是要**遵循查询的基本协议**。所有查询都**将用户名作为唯一的参数**。认证查询会选取用户名、密码以及启用状态信息。权限查询会选取零行或多行包含该用户名及其权限信息的数据。群组权限查询会选取零行或多行数据，每行数据中都会包含群组ID、群组名称以及权限。
+
+**使用转码后的密码**
+
+上面的认证查询会预期用户密码存储在了数据库之中。这里唯一的问题在于如果密码明文存储的话，会很容易受到黑客的窃取。但是，如果数据库中的密码进行了转码的话，那么认证就会失败，因为它与用户提交的明文密码并不匹配。
+
+为了解决这个问题，我们需要借助`passwordEncoder()`方法指定一个密码转码器：
+
+（原书中使用的是`StandardPasswordEncoder`，这个类已经被标记为`@Deprecated`，因为它被认为是不安全的，这里使用`Pbkdf2PasswordEncoder`。）
+
+```java
+@Override
+protected void configure(AuthenticationManagerBuilder auth) throws Exception {
+    auth.jdbcAuthentication()
+        .dataSource(dataSource)
+        .usersByUsernameQuery(
+            "select username, password, enabled from spitter where username=?"
+        ).authoritiesByUsernameQuery(
+            "select username, role from spitter where username=?"
+        ).passwordEncoder(new Pbkdf2PasswordEncoder("53cr3t"));
+}
+```
+
+`passwordEncoder()`方法可以接受Spring Security中`PasswordEncoder`接口的任意实现。Spring Security（版本4.2.7）的加密模块包含以下实现：
+
+- 可以正常使用的：
+    + BCryptPasswordEncoder
+    + DelegatingPasswordEncoder
+    + Pbkdf2PasswordEncoder
+    + SCryptPasswordEncoder
+- 已被标注为`@Deprecated`：
+    + LdapShaPasswordEncoder
+    + Md4PasswordEncoder
+    + MessageDigestPasswordEncoder
+    + NoOpPasswordEncoder
+    + StandardPasswordEncoder
+
+如果内置的实现无法满足我们的需求，那么我们也可以自定义一个实现，也就是实现`PasswordEncoder`接口：
+
+```java
+public interface PasswordEncoder {
+
+    /**
+     * Encode the raw password. Generally, a good encoding algorithm applies a SHA-1 or
+     * greater hash combined with an 8-byte or greater randomly generated salt.
+     */
+    String encode(CharSequence rawPassword);
+
+    /**
+     * Verify the encoded password obtained from storage matches the submitted raw
+     * password after it too is encoded. Returns true if the passwords match, false if
+     * they do not. The stored password itself is never decoded.
+     *
+     * @param rawPassword the raw password to encode and match
+     * @param encodedPassword the encoded password from storage to compare with
+     * @return true if the raw password, after encoding, matches the encoded password from
+     * storage
+     */
+    boolean matches(CharSequence rawPassword, String encodedPassword);
+
+}
+```
+
+不管你使用哪一个密码转码器，都需要理解的一点是，数据库中的密码是永远不会解码的。所采取的策略与之相反，用户在登录时输入的密码会按照相同的算法进行转码，然后再与数据库中已经转码过的密码进行对比。这个对比是在`PasswordEncoder`的`matches()`方法中进行的。
+
+#### 9.2.3 基于LDAP进行认证
+
+为了让Spring Security使用基于LDAP的认证，我们可以使用`ldapAuthentication()`方法。这个方法在功能上类似于`jdbcAuthentication()`，只不过是LDAP版本。如下的configure()方法展现了LDAP认证的简单配置：
+
+```java
+@Override
+protected void configure(AuthenticationManagerBuilder auth) throws Exception {
+    auth.ldapAuthentication()
+        .userSearchFilter("(uid={0})")
+        .groupSearchFilter("member={0}");
+}
+```
+    
+方法`userSearchFilter()`和`groupSearchFilter()`用来为基础LDAP查询提供过滤条件，它们分别用于搜索用户和组。默认情况下，对于用户和组的基础查询都是空的，也就是表明搜索会在LDAP层级结构的根开始。但是我们可以通过指定查询基础来改变这个默认行为：
+
+```java
+@Override
+protected void configure(AuthenticationManagerBuilder auth) throws Exception {
+    auth.ldapAuthentication()
+        .userSearchBase("ou=people")
+        .userSearchFilter("(uid={0})")
+        .groupSearchBase("ou=groups")
+        .groupSearchFilter("member={0}");
+}
+```
+
+`userSearchBase()`属性为查找用户提供了基础查询。同样，`groupSearchBase()`为查找组指定了基础查询。我们声明用户应该在名为people的组织单元下搜索而不是从根开始。而组应该在名为groups的组织单元下搜索。
+
+**配置密码比对**
+
+基于LDAP进行认证的默认策略是进行绑定操作，直接通过LDAP服务器认证用户。另一种可选的方式是进行比对操作。这涉及将输入的密码发送到LDAP目录上，并要求服务器将这个密码和用户的密码进行比对。因为比对是在LDAP服务器内完成的，实际的密码能保持私密。
+
+如果希望通过密码比对进行认证，可以通过`passwordCompare()`方法来实现：
+
+```java
+@Override
+protected void configure(AuthenticationManagerBuilder auth) throws Exception {
+    auth.ldapAuthentication()
+        .userSearchBase("ou=people")
+        .userSearchFilter("(uid={0})")
+        .groupSearchBase("ou=groups")
+        .groupSearchFilter("member={0}")
+        .passwordCompare();
+}
+```
+
+默认情况下，在登录表单中提供的密码将会与用户的LDAP条目中的`userPassword`属性进行比对。如果密码被保存在不同的属性中，可以通过`passwordAttribute()`方法来声明密码属性的名称：
+
+（注意`passwordEncoder(new Md5PasswordEncoder())`中，`Md5PasswordEncoder`类实现的接口`org.springframework.security.authentication.encoding.PasswordEncoder`已经被标注为`@Deprecated`。）
+
+```java
+@Override
+protected void configure(AuthenticationManagerBuilder auth) throws Exception {
+    auth.ldapAuthentication()
+        .userSearchBase("ou=people")
+        .userSearchFilter("(uid={0})")
+        .groupSearchBase("ou=groups")
+        .groupSearchFilter("member={0}")
+        .passwordCompare()
+        .passwordEncoder(new Md5PasswordEncoder())
+        .passwordAttribute("passcode");
+}
+```
+
+在本例中，我们指定了要与给定密码进行比对的是“passcode”属性。另外，我们还可以指定密码转码器。在进行服务器端密码比对时，有一点非常好，那就是实际的密码在服务器端是私密的。但是进行尝试的密码还是需要通过线路传输到LDAP服务器上，这可能会被黑客所拦截。为了避免这一点，我们可以通过调用`passwordEncoder()`方法指定加密策略。上述代码使用了MD5加密，，密码会进行MD5加密。这需要LDAP服务器上密码也使用MD5加密。
+
+**引用远程的LDAP服务器**
+
+到目前为止，我们忽略的一件事就是LDAP和实际的数据在哪里。
+
+默认情况下，Spring Security的LDAP认证假设LDAP服务器监听本机的33389端口。但是，如果你的LDAP服务器在另一台机器上，那么可以使用`contextSource()`方法来配置这个地址：
+
+```java
+@Override
+protected void configure(AuthenticationManagerBuilder auth) throws Exception {
+    auth.ldapAuthentication()
+        .userSearchBase("ou=people")
+        .userSearchFilter("(uid={0})")
+        .groupSearchBase("ou=groups")
+        .groupSearchFilter("member={0}")
+        .contextSource()
+        .url("ldap://habuma.com:389/dc=habuma,dc=com");
+}
+```
+
+`contextSource()`方法会返回一个`ContextSourceBuilder`对象，这个对象除了其他功能以外，还提供了`url()`方法用来指定LDAP服务器的地址。
+
+**配置嵌入式的LDAP服务器**
+
+如果我们没有现成的LDAP服务器供认证使用，Spring Security还为我们提供了嵌入式的LDAP服务器。我们不再需要设置远程LDAP服务器的URL，只需通过`root()`方法指定嵌入式服务器的根前缀就可以了：
+
+```java
+@Override
+protected void configure(AuthenticationManagerBuilder auth) throws Exception {
+    auth.ldapAuthentication()
+        .userSearchBase("ou=people")
+        .userSearchFilter("(uid={0})")
+        .groupSearchBase("ou=groups")
+        .groupSearchFilter("member={0}")
+        .contextSource()
+        .root("dc=habuma,dc=com");
+}
+```
+
+当LDAP服务器启动时，它会尝试在类路径下寻找LDIF文件来加载数据。LDIF（LDAP Data Interchange Format，LDAP数据交换格式）是以文本文件展现LDAP数据的标准方式。每条记录可以有一行或多行，每项包含一个名值对。记录之间通过空行进行分割。
+
+当然我们也可以显式指定要加载的LDIF文件：
+
+```java
+@Override
+protected void configure(AuthenticationManagerBuilder auth) throws Exception {
+    auth.ldapAuthentication()
+        .userSearchBase("ou=people")
+        .userSearchFilter("(uid={0})")
+        .groupSearchBase("ou=groups")
+        .groupSearchFilter("member={0}")
+        .contextSource()
+        .root("dc=habuma,dc=com")
+        .ldif("classpath:users.ldif");
+}
+```
+
+在这里，我们明确要求LDAP服务器从类路径根目录下的users.ldif文件中加载内容
+
+如下就是一个包含用户数据的LDIF文件：
+
+```text
+dn: ou=groups,dc=habuma,dc=com
+objectclass: top
+objectclass: organizationalUnit
+ou: groups
+dn: ou=people,dc=habuma,dc=com
+objectclass: top
+objectclass: organizationalUnit
+ou: people
+dn: uid=habuma,ou=people,dc=habuma,dc=com
+objectclass: top
+objectclass: person
+objectclass: organizationalPerson
+objectclass: inetOrgPerson
+cn: Craig Walls
+sn: Walls
+uid: habuma
+userPassword: password
+dn: uid=jsmith,ou=people,dc=habuma,dc=com
+objectclass: top
+objectclass: person
+objectclass: organizationalPerson
+objectclass: inetOrgPerson
+cn: John Smith
+sn: Smith
+uid: jsmith
+userPassword: password
+dn: cn=spittr,ou=groups,dc=habuma,dc=com
+objectclass: top
+objectclass: groupOfNames
+cn: spittr
+member: uid=habuma,ou=people,dc=habuma,dc=com
+```
+
+Spring Security内置的用户存储非常便利，并且涵盖了最为常用的用户场景。但是，如果你的认证需求不是那么通用的话，那么就需要创建并配置自定义的用户详细信息服务了。
+
+#### 9.2.4 配置自定义的用户服务
+
+假设我们需要认证的用户存储在非关系型数据库中，如Mongo或Neo4j，在这种情况下，我们需要提供一个自定义的`org.springframework.security.core.userdetails.UserDetailsService`实现。这个接口非常简单：
+
+```java
+public interface UserDetailsService {
+    UserDetails loadUserByUsername(String username) throws UsernameNotFoundException;
+}
+```
+
+我们所需要做的就是实现`loadUserByUsername()`方法，根据给定的用户名来查找用户。`loadUserByUsername()`方法会返回代表给定用户的`UserDetails`对象。
+
+示例如下：
+
+```java
+public class SpitterUserService implements UserDetailsService {
+
+    private final SpitterRepository spitterRepository;
+
+    // 诸如SpitterRepository
+    public SpitterUserService(SpitterRepository spitterRepository) {
+        this.spitterRepository = spitterRepository;
+    }
+
+    @Override
+    public UserDetails loadUserByUsername(String username) throws  UsernameNotFoundException {
+
+        // 查找Spitter
+        Spitter spitter = spitterRepository.findByUsername(username);
+
+        if (spitter != null) {
+            List<GrantedAuthority> authorities = new ArrayList<>();
+            // 创建权限列表
+            authorities.add(new SimpleGrantedAuthority("ROLE_SPITTER"));
+            // 返回User
+            return new User(spitter.getUsername(), spitter.getPassword(), authorities);
+        }
+        throw new UsernameNotFoundException("User '" + username + "' not found.");
+    }
+}
+```
+
+`SpitterUserService`有意思的地方在于它并不知道用户数据存储在什么地方。设置进来的`SpitterRepository`能够从关系型数据库、文档数据库或图数据中查找Spitter对象，甚至可以伪造一个。`SpitterUserService`不知道也不会关心底层所使用的数据存储。它只是获得`Spitter`对象，并使用它来创建`User`对象。
+
+为了使用`SpitterUserService`来认证用户，我们可以通过`userDetailsService()`方法将其设置到安全配置中：
+
+```java
+@Autowired
+private SpitterRepository spitterRepository;
+
+@Override
+protected void configure(AuthenticationManagerBuilder auth) {
+    auth.userDetailsService(new SpitterUserService(spitterRepository);)
+}
+```
+
+`userDetailsService()`方法（类似于`jdbcAuthentication()`、`ldapAuthentication()`以及`inMemoryAuthentication()`）会配置一个用户存储。不过，这里所使用的不是Spring所提供的用户存储，而是使用`UserDetailsService`的实现。
+
+另一张方案就是修改`Spitter`类，让其实现`UserDetails`接口，这样`loadUserByUsername()`就能直接返回`Spiter`对象，而不必再将它的值复制到`User`对象中。
+
+### 9.3 拦截请求
+
+在任何应用中，并不是所有的请求都需要同等程度地保护。有些请求需要认证，而另一些可能并不需要。有些请求可能只有具备特定权限的用户才能访问，没有这些权限的用户会无法访问。
+
+考虑Spittr应用的请求。首页当然是公开的，不需要进行保护。类似地，因为所有的Spittle都是公开的，所以展现Spittle的页面不需要安全性。但是，创建Spittle的请求只有认证用户才能执行。同样，尽管用户基本信息页面是公开的，不需要认证，但是，如果要处理“/spitter/me”请求，并展现当前用户的基本信息时，那么就需要进行认证，从而确定要展现谁的信息。
+
+对每个请求进行细粒度安全性控制的关键在于重写`configure(HttpSecurity)`方法
+
+示例如下：
+
+```java
+@Override
+protected void configure(HttpSecurity http) throws Exception {
+    http.authorizeRequests()
+        .antMatchers("/spitter/me").authenticated()
+        .antMatchers(HttpMethod.POST, "/spittles").authenticated()
+        .anyRequest().permitAll();
+
+}
+```
+
+`configure()`方法中得到的`HttpSecurity`对象可以在多个方面配置HTTP的安全性。在这里，我们首先调用`authorizeRequests()`，然后调用该方法所返回的对象的方法来配置请求级别的安全性细节。其中，第一次调用`antMatchers()`指定了对“/spitter/me”路径的请求需要进行认证。第二次调用`antMatchers()`更为具体，说明对“/spittles”路径的HTTP POST请求必须要经过认证。最后对anyRequests()的调用中，说明其他所有的请求都是允许的，不需要认证和任何的权限。
+
+在`antMatchers()`方法中设定的路径支持Ant风格的通配符：
+
+```java
+.antMatchers("/spitter/**").authenticated();
+```
+
+也可以在一个`antMatchers()`方法中指定多个路径：
+
+```java
+.antMatchers("/spitter/**", "/spittles/mine").quthenticated();
+```
+
+我们也可以使用`regexMatchers()`来代替`antMatchers()`：
+
+```java
+.regexMatchers("/spitter/.*").authenticated();
+```
+
+上述代码与`.antMatchers("/spitter/**").authenticated()`效果是相同的。
+
+除了路径选择，我们还通过`authenticated()`和`permitAll()`来定义该如何保护路径。`authenticated()`要求在执行该请求时，必须已经登录了应用。如果用户没有认证的话，Spring Security的Filter将会捕获该请求，并将用户重定向到应用的登录页面。同时，`permitAll()`方法允许请求没有任何的安全限制。
+
+除了`authenticated()`和`permitAll()`以外，还有其他的一些方法能够用来定义该如何保护请求，如下所示：
+
+方法 | 能够做什么
+-----|-----
+`access(String)` | 如果给定的SpEL表达式计算结果为true，就允许访问
+`anonymous()` | 允许匿名用户访问
+`authenticated()` | 允许认证过的用户访问
+`denyAll()` | 无条件拒绝所有访问
+`fullyAuthenticated()` | 如果用户是完整认证的话（不是通过Remember-me功能认证的），就允许访问
+`hasAnyAuthority(String...)` | 如果用户具备给定权限中的某一个的话，就允许访问
+`hasAnyRole(String...)` | 如果用户具备给定角色中的某一个的话，就允许访问
+`hasAuthority(String)` | 如果用户具备给定权限的话，就允许访问
+`hasIpAddress(String)` | 如果请求来自给定IP地址的话，就允许访问
+`hasRole(String)` | 如果用户具备给定角色的话，就允许访问
+`not()` | 对其他访问方法的结果求反
+`permitAll()` | 无条件允许访问
+`rememberMe()` | 如果用户是通过Remember-me功能认证的，就允许访问
+
+通过上述方法，我们所配置的安全性能够不仅仅限于认证用户。例如我们可以要求用户不仅需要认证，还需要具备`ROLE_SPITTER`权限：
+
+```java
+@Override
+protected void configure(HttpSecurity http) throws Exception {
+    http.authorizeRequests()
+        .antMatchers("/spitter/me").hasAuthority("ROLE_SPITTER")
+        .antMatchers(HttpMethod.POST, "/spittles").hasAuthority("ROLE_SPITTER")
+        .anyRequest().permitAll();
+
+}
+```
+
+作为替代方案，我们还可以使用`hasRole()`方法，他会自动使用“ROLE_”前缀：
+
+```java
+@Override
+protected void configure(HttpSecurity http) throws Exception {
+    http.authorizeRequests()
+        .antMatchers("/spitter/me").hasRole("SPITTER")
+        .antMatchers(HttpMethod.POST, "/spittles").hasRole("SPITTER")
+        .anyRequest().permitAll();
+
+}
+```
+
+#### 9.3.1 使用Spring表达式进行安全保护
+
+上一节中表内的大多数方法都是一维的，也就是我们可以使用`hasRole()`限制某个特定的角色，但是我们不能在相同的路径上同时通过`hasIpAddress()`限制特定的IP地址。
+
+除了表9.4定义的方法以外，我们没有办法使用其他的条件。如果我们希望限制某个角色只能在星期二进行访问的话，该怎么办呢？
+
+借助`access()`方法，我们可以将SpEL表达式作为生命访问限制的一种方式。例如，如下就是使用SpEL表达式来声明具有“SPITTER”角色才能访问“/spitter/me”：
+
+```java
+.antMatchers("/spitter/me").access("hasRole('SPITTER')")
+```
+
+让SpEL更强大的原因在于，`hasRole()`仅是Spring支持的安全相关表达式中的一种，下表列出了Spring Security支持的所有SpEL表达式：
+
+表达式 | 计算结果
+-----|-----
+`authentication` | 用户的认证对象
+`denyAll` | 结果始终为false
+`hasAnyRole(list of roles)` | 如果用户被授予了列表中任意的指定角色，结果为true
+`hasRole(role)` | 如果用户被授予了指定的角色，结果为true
+`hasIpAddress(IP Address)` | 如果请求来自指定IP的话，结果为true
+`isAnonymous()` | 如果当前用户为匿名用户，结果为true
+`isAuthenticated()` | 如果当前用户进行了认证的话，结果为true
+`isFullyAuthenticated()` | 如果当前用户进行了完整认证的话（不是通过Remember-me功能进行的认证），结果为true
+`isRememberMe()` | 如果当前用户是通过Remember-me自动认证的，结果为true
+`permitAll` | 结果始终为true
+`principal` | 用户的principal对象
+
+使用SpEL表达式后，我们就能够不再局限于基于用户的权限进行访问限制了。例如，如果我们希望限制“/spitter/me”的访问，不仅需要“ROLE_SPITTER”，还需要来自指定的IP地址，那么我们可以这样做：
+
+```java
+.antMatchers("/spitter/me")
+    .access("hasRole('SPITTER') and hasIpAddress('192.168.1.2')")
+```
+
+我们可以使用SpEL实现各种各样的安全性限制。除此之外，Spring Security拦截请求还有另外一种方式：强制通道的安全性。
+
+#### 9.3.2 强制通道的安全性
+
+使用HTTP提交数据是一件具有风险的事情。如果使用HTTP发送无关紧要的信息，这可能不是什么大问题。但是如果你通过HTTP发送诸如密码和信用卡号这样的敏感信息的话，那你就是在找麻烦了。通过HTTP发送的数据没有经过加密，黑客就有机会拦截请求并且能够看到他们想看的数据。这就是为什么敏感信息要通过HTTPS来加密发送的原因。
+
+使用HTTPS似乎很简单。你要做的事情只是在URL中的HTTP后加上一个字母“s”就可以了。通过添加“s”我们就能很容易地实现页面的安全性，但是忘记添加“s”同样也是很容易出现的。如果我们的应用中有多个链接需要HTTPS，估计在其中的一两个上忘记添加“s”的概率还是很高的。另一方面，你可能还会在原本并不需要HTTPS的地方，误用HTTPS。
+
+传递到`configure()`方法中的`HttpSecurity`对象，除了具有`authorizeRequests()`方法以外，还有一个`requiresChannel()`方法，借助这个方法能够为各种URL模式声明所要求的通道。
+
+考虑Spittr应用，尽管这个应用不需要新用卡号不需要信用卡号、社会保障号或其他特别敏感的信息，但用户有可能仍然希望信息是私密的。为了保证注册表单的数据通过HTTPS传送，我们可以在配置中添加`requiresChannel()`方法，如下所示：
+
+```java
+@Override
+protected void configure(HttpSecurity http) throws Exception {
+    http.authorizeRequests()
+        .antMatchers("/spitter/me").hasRole("SPITTER")
+        .antMatchers(HttpMethod.POST, "/spittles").hasRole("SPITTER")
+        .anyRequest().permitAll()
+        .and()
+        .requiresChannel()
+        .antMatchers("/spitter/form").requiresSecure();
+
+}
+```
+
+不论何时，只要是对“/spitter/form”的请求，Spring Security都视为需要安全通道（通过调用`requiresChannel()`确定的）并自动将请求重定向到HTTPS上。
+
+与之相反，有些页面并不需要通过HTTPS传送。例如，首页不包含任何敏感信息，因此并不需要通过HTTPS传送。我们可以使用`requiresInsecure()`代替`requiresSecure()`方法，将首页声明为始终通过HTTP传送：
+
+```java
+.antMatchers("/").requiresInsecure()
+```
+
+如果通过HTTPS发送了对“/”的请求，Spring Security将会把请求重定向到不安全的HTTP通道上。
+
+#### 9.3.3 防止跨站请求伪造
+
+当一个POST请求提交到“/spittles”上时，`SpittleController`将会为用户创建一个新的Spittle对象。代码如下：
+
+```java
+@Controller
+@RequestMapping("/spittles")
+public class SpittleController {
+
+    private SpittleRepository spittleRepository;
+
+    @Autowired
+    public SpittleController(SpittleRepository spittleRepository) {
+        this.spittleRepository = spittleRepository;
+    }
+
+    // ...
+
+    @RequestMapping(method = RequestMethod.POST)
+    public String saveSpittle(SpittleForm form, Model model) throws Exception {
+        spittleRepository
+                .save(new Spittle(null, form.getMessage(), new Date(), form.getLongitude(), form.getLatitude()));
+        return "redirect:/spittles";
+    }
+}
+```
+
+是，如果这个POST请求来源于其他站点的话，会怎么样呢？
+
+例如我们有如下表单：
+
+```html
+<form method="POST" action="http://www.spittr.com/spittles">
+    <input type="hidden" name="message" value="I'm stupid!" />
+    <input type="submit" value="Click here to win a new car!" />
+</form>
+```
+
+假设我们点击了按钮，那么你将会提交表单到如下地址http://www.spittr.com/spittles。如果你已经登录到了spittr.com，那么这就会广播一条消息，让每个人都知道你做了一件蠢事。
+
+这是跨站请求伪造（cross-site request forgery，CSRF）的一个简单样例。
+
+简单来讲，如果一个站点欺骗用户提交请求到其他服务器的话，就会发生CSRF攻击，这可能会带来消极的后果。
+
+从Spring Security 3.2开始，默认就会启用CSRF防护。实际上，除非你采取行为处理CSRF防护或者将这个功能禁用，否则的话，在应用中提交表单时，你可能会遇到问题。
+
+Spring Security通过一个同步token的方式来实现CSRF防护的功能。它将会拦截状态变化的请求（例如，非GET、HEAD、OPTIONS和TRACE的请求）并检查CSRF token。如果请求中不包含CSRF token的话，或者token不能与服务器端的token相匹配，请求将会失败，并抛出CsrfException异常。
+
+这意味着在你的应用中，所有的表单必须在一个“_csrf”域中提交token，而且这个token必须要与服务器端计算并存储的token一致，这样的话当表单提交的时候，才能进行匹配。
+
+好消息是，Spring Security已经简化了将token放到请求的属性中这一任务。
+
+假如我们使用Thymeleaf作为页面模板，只要在`<form>`元素的`action`属性前添加Thymeleaf命名空间前缀即可，那么它会自动生成一个“_csrf”隐藏域：
+
+```html
+<form method="POST" th:action="@{/spittes}">
+
+</form>
+```
+
+如果使用JSP作为页面模板的话，我们要做的事情如下：
+
+```html
+<input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+```
+
+如果我们使用Spring的表单绑定标签的话，`<sf:form>`标签会自动为我们添加隐藏的CSRF token标签。
+
+当然我们也可以禁用Spring Security的CSRF防护功能：
+
+```java
+@Override
+protected void configure(HttpSecurity http) throws Exception {
+    http
+        // ...
+        .csrf().disable();
+}
+```
+
+禁用CSRF防护通常来说不是一个好主意。
+
+由于CSRF防护是默认开启的，所以如果我们及不配置也不禁用，那么实际上我们根本无法访问应用。
+
+### 9.4 认证用户
+
+如果我们使用上一节中最简单的Spring Security配置的话，那么就能无偿地得到一个登录页。实际上，在重写`configure(HttpSecurity)`之前，我们都能使用一个简单却功能完备的登录页。但是，一旦重写了`configure(HttpSecurity`)方法，就失去了这个简单的登录页面。
+
+不过，把这个功能找回来也很容易。我们所需要做的就是在`configure(HttpSecurity)`方法中，调用`formLogin()`。
+
+```java
+@Override
+protected void configure(HttpSecurity http) throws Exception {
+    http.formLogin()
+        .and()
+            .authorizeRequests()
+                .antMatchers("/spitter/me").hasRole("SPITTER")
+                .antMatchers(HttpMethod.POST, "/spittles").hasRole("SPITTER")
+                .anyRequest().permitAll()
+        .and()
+            .requiresChannel()
+                .antMatchers("/spitter/form").requiresSecure();
+}
+```
+
+但这个默认的登录页十分简陋，我们需要添加自定义登录页面。
+
+#### 9.4.1 添加自定义的登录页
+
+创建自定义登录页的第一步就是了解登录表单中都需要些什么。
+
+以下是一个以Thymeleaf为模板的login页面：
+
+```html
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="UTF-8">
+<title>Spittr</title>
+<link rel="stylesheet" type="text/css" th:href="@{/resources/style.css}">
+<link>
+</head>
+<body>
+    <a th:href="@{/spitter/register}">Register</a>
+    <form th:action="@{/login}" method="POST">
+        <table>
+            <tr>
+                <td>User:</td>
+                <td>
+                    <input type="text" name="username" value="" />
+                </td>
+            </tr>
+            <tr>
+                <td>Password:</td>
+                <td>
+                    <input type="password" name="password" />
+                </td>
+            </tr>
+            <tr>
+                <td colspan="2">
+                    <input id="remember_me" name="remember-me" type="checkbox" />
+                    <label for="remember_me" class="inline">Remember me</label>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="2">
+                    <input name="submit" type="submit" value="Login" />
+                </td>
+            </tr>
+        </table>
+    </form>
+</body>
+</html>
+```
+
+这个页面包含了username和password输入域，并提交到“/login”上。因为这是一个Thymeleaf模板，因此隐藏的“_csrf”域将会自动添加到表单中。
+
+#### 9.4.2 启用HTTP Basic认证
+
+对于应用程序的人类用户来说，基于表单的认证是比较理想的。但是在第16章中，将会看到如何将我们Web应用的页面转化为RESTful API。当应用程序的使用者是另外一个应用程序的话，使用表单来提示登录的方式就不太适合了。
+
+HTTP Basic认证（HTTP Basic Authentication）会直接通过HTTP请求本身，对要访问应用程序的用户进行认证。
+
+但这只是Web浏览器的显示方式。本质上，这是一个HTTP 401响应，表明必须要在请求中包含一个用户名和密码。在REST客户端向它使用的服务进行认证的场景中，这种方式比较适合。
+
+如果要启用HTTP Basic认证的话，只需在`configure()`方法所传入的`HttpSecurity`对象上调用`httpBasic()`即可。另外，还可以通过调用`realmName()`方法指定域。如下是在Spring Security中启用HTTP Basic认证的典型配置：
+
+```java
+@Override
+protected void configure(HttpSecurity http) throws Exception {
+    http.formLogin().loginPage("/login")
+        .and()
+           .httpBasic().realmName("Spittr")
+        .and()
+        // ...
+}
+```
+
+在`httpBasic()`方法中，并没有太多的可配置项，甚至不需要什么额外配置。HTTP Basic认证要么开启要么关闭。
+
+#### 9.4.3 启用Remember-me功能
+
+对于应用程序来讲，能够对用户进行认证是非常重要的。但是站在用户的角度来讲，如果应用程序不用每次都提示他们登录是更好的。这就是为什么许多站点提供了Remember-me功能，你只要登录过一次，应用就会记住你，当再次回到应用的时候你就不需要登录了。
+
+Spring Security使得为应用添加Remember-me功能变得非常容易。为了启用这项功能，只需在configure()方法所传入的`HttpSecurity`对象上调用`rememberMe()`即可。
+
+```java
+@Override
+protected void configure(HttpSecurity http) throws Exception {
+    http.formLogin().loginPage("/login")
+        .and()
+           .httpBasic().realmName("Spittr")
+        .and()
+            .rememberMe()
+                .tokenValiditySeconds(2419200)
+                .key("spitterKey")
+        // ...
+}
+```
+
+默认情况下，这个功能是通过在cookie中存储一个token完成的，这个token最多两周内有效。但是，在这里，我们指定这个token最多四周内有效（2,419,200秒）。
+
+存储在cookie中的token包含用户名、密码、过期时间和一个私钥——在写入cookie前都进行了MD5哈希。默认情况下，私钥的名为SpringSecured，但在这里我们将其设置为spitterKey，使它专门用于Spittr应用。
+
+如此简单。既然Remember-me功能已经启用，我们需要有一种方式来让用户表明他们希望应用程序能够记住他们。为了实现这一点，登录请求必须包含一个名为remember-me的参数。在登录表单中，增加一个简单复选框就可以完成这件事情：
+
+```html
+<tr>
+    <td colspan="2">
+        <input id="remember_me" name="remember-me" type="checkbox" />
+        <label for="remember_me" class="inline">Remember me</label>
+    </td>
+</tr>
+```
+
+在应用中，与登录同等重要的功能就是退出。如果你启用Remember-me功能的话，更是如此，否则的话，用户将永远登录在这个系统中。我们下面将看一下如何添加退出功能。
+
+#### 9.4.4 退出
+
+事实上，按照我们的配置，退出功能已经启用了，不需要再做其他的配置了。我们需要的只是一个使用该功能的链接。
+
+退出功能是通过Servlet容器中的Filter实现的（默认情况下），这个Filter会拦截针对“/logout”的请求。因此，为应用添加退出功能只需添加如下的链接即可（如下以Thymeleaf代码片段的形式进行了展现）：
+
+```html
+<a th:href="@{/logout}">Logout</a>
+```
+
+当用户点击这个链接的时候，会发起对“/logout”的请求，这个请求会被Spring Security的`LogoutFilter`所处理。用户会退出应用，所有的Remember-me token都会被清除掉。在退出完成后，用户浏览器将会重定向到“/login?logout”，从而允许用户进行再次登录。
+
+当然，我们可以配置使其被重定向到其他页面，例如应用首页：
+
+```java
+@Override
+protected void configure(HttpSecurity http) throws Exception {
+    http.formLogin()
+            .loginPage("/login")
+        .and()
+            .logout()
+                .logoutSuccessUrl("/")
+        // ...
+}
+```
+
+我们还可以重写默认的`LogoutFilter`拦截路径：
+
+```java
+@Override
+protected void configure(HttpSecurity http) throws Exception {
+    http.formLogin()
+            .loginPage("/login")
+        .and()
+            .logout()
+                .logoutUrl("/signout")
+                .logoutSuccessUrl("/")
+        // ...
+}
+```
+
+到目前为止，我们已经看到了如何在发起请求的时候保护Web应用。这假设安全性主要涉及阻止用户访问没有权限的URL。但是，如果我们能够不给用户显示其无权访问的连接，那么这也是一个很好的思路。接下来，我们将会看一下如何添加视图级别的安全性。
+
+### 9.5 保护视图
+
+当为浏览器渲染HTML内容时，你可能希望视图中能够反映安全限制和相关的信息。一个简单的样例就是渲染用户的基本信息（比如显示“您已经以……身份登录”）。或者你想根据用户被授予了什么权限，有条件地渲染特定的视图元素。
+
+我们看到了在Spring MVC应用中渲染视图的两个最重要的可选方案：JSP和Thymeleaf。不管你使用哪种方案，都有办法在视图上实现安全性。Spring Security本身提供了一个JSP标签库，而Thymeleaf通过特定的方言实现了与Spring Security的集成。
+
+#### 9.5.1 使用Spring Security的JSP标签库
+
+Spring Security的JSP标签库很小，只包含三个标签：
+
+JSP标签 | 作用
+-----|-----
+`<security:accesscontrollist>` | 如果用户通过访问控制列表授予了指定的权限，那么渲染该标签体中的内容
+`<security:authentication>` | 渲染当前用户认证对象的详细信息
+`<security:authorize>` | 如果用户被授予了特定的权限或者SpEL表达式的计算结果为true，那么渲染该标签体中的内容
+
+为了使用上述标签，我们需要在对应的JSP中声明：
+
+```jsp
+<%@ taglib prefix="security" uri="http://www.springframework.org/security/tags" %>
+```
+
+**访问认证信息的细节**
+
+借助Spring Security JSP标签库，所能做到的最简单的一件事情就是便利地访问用户的认证信息。例如，对于Web站点来讲，在页面顶部以用户名标示显示“欢迎”或“您好”信息是很常见的。这恰恰是`<security:authentication>`能为我们所做的事情。
+
+示例：
+
+```jsp
+Hello <security:authentication property="principal.username" />
+```
+
+其中，property用来标示用户认证对象的一个属性。可用的属性取决于用户认证的方式。但是，我们可以依赖几个通用的属性，在不同的认证方式下，它们都是可用的：
+
+使用`<security:authentication>`标签来访问用户的认证详情：
+
+认证属性 | 描述
+-----|-----
+`authorities` | 一组用于表示用户所授予权限的`GrantedAuthority`对象
+`credentials` | 用于核实用户的凭证（通常，这会是用户的密码）
+`details` | 认证的附加信息（IP地址、证件序列号、会话ID等）
+`principal` | 用户的基本信息对象
+
+在上述示例中，实际上渲染的是`principal`属性中嵌套`username`属性。
+
+当像前面示例那样使用时，`<security:authentication>`将在视图中渲染属性的值。但是如果你愿意将其赋值给一个变量，那只需要在`var`属性中指明变量的名字即可。例如，如下展现了如何将其设置给名为loginId的属性：
+
+```jsp
+<security:authentication property="principal.username" var="loginId" />
+```
+
+这个变量默认是定义在页面作用域内的。但是我们可以使用`scope`属性来声明这个变量的作用域：
+
+```jsp
+<security:authentication property="principal.username" var="loginId" scope="request" />
+```
+
+**条件性的渲染内容**
+
+有时候视图上的一部分内容需要根据用户被授予了什么权限来确定是否渲染。对于已经登录的用户显示登录表单，或者对还未登录的用户显示个性化的问候信息都是毫无意义的。
+
+Spring Security的`<security:authorize>`JSP标签能够根据用户被授予的权限有条件地渲染页面的部分内容。例如，在Spittr应用中，对于没有`ROLE_SPITTER`角色的用户，我们不会为其显示添加新Spitter记录的表单。
+
+```jsp
+<%@ taglib uri="http://www.springframework.org/tags/form" prefix="sf" %>
+<%@ taglib uri="http://www.springframework.org/tags" prefix="s"%>
+<%@ taglib uri="http://www.springframework.org/security/tags" prefix="security"%>
+<security:authorize access="hasRole('SPITTER')">
+    <s:url value="/spittles" var="spittle_url"/>
+    <sf:form modelAttribute="spittle" action="${spittle_url}">
+        <sf:label path="text">
+            <s:message code="label.spittle" text="Enter spittle:"/>
+        </sf:label>
+        <sf:textarea path="text" rows="2" cols="40" />
+        <sf:errors path="text" />
+        <br />
+        <div class="spitItSubmitIt">
+            <input type="submit" value="Spit it!" 
+                class="status-btn round-btn disabled" />
+        </div>
+    </sf:form>
+</security:authorize>
+```
+
+这里`access`属性被赋值为一个SpEL表达式，这个表达式的值将确定`<sec:authorize>`标签主体的内容是否渲染。这里我们使用`hasRole('SPITTER')`来确保用户具有`SPITTER`角色。事实上，当使用`access`属性时，我们可以任意发挥SpEL的强大威力。
+
+借助于这些可用的表达式，可以构造出非常有意思的安全性约束。例如，假设应用中有一些管理功能只能对用户名为habuma的用户可用：
+
+```jsp
+<security:authorize access="isAuthenticated() and principal.username=='habuma'">
+    <a href="/admin">Aaministration</a>
+</security:authorize>
+```
+
+上述示例可能会令人困扰，尽管我们想限制管理功能只能给habuma用户，但使用JSP标签表达式并不见得理想。确实，它能在视图上阻止链接的渲染。但是没有什么可以阻止别人在浏览器的地址栏手动输入“/admin”这个URL。
+
+结合我们前面所学，这个问题很容易解决。在安全配置中，添加一个对`antMatchers()`方法的调用将会严格限制对`/admin`这个URL的访问：
+
+```java
+.antMatchers("/admin")
+    .access("isAuthenticated() and principal.username == 'habuma'");
+```
+
+现在，管理功能已经被锁定了。URL地址得到了保护，并且到这个URL的链接在用户没有授权使用的情况下不会显示。但是为了做到这一点，我们需要在两个地方声明SpEL表达式——在安全配置中以及在`<security:authorize>`标签的`access`属性中。有没有办法消除这种重复性，并且还要确保只有规则条件满足的情况下才渲染管理功能的链接呢？
+
+这是`<security:authorize>`的url属性所要做的事情。它不像`access`属性那样明确声明安全性限制，`url`属性对一个给定的URL模式会间接引用其安全性约束。鉴于我们已经在Spring Security配置中为“/admin”声明了安全性约束，所以我们可以这样使用`url`属性：
+
+```jsp
+<security:authorize url="/admin">
+    <s:url value="/admin" var="admin_url" />
+    <br />
+    <a href="${admin_url}">Admin</a>
+</security:authorize>
+```
+
+因为只有基本信息中用户名为“habuma”的已认证用户才能访问“/admin” URL，所以只有满足以上条件，`<security:authorize>`标签主体中的内容才会被渲染。我们只在一个地方配置了表达式（安全配置中），但是在两个地方进行了应用。
+
+#### 9.5.2 使用Thymeleaf的Spring Security方言
+
+与Spring Security的JSP标签库类似，Thymeleaf的安全方言提供了条件化渲染和显示认证细节的能力。
+
+属性 | 作用
+-----|-----
+`sec:authentication` | 渲染认证对象的属性。类似于Spring Security的`<sec:authentication/>`JSP标签
+`sec:authorize` | 基于表达式的计算结果，条件性的渲染内容。类似于Spring Security的`<sec:authorize/>`JSP标签
+`sec:authorize-acl` | 基于表达式的计算结果，条件性的渲染内容。类似于Spring Security的`<sec:accesscontrollist/>` JSP标签
+`sec:authorize-expr` | `sec:authorize`属性的别名
+`sec:authorize-url` | 基于给定URL路径相关的安全规则，条件性的渲染内容。类似于Spring Security的`<sec:authorize/>` JSP标签使用url属性时的场景
+
+为了使用安全方言，我们需要确保依赖Thymeleaf Extras Spring Security（这里使用Thymeleaf Extras Springsecurity4）。然后，还需要在配置中使用`SpringTemplateEngine`来注册`SpringSecurityDialect`：
+
+```java
+@Bean
+public TemplateEngine templateEngine(ITemplateResolver templateResolver) {
+    SpringTemplateEngine templateEngine = new SpringTemplateEngine();
+    templateEngine.setTemplateResolver(templateResolver);
+    // 配置Thymeleaf的Spring Security方言
+    templateEngine.addDialect(new SpringSecurityDialect());
+    return templateEngine;
+}
+```
+
+安全方言注册完成之后，我们就可以在Thymeleaf模板中使用它的属性了。首先，需要在使用这些属性的模板中声明安全命名空间：
+
+```html
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/thymeleaf-extras-springsecurity4">
+
+</html>
+```
+
+标准的Thymeleaf方法依旧与之前一样，使用th前缀，安全方言则设置为使用sec前缀。
+
+这样我们就能在任意合适的地方使用Thymeleaf属性了。比如，假设我们想要为认证用户渲染“Hello”文本。如下的Thymeleaf模板代码片段就能完成这项任务：
+
+```html
+<div sec:authorize="isAuthenticated()">
+    Hello <span sec:authentication="name">someone</span>
+</div>
+```
+
+`sec:authorize`属性会接受一个SpEL表达式。如果表达式的计算结果为true，那么元素的主体内容就会渲染。在本例中，表达式为`isAuthenticated()`，所以只有用户已经进行了认证，才会渲染`<div>`标签的主体内容。就这个标签的主体内容部分而言，它的功能是使用认证对象的name属性提示“Hello”文本。
+
+如果我们要在URL中使用已认证用户的username，例如我们要对已认证用户显示“profile”链接：
+
+```html
+<span sec:authorize="isAuthenticated()">
+    <a th:href="@{'/spitter/' + ${#authentication.name}}">profile</a>
+</span>
+```
+
+使用`<sec:authorize>`JSP标签的`url`属性能够基于给定URL的权限有条件地渲染内容。在Thymeleaf中，我们可以通过`sec:authorize-url`属性完成相同的功能：
+
+```html
+<span sec:authorize-url="/admin">
+    <br />
+    <a th:href="@{/admin}">Admin</a>
+</span>
+```
+
+如果用户有权限访问“/admin”的话，那么到管理页面的链接就会渲染，否则的话，这个链接将不会渲染。
+
+### 9.6　小结
+
+>
+对于许多应用而言，安全性都是非常重要的切面。Spring Security提供了一种简单、灵活且强大的机制来保护我们的应用程序。
+>
+借助于一系列Servlet Filter，Spring Security能够控制对Web资源的访问，包括Spring MVC控制器。借助于Spring Security的Java配置模型，我们不必直接处理Filter，能够非常简洁地声明Web安全性功能。
+>
+当认证用户时，Spring Security提供了多种选项。我们探讨了如何基于内存用户库、关系型数据库和LDAP目录服务器来配置认证功能。如果这些可选方案无法满足认证需求的话，我们还学习了如何创建和配置自定义的用户服务。
+>
+在前面的几章中，我们看到了如何将Spring运用到应用程序的前端。在接下来的章中，我们将会继续深入这个技术栈，学习Spring如何在后端发挥作用，下一章将会首先从Spring的JDBC抽象开始。
+
+## 第十章 通过Spring和JDBC征服数据库
+
+本章内容：
+
+- 定义Spring对数据访问的支持
+- 配置数据库资源
+- 使用Spring的JDBC模板
+
+Spring自带了一组数据访问框架，集成了多种数据访问技术。不管你是直接通过JDBC还是像Hibernate这样的对象关系映射（object-relational mapping，ORM）框架实现数据持久化，Spring都能够帮你消除持久化代码中那些单调枯燥的数据访问逻辑。我们可以依赖Spring来处理底层的数据访问，这样就可以专注于应用程序中数据的管理了。
+
+当开发Spittr应用的持久层的时候，会面临多种选择，我们可以使用JDBC、Hibernate、Java持久化API（Java Persistence API，JPA）或者其他任意的持久化框架。你可能还会考虑使用最近很流行的NoSQL数据库。
+
+不管我们选择哪种持久化方式，Spring都能够提供支持。在本章，我们主要关注于Spring对JDBC的支持。
+
+### 10.1 Spring的数据访问哲学
+
+Spring的目标之一就是允许我们在开发应用程序时，能够遵循面向对象（OO）原则中的“针对接口编程”。Spring对数据访问的支持也不例外。
+
+像很多应用程序一样，Spittr应用需要从某种类型的数据库中读取和写入数据。为了避免持久化的逻辑分散到应用的各个组件中，最好将数据访问的功能放到一个或多个专注于此项任务的组件中。这样的组件通常称为数据访问对象（data access object，DAO）或Repository。
+
+为了避免应用与特定的数据访问策略耦合在一起，编写良好的Repository应该以接口的方式暴露功能。下图展现了设计数据访问层的合理方式。
+
+<center>
+    ![图10.1-Repository接口确保其与服务对象的松耦合](images\图10.1-Repository接口确保其与服务对象的松耦合.PNG)
+    **服务对象本身并不会处理数据访问，而是将数据访问委托给Repository。Repository接口确保其与服务对象的松耦合**
+</center>
+
+服务对象通过接口来访问Repository。这样做会有几个好处。第一，它使得服务对象易于测试，因为它们不再与特定的数据访问实现绑定在一起。实际上，你可以为这些数据访问接口创建mock实现，这样无需连接数据库就能测试服务对象，而且会显著提升单元测试的效率并排除因数据不一致所造成的测试失败。
+
+此外，数据访问层是以持久化技术无关的方式来进行访问的。持久化方式的选择独立于Repository，同时只有数据访问相关的方法才通过接口进行暴露。这可以实现灵活的设计，并且切换持久化框架对应用程序其他部分所带来的影响最小。如果将数据访问层的实现细节渗透到应用程序的其他部分中，那么整个应用程序将与数据访问层耦合在一起，从而导致僵化的设计。
+
+为了将数据访问层与应用程序的其他部分隔离开来，Spring采用的方式之一就是提供统一的异常体系，这个异常体系用在了它支持的所有持久化方案中。
+
+#### 10.1.1 了解Spring的数据访问异常体系
+
+在使用JDBC（不使用Spring）连接数据库时，我们会在代码中强制捕获`SQLException`。`SQLException`表示在访问数据库时出现了问题，但是这个异常却无法处理。
+
+可能导致抛出`SQLException`的常见问题包括：
+
+- 应用程序无法连接数据库
+- 要执行的查询存在语法错误
+- 查询中所使用的表和（或）列不存在
+- 试图插入或更新的数据违反了数据库约束
+
+`SQLException`的问题在于捕获到它的时候该如何处理。事实上，能够触发`SQLException`的问题通常是不能在`catch`代码块中解决的。大多数抛出`SQLException`的情况表明发生了致命性错误。如果应用程序不能连接到数据库，这通常意味着应用不能继续使用了。类似地，如果查询时出现了错误，那在运行时基本上也是无能为力。
+
+如果无法从`SQLException`中恢复，那为什么我们还要强制捕获它呢？
+
+即使对某些`SQLException`有处理方案，我们还是要捕获`SQLException`并查看其属性才能获知问题根源的更多信息。这是因为`SQLException`被视为处理数据访问所有问题的通用异常。对于所有的数据访问问题都会抛出`SQLException`，而不是对每种可能的问题都会有不同的异常类型。
+
+一些持久化框架提供了相对丰富的异常体系。例如，Hibernate提供了二十个左右的异常，分别对应于特定的数据访问问题。这样就可以针对想处理的异常编写`catch`代码块。
+
+即便如此，Hibernate的异常是其本身所特有的。正如前面所言，我们想将特定的持久化机制独立于数据访问层。如果抛出了Hibernate所特有的异常，那我们对Hibernate的使用将会渗透到应用程序的其他部分。如果不这样做的话，我们就得捕获持久化平台的异常，然后将其作为平台无关的异常再次抛出。
+
+一方面，JDBC的异常体系过于简单了——实际上，它算不上一个体系。另一方面，Hibernate的异常体系是其本身所独有的。我们需要的数据访问异常要具有描述性而且又与特定的持久化框架无关。
+
+**Spring所提供的平台无关的持久化异常**
+
+Spring JDBC提供的数据访问异常体系解决了以上的两个问题。不同于JDBC，Spring提供了多个数据访问异常，分别描述了它们抛出时所对应的问题。
+
+JDBC异常 | Spring的数据访问异常
+-----|-----
+BatchUpdateException<br>DataTruncation<br>SQLException<br>SQLWarning | BadSqlGrammarException<br>CannotAcquireLockException<br>CannotSerializeTransactionException<br>CannotGetJdbcConnectionException<br>CleanupFailureDataAccessException<br>ConcurrencyFailureException<br>DataAccessException<br>DataAccessResourceFailureException<br>DataIntegrityViolationException<br>DataRetrievalFailureException<br>DataSourceLookupApiUsageException<br>DeadlockLoserDataAccessException<br>DuplicateKeyException<br>EmptyResultDataAccessException<br>IncorrectResultSizeDataAccessException<br>IncorrectUpdateSemanticsDataAccessException<br>InvalidDataAccessApiUsageException<br>InvalidDataAccessResourceUsageException<br>InvalidResultSetAccessException<br>JdbcUpdateAffectedIncorrectNumberOfRowsException<br>LbRetrievalFailureException<br>NonTransientDataAccessResourceException<br>OptimisticLockingFailureException<br>PermissionDeniedDataAccessException<br>PessimisticLockingFailureException<br>QueryTimeoutException<br>RecoverableDataAccessException<br>SQLWarningException<br>SqlXmlFeatureNotImplementedException<br>TransientDataAccessException<br>TransientDataAccessResourceException<br>TypeMismatchDataAccessException<br>UncategorizedDataAccessException<br>UncategorizedSQLException<br>
+
+（在此没有列出所有的异常）
+
+尽管Spring的异常体系比JDBC简单的`SQLException`丰富得多，但它并没有与特定的持久化方式相关联。这意味着我们可以使用Spring抛出一致的异常，而不用关心所选择的持久化方案。这有助于我们将所选择持久化机制与数据访问层隔离开来。
+
+上述表中的这些异常都继承自`DataAccessException`，而这个类继承了`RuntimeException`。也就是说，上述的这些异常都是非检查型异常，我们不必必须捕获Spring所报出的数据访问异常。
+
+`DataAccessException`只是Sping处理检查型异常和非检查型异常哲学的一个范例。Spring认为触发异常的很多问题是不能在`catch`代码块中修复的。Spring使用了非检查型异常，而不是强制开发人员编写`catch`代码块（里面经常是空的）。这把是否要捕获异常的权力留给了开发人员。
+
+#### 10.1.2 数据访问模板化
+
+Spring在数据访问中使用模板方法模式。不管我们使用什么样的技术，都需要一些特定的数据访问步骤。例如，我们都需要获取一个到数据存储的连接并在处理完成后释放资源。这都是在数据访问处理过程中的固定步骤，但是每种数据访问方法又会有些不同，我们会查询不同的对象或以不同的方式更新数据，这都是数据访问过程中变化的部分。
+
+Spring将数据访问过程中固定的和可变的部分明确划分为两个不同的类：模板（template）和回调（callback）。模板管理过程中固定的部分，而回调处理自定义的数据访问代码。如下图所示：
+
+<center>
+    ![图10.2-Repository模板和回调负责不同的任务.PNG](images\图10.2-Repository模板和回调负责不同的任务.PNG)
+    **Spring的数据访问模板类负责通用的数据访问功能。对于应用程序特定的任务，则会调用自定义的回调对象**
+</center>
+
+如图所示，Spring的模板类处理数据访问的固定部分：事务控制、管理资源以及处理异常。同时，应用程序相关的数据访问——语句、绑定参数以及整理结果集：在回调的实现中处理。事实证明，这是一个优雅的架构，因为你只需关心自己的数据访问逻辑即可。
+
+针对不同的持久化平台，Spring提供了多个可选的模板：
+
+模板类 | 用途
+-----|-----
+`CciTemplate` | JCA CCI连接
+`JdbcTemplate` | JDBC连接
+`NamedParameterJdbcTemplate` | 支持命名参数的JDBC连接
+`SimpleJdbcTemplate`（已废弃） | 通过Java 5简化后的JDBC连接
+`HibernateTemplate` | Spring 4支持Hibernate3、Hibernate4以及Hibernate5（分别对应三个不同包下的类）
+`SqlMapClientTemplate`（已废弃） | ibatis的sqlMap客户端
+`JdoTemplate`（已废弃） | Java数据对象（Java Data Object）实现
+`JpaTemplate`（已废弃） | Java持久化API的实体管理器
+
+在本章中，我们将会从基础的JDBC访问开始，因为这是从数据库中读取和写入数据的最基本方式。在第11章中，我们将会了解Hibernate和JPA，我们会在第12章结束Spring持久化的话题，在这一章中，将会看到Spring Data项目是如何让Spring支持无模式数据的。
+
+但首先要说明的是Spring所支持的大多数持久化功能都依赖于数据源。因此，在声明模板和Repository之前，我们需要在Spring中配置一个数据源用来连接数据库。
+
+### 10.2 配置数据源
+
+无论选择Spring的哪种数据访问方式，我们都需要配置一个数据源引用。Spring提供了在Spring上下文中配置数据源bean的多种方式，包括：
+
+- 通过JDBC驱动程序定义的数据源
+- 通过JNDI查找的数据源
+- 连接池的数据源
+
+#### 10.2.1 使用JNDI数据源
+
+Spring应用程序经常部署在Java EE应用服务器中，如WebSphere、JBoss或甚至像Tomcat这样的Web容器中。这些服务器允许你配置通过JNDI获取数据源。这种配置的好处在于数据源完全可以在应用程序之外进行管理，这样应用程序只需在访问数据库的时候查找数据源就可以了。另外，在应用服务器中管理的数据源通常以池的方式组织，从而具备更好的性能，并且还支持系统管理员对其进行热切换。
+
+利用Spring，我们可以像使用Spring bean那样配置JNDI中数据源的引用并将其装配到需要的类中。位于`jee`命名空间下的`<jee:jndi-lookup>`元素可以用于检索JNDI中的任何对象（包括数据源）并将其作为Spring的bean。例如，如果应用程序的数据源配置在JNDI中，我们可以使用`<jee:jndi-lookup>`元素将其装配到Spring中，如下所示：
+
+```xml
+<jee:jndi-lookup id="dataSource" jndi-name="/jdbc/SpitterDS" resource-ref="true" />
+```
+
+其中`jndi-name`属性用于指定JNDI中资源的名称。如果只设置了`jndi-name`属性，那么就会根据指定的名称查找数据源。但是，如果应用程序运行在Java应用服务器中，你需要将`resource-ref`属性设置为`true`，这样给定的`jndi-name`将会自动添加“java:comp/env/”前缀。
+
+如果使用JavaConfig的方式配置，则需要借助`JndiObjectFactoryBean`从JNDI中查找`DataSource`：
+
+```java
+@Bean
+public JndiObjectFactoryBean dataSource() {
+    JndiObjectFactoryBean jndiObjectFB = new JndiObjectFactoryBean();
+    jndiObjectFB.setJndiName("jdbc/SpitterDS");
+    jndiObjectFB.setResourceRef(true);
+    jndiObjectFB.setProxyInterface(DataSource.class);
+    return jndiObjectFB;
+}
+```
+
+#### 10.2.2 使用数据源连接池
+
+尽管Spring并没有提供数据源连接池实现，但时我们有多种可选的方案：
+
+- Apache Commons DBCP/DBCP2
+- c3p0
+- BoneCP
+
+这些连接池都能配置为Spring的数据源，在一定程度上与Spring自带的`DriverManagerDataSource`或`SingleConnectionDataSource`类似。
+
+如下是使用XML配置DBCP数据源的方式（搭配H2数据库）：
+
+```xml
+<bean id="dataSource" class="org.apache.commons.dbcp.BasicDataSource"
+    p:driverClassName="org.h2.Driver"
+    p:url="jdbc:h2:tcp://localhost/~/spitter"
+    p:username="admin"
+    p:password="admin"
+    p:initialSize="5"
+    p:maxActive="10" />
+```
+
+使用JavaConfig的方式：
+
+```java
+@Bean
+public BasicDataSource dataSource() {
+    BasicDataSource ds = new BasicDataSource();
+    ds.setDriverClassName("org.h2.Driver");
+    ds.setUrl("jdbc:h2:tcp://localhost/~/spitter");
+    ds.setUsername("admin");
+    ds.setPassword("admin");
+    ds.setInitialSize(5);
+    ds.setMaxActive(10);
+    return ds;
+}
+```
+
+前四个属性（数据库连接四要素）是配置`BasicDataSource`所必需的。属性`driverClassName`指定了JDBC驱动类的全限定类名，在这里我们配置的是H2数据库。属性`url`用于设置数据库的JDBC URL。最后，`username`和`password`用于在连接数据库时进行认证。
+
+以上四个基本属性定义了`BasicDataSource`的连接信息。除此以外，还有多个配置数据源连接池的属性：
+
+属性 | 指定的内容
+----- | -----
+`initialSize` | 池启动时创建的连接数量
+`maxActive` | 同一时间可从池中分配的最多连接数。如果设置为0，表示无限制
+`maxIdle` | 池里不会被释放的最多空闲连接数。如果设置为0，表示无限制
+`maxOpenPreparedStatements` | 在同一时间能够从语句池中分配的预处理语句（prepared statement）的最大数量。如果设置为0，表示无限制
+`maxWait` | 在抛出异常之前，池等待连接回收的最大时间（当没有可用连接时）。如果设置为-1，表示无限等待
+`minEvictableIdleTimeMillis` | 连接在池中保持空闲而不被回收的最大时间
+`minIdle` | 在不创建新连接的情况下，池中保持空闲的最小连接数
+`poolPreparedStatements` | 是否对预处理语句（prepared statement）进行池管理（布尔值）
+
+（注意，DBCP2与DBCP使用的属性存在不同）
+
+在我们的示例中，连接池启动时会创建5个连接；当需要的时候，允许`BasicDataSource`创建新的连接，但最大活跃连接数为10。
+
+#### 10.2.3 基于JDBC驱动的数据源
+
+在Spring中，通过JDBC驱动定义数据源是最简单的配置方式。Spring提供了三个这样的数据源类：
+
+- DriverManagerDataSource：在每个连接请求时都会返回一个新建的连接。与DBCP的`BasicDataSource`不同，由`DriverManagerDataSource`提供的连接并没有进行池化管理
+- SimpleDriverDataSource：与`DriverManagerDataSource`的工作方式类似，但是它直接使用JDBC驱动，来解决在特定环境下的类加载问题，这样的环境包括OSGi容器
+- SingleConnectionDataSource：继承`DriverManagerDataSource`，在每个连接请求时都会返回同一个的连接。尽管它不是严格意义上的连接池，但可以将其视为只有一个连接的连接池
+
+使用XML配置`DriverManagerDataSource`的方式：
+
+```xml
+<bean id="dataSource" class="org.springframework.jdbc.datasource.DriverManagerDataSource"
+    p:driverClassName="org.h2.Driver"
+    p:url="jdbc:h2:tcp://localhost/~/spitter"
+    p:username="admin"
+    p:password="admin" />
+```
+
+使用JavaConfig的方式：
+
+```java
+@Bean
+public DataSource dataSource() {
+    DriverManagerDataSource ds = new DriverManagerDataSource();
+    ds.setDriverClassName("org.h2.Driver");
+    ds.setUrl("jdbc:h2:tcp://localhost/~/spitter");
+    ds.setUsername("admin");
+    ds.setPassword("admin");
+    return ds;
+}
+```
+
+与具备池功能的数据源相比，唯一的区别在于这些数据源bean都没有提供连接池功能，所以没有可配置的池相关的属性。
+
+尽管这些数据源对于小应用或开发环境来说是不错的，但是要将其用于生产环境，你还是需要慎重考虑。因为`SingleConnectionDataSource`有且只有一个数据库连接，所以不适合用于多线程的应用程序，最好只在测试的时候使用。而`DriverManagerDataSource`和`SimpleDriverDataSource`尽管支持多线程，但是在每次请求连接的时候都会创建新连接，这是以性能为代价的。
+
+#### 10.2.4 使用嵌入式的数据源
+
+嵌入式数据库作为应用的一部分运行，而不是应用连接的独立数据库服务器。尽管在生产环境的设置中，它并没有太大的用处，但是对于开发和测试来讲，嵌入式数据库都是很好的可选方案。这是因为每次重启应用或运行测试的时候，都能够重新填充测试数据。
+
+Spring的`jdbc`命名空间能够简化嵌入式数据库的配置。例如，如下的程序清单展现了如何使用jdbc命名空间来配置嵌入式的H2数据库：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:jdbc="http://www.springframework.org/schema/jdbc"
+    xsi:schemaLocation="http://www.springframework.org/schema/beans 
+    http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/jdbc 
+        http://www.springframework.org/schema/jdbc/spring-jdbc.xsd">
+        
+    <jdbc:embedded-database id="dataSource" type="H2">
+        <jdbc:script location="com/habuma/spitter/db/jdbc/schema.sql" />
+        <jdbc:script location="com/habuma/spitter/db/jdbc/test-sql" />
+    </jdbc:embedded-database>
+
+</beans>
+```
+
+`<jdbc:embedded-database>`的`type`属性设置为H2，表明嵌入式数据库应该是H2数据库（需要引入相关依赖）。另外，我们还可以将`type`设置为DERBY，以使用嵌入式的ApacheDerby数据库。
+
+在`<jdbc:embedded-database>`中，我们可以不配置也可以配置多个`<jdbc:script>`元素来搭建数据库。上述配置中包含了两个·元素：第一个引用了schema.sql，它包含了在数据库中创建表的SQL；第二个引用了test-data.sql，用来将测试数据填充到数据库中。
+
+除了搭建嵌入式数据库以外，`<jdbc:embedded-database>`元素还会暴露一个数据源，我们可以像使用其他的数据源那样来使用它。在这里，id属性被设置成了`dataSource`，这也是所暴露数据源的bean ID。因此，当我们需要`javax.sql.DataSource`的时候，就可以注入`dataSource` bean。
+
+如果使用JavaConfig的方式进行配置，需要使用`EmbeddedDatabaseBuilder`：
+
+```java
+@Bean
+public DataSource dataSource() {
+    return new EmbeddedDatabaseBuilder()
+            .setType(EmbeddedDatabaseType.H2)
+            .addScript("classpath:schema.sql")
+            .addScript("classpath:test-data.sql")
+            .build();
+}
+```
+
+#### 10.2.5 使用profile选择数据源
+
+我们已经看到了多种在Spring中配置数据源的方法，我相信你已经找到了一两种适合你的应用程序的配置方式。实际上，我们很可能面临这样一种需求，那就是在某种环境下需要其中一种数据源，而在另外的环境中需要不同的数据源。
+
+例如，在开发期，嵌入式的数据源可能很合适。但是在QA环境中，我们可能又要使用DBCP数据源连接池。
+
+第三章中使用profile特性可以很好的应用在这里，所需要做的就是将每个数据源配置在不同的profile下：
+
+```java
+@Bean
+@Profile("dev")
+public DataSource embeddedDataSource() {
+    return new EmbeddedDatabaseBuilder().
+            setType(EmbeddedDatabaseType.H2)
+            .addScript("classpath:schema.sql")
+            .addScript("classpath:test-data.sql")
+            .build();
+}
+
+@Bean
+@Profile("qa")
+public DataSource qaDataSource() {
+    BasicDataSource ds = new BasicDataSource();
+    ds.setDriverClassName("org.h2.Driver");
+    ds.setUrl("jdbc:h2:tcp://localhost/~/spitter");
+    ds.setUsername("sa");
+    ds.setPassword("");
+    ds.setInitialSize(5);
+    ds.setMaxActive(10);
+    return ds;
+}
+
+@Bean
+@Profile("production")
+public DataSource dataSource() {
+    JndiObjectFactoryBean jndiObjectFactoryBean = new JndiObjectFactoryBean();
+    jndiObjectFactoryBean.setJndiName("jdbc/SpittrDS");
+    jndiObjectFactoryBean.setResourceRef(true);
+    jndiObjectFactoryBean.setProxyInterface(javax.sql.DataSource.class);
+    return (DataSource) jndiObjectFactoryBean.getObject();
+}
+```
+
+要使用XML配置，可以使用嵌套的`<beans>`：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:jdbc="http://www.springframework.org/schema/jdbc"
+    xmlns:jee="http://www.springframework.org/schema/jee"
+    xmlns:p="http://www.springframework.org/schema/p"
+    xsi:schemaLocation="
+        http://www.springframework.org/schema/jee
+        http://www.springframework.org/schema/jee/spring-jee.xsd
+        http://www.springframework.org/schema/jdbc
+        http://www.springframework.org/schema/jdbc/spring-jdbc.xsd
+        http://www.springframework.org/schema/beans
+        http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+    <!-- 开发阶段 -->
+    <beans profile="dev">
+        <jdbc:embedded-database id="dataSource" type="H2">
+            <jdbc:script location="com/habuma/spitter/db/jdbc/schema.sql" />
+            <jdbc:script location="com/habuma/spitter/db/jdbc/test-sql" />
+        </jdbc:embedded-database>
+    </beans>
+
+    <!-- qa阶段 -->
+    <beans profile="qa">
+        <bean id="dataSource" class="org.apache.commons.dbcp.BasicDataSource"
+            p:driverClassName="org.h2.Driver"
+            p:url="jdbc:h2:tcp://localhost/~/spitter"
+            p:username="admin"
+            p:password="admin"
+            p:initialSize="5"
+            p:maxActive="10" />
+    </beans>
+
+    <!-- 生产阶段 -->
+    <beans profile="prod">
+        <jee:jndi-lookup 
+            id="dataSource" 
+            jndi-name="/jdbc/SpitterDS" 
+            resource-ref="true" />
+    </beans>
+
+</beans>
+```
+
+通过使用profile功能，会在运行时选择数据源，这取决于哪一个profile处于激活状态。
+
+### 10.3 在Spring中使用JDBC
+
+*以下内容代码在工程sia4e-P3_Spring_in_the_back_end-C10_Hitting_the_database_with_Spring_and_JDBC中*。
+
+持久化技术有很多种，而Hibernate、iBATIS（MyBatis）和JPA只是其中的几种而已。尽管如此，还是有很多的应用程序使用最古老的方式将Java对象保存到数据库中，那就是使用JDBC。
+
+JDBC不要求我们掌握其他框架的查询语言。它是建立在SQL之上的，而SQL本身就是数据访问语言。此外，与其他的技术相比，使用JDBC能够更好地对数据访问的性能进行调优。JDBC允许你使用数据库的所有特性，而这是其他框架不鼓励甚至禁止的。
+
+再者，相对于持久层框架，JDBC能够让我们在更低的层次上处理数据，我们可以完全控制应用程序如何读取和管理数据，包括访问和管理数据库中单独的列。这种细粒度的数据访问方式在很多应用程序中是很方便的。例如在报表应用中，如果将数据组织为对象，而接下来唯一要做的就是将其解包为原始数据，那就没有太大意义了。
+
+但是JDBC也不是十全十美的。虽然JDBC具有强大、灵活和其他一些优点，但也有其不足之处。
+
+#### 10.3.1 应对失控的JDBC代码
+
+如果使用JDBC所提供的直接操作数据库的API，我们需要负责处理与数据库访问相关的所有事情，其中包含管理数据库资源和处理异常。
+
+例如，使用JDBC在数据库中插入一行数据：
+
+```java
+private static final String SQL_INSERTION_SPITTER = "insert into spitter (username, password, firstname, lastname) values (?, ?, ?, ?)";
+
+// 使用配置的数据源，而不是DriverManager
+private DataSource dataSource;
+
+// constructor init DataSource...
+
+public void addSpitter(Spitter spitter) {
+
+    Connection conn = null;
+    PreparedStatement stmt = null;
+
+    try {
+
+        // 获取连接
+        conn = dataSource.getConnection();
+
+        // 创建语句
+        stmt = conn.prepareStatement(SQL_INSERTION_SPITTER);
+
+        // 绑定参数
+        stmt.setString(1, spitter.getUsername());
+        stmt.setString(2, spitter.getPassword());
+        stmt.setString(3, spitter.getFirstName());
+        stmt.setString(4, spitter.getLastName());
+
+        // 执行语句
+        stmt.execute();
+
+    } catch (SQLException e) {
+        // ...
+    } finally {
+        // 清理资源
+        try {
+            if (stmt != null) {
+                stmt.close();
+            }
+            if (conn != null) {
+                conn.close();
+            }
+        } catch (SQLException e) {
+            // ...
+        }
+    }
+}
+```
+
+上述代码仅仅是为了向数据库中插入一条记录，对于JDBC而言，这是最简单的了。但是为什么要用这么多行代码才能做如此简单的事情呢？实际上，并非如此，只有几行代码是真正用于进行插入数据的。但是JDBC要求你必须正确地管理连接和语句，并以某种方式处理可能抛出的`SQLException`异常。而且我们还要捕捉它两次，我们要在插入记录出错时捕捉它，同时还需要在关闭语句和连接出错的时候捕捉它。
+
+使用传统的JDBC来更新数据：
+
+```java
+private static final String SQL_UPDATE_SPITTER = "update spitter set username = ?, password = ?, firstname = ?, lastname = ? where id = ?";
+
+// 使用配置的数据源，而不是DriverManager
+private DataSource dataSource;
+
+// constructor init DataSource...
+
+public void addSpitter(Spitter spitter) {
+
+    Connection conn = null;
+    PreparedStatement stmt = null;
+
+    try {
+
+        // 获取连接
+        conn = dataSource.getConnection();
+
+        // 创建语句
+        stmt = conn.prepareStatement(SQL_INSERTION_SPITTER);
+
+        // 绑定参数
+        stmt.setString(1, spitter.getUsername());
+        stmt.setString(2, spitter.getPassword());
+        stmt.setString(3, spitter.getFirstName());
+        stmt.setString(4, spitter.getLastName());
+        stmt.setLong(5, spitter.getId());
+
+        // 执行语句
+        stmt.execute();
+
+    } catch (SQLException e) {
+        // ...
+    } finally {
+        // 清理资源
+        try {
+            if (stmt != null) {
+                stmt.close();
+            }
+            if (conn != null) {
+                conn.close();
+            }
+        } catch (SQLException e) {
+            // ...
+        }
+    }
+}
+```
+
+实际上，上述更新一行数据的代码与插入一行数据的代码除了在SQL语句字符串上有不同，其余几乎是完全相同的。大量的JDBC代码都是用于创建连接和语句以及异常处理的样板代码。但实际上，这些样板代码是非常重要的。清理资源和处理错误确保了数据访问的健壮性。如果没有它们的话，就不会发现错误而且资源也会处于打开的状态，这将会导致意外的代码和资源泄露。我们不仅需要这些代码，而且还要保证它是正确的。基于这样的原因，我们才需要框架来保证这些代码只写一次而且是正确的。
+
+#### 10.3.2 使用JDBC模板
+
+Spring的JDBC框架承担了资源管理和异常处理的工作，从而简化了JDBC代码，让我们只需编写从数据库读写数据的必需代码。
+
+Spring将数据访问的样板代码抽象到模板类之中。Spring为JDBC提供了三个模板类供选择：
+
+- JdbcTemplate：最基本的Spring JDBC模板，这个模板支持简单的JDBC数据库访问功能以及基于索引参数的查询
+- NamedParameterJdbcTemplate：使用该模板类执行查询时可以将值以命名参数的形式绑定到SQL中，而不是使用简单的索引参数
+- SimpleJdbcTemplate（已废弃）：该模板类利用Java 5的一些特性如自动装箱、泛型以及可变参数列表来简化JDBC模板的使用。
+
+`SimpleJdbcTemplate`已经被废弃了，其Java 5的特性被转移到了`JdbcTemplate`中，并且只有在你需要使用命名参数的时候，才需要使用`NamedParameterJdbcTemplate`。这样的话，对于大多数的JDBC任务来说，`JdbcTemplate`就是最好的可选方案，这也是本小节中所关注的方案。
+
+**使用JdbcTemplate来插入数据**
+
+为了让`JdbcTemplate`正常工作，只需要为其设置`DataSource`就可以了，这使得在Spring中配置`JdbcTemplate`非常容易：
+
+```java
+// 配置JDBC模板
+@Bean
+public JdbcOperations jdbcOperations(DataSource dataSource) {
+    return new JdbcTemplate(dataSource);
+}
+
+// 配置数据源
+@Bean
+public DataSource dataSource() throws PropertyVetoException {
+    ComboPooledDataSource dataSource = new ComboPooledDataSource();
+    dataSource.setDriverClass("com.mysql.jdbc.Driver");
+    dataSource.setJdbcUrl("jdbc:mysql://localhost:3306/test");
+    dataSource.setUser("root");
+    dataSource.setPassword("mysql");
+    return dataSource();
+}
+```
+
+在这里，`DataSource`是通过构造器参数注入进来的。这里所引用的`dataSource` bean可以是`javax.sql.DataSource`的任意实现（这里使用c3p0数据源）。
+
+定义好`DataSource`和`JdbcTemplate`后我们就可以创建Repository类了：
+
+```java
+@Repository("jdbcSpitter")
+public class JdbcSpitterRepository implements SpitterRepository {
+
+    private static final String SQL_INSERT_SPITTER = "insert into spitter (username, password, firstname, lastname) values (?, ?, ?, ?)";
+    
+    @Autowired
+    private JdbcOperations jdbcOperations;
+    
+}
+```
+
+这里`JdbcSpitterRepository`使用了`@Repository`注解，这表明它会在组件扫描时自动创建。其中其成员变量`jdbcOperations`通过`@Autowired`注解注入。
+
+`JdbcOperations`是一个接口，定义了`JdbcTemplate`所实现的操作。通过注入`JdbcOperations`，而不是具体的`JdbcTemplate`，能够保证`JdbcSpitterRepository`通过`JdbcOperations`接口达到与`JdbcTemplate`保持松耦合。
+
+`JdbcSpitterRepository`类具有可用的`JdbcTemplate`后，我们就可以真正实现通过用户注册表单注册用户的功能了：
+
+```java
+@Override
+public void addSpitter(Spitter spitter) {
+    
+    jdbcOperations.update(SQL_INSERT_SPITTER,
+            spitter.getUsername(),
+            spitter.getPassword(),
+            spitter.getFirstName(),
+            spitter.getLastName());
+    
+}
+```
+
+其对应的spitter表如下：
+
+```sql
+CREATE TABLE `spitter` (
+    `id` bigint(20) NOT NULL AUTO_INCREMENT,
+    `username` varchar(16) NOT NULL,
+    `password` varchar(25) NOT NULL,
+    `firstname` varchar(30) NOT NULL,
+    `lastname` varchar(30) NOT NULL,
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8
+```
+
+这个版本的`save()`方法简单多了（相对于之前的`addSpitter()`）。这里没有了创建连接和语句的代码，也没有异常处理的代码，只剩下单纯的数据插入代码。
+
+不能因为我们看不到这些样板代码，就意味着它们不存在。样板代码被巧妙地隐藏到JDBC模板类中了。当`update()`方法被调用的时候`JdbcTemplate`将会获取连接、创建语句并执行插入SQL。
+
+在这里也看不到任何处理`SQLException`的代码。在框架内部，`JdbcTemplate`将会捕获所有可能抛出的`SQLException`，并将其转换为Spring定义的对数据访问的异常并重新抛出。由于这些异常都是运行时异常，所以我们不必进行捕获。
+
+**使用JdbcTemplate读取数据**
+
+`JdbcTemplate`也简化了数据的读取操作：
+
+```java
+@Override
+public Spitter findByUsername(String username) {
+    
+    return jdbcOperations.queryForObject(SQL_SELECT_SPITTER, new RowMapper<Spitter>() {
+
+        @Override
+        public Spitter mapRow(ResultSet rs, int rowNum) throws SQLException {
+            
+            return new Spitter(
+                    rs.getLong("id"), 
+                    rs.getString("username"), 
+                    rs.getString("password"), 
+                    rs.getString("firstname"), 
+                    rs.getString("lastname"));
+        }
+        
+    }, username);
+}
+```
+
+`findByUsername()`方法中使用`JdbcTemplate`的`queryForObject()`方法来进行查询，这个方法有三个参数：
+
+- String类型的SQL语句
+- `RowMapper`接口的实现类，用来从`ResultSet`中提取数据并构建对象。这里使用一个匿名内部类实现`RowMapper`接口
+- 一个可变参数列表，列出了要绑定到SQL语句上参数
+
+**使用命名参数**
+
+在`save()`方法中，我们使用的SQL语句是这样的：`insert into spitter (username, password, firstname, lastname) values (?, ?, ?, ?)`。这意味着我们要小心参数的数据，在将参数传递给`update()`方法时要保证正确的顺序。此时如果我们修改了SQL语句中参数的顺序，那么我们也要在方法中修改参数的顺序。
+
+除了这种方法之外，我们还可以使用命名参数。命名参数可以赋予SQL中每个参数一个明确的名字，在绑定值到SQL语句时就通过该名字引用参数，此时绑定值的顺序就不重要了。即使SQL语句发生了变化导致参数顺序与原来不一致，我们也不需要修改方法代码。
+
+`NamedParameterJdbcTemplate`是一个特殊的JDBC模板类，它支持使用命名参数。
+
+声明`NamedParameterJdbcTemplate`：
+
+```java
+@Bean
+public NamedParameterJdbcOperations namedParameterjdbcOperations(DataSource dataSource) {
+    return new NamedParameterJdbcTemplate(dataSource);
+}
+```
+
+注意，`NamedParameterJdbcTemplate`实现的接口并不是`JdbcOperations`，而是`NamedParameterJdbcOperations`。
+
+使用`NamedParameterJdbcTemplate`实现`save()`方法：
+
+```java
+private static final String SQL_INSERT_SPITTER_NAMED_PARAMETER = 
+        "insert into spitter (username, password, firstname, lastname)"
+                + " values "
+                + "(:username, :password, :firstname, :lastname)";
+
+@Autowired 
+private NamedParameterJdbcOperations jdbcOperations;
+
+@Override
+public void addSpitter(Spitter spitter) {
+    Map<String, Object> paramMap = new HashMap<>();
+    
+    // 绑定参数
+    paramMap.put("username", spitter.getUsername());
+    paramMap.put("password", spitter.getPassword());
+    paramMap.put("firstname", spitter.getFirstName());
+    paramMap.put("lastname", spitter.getLastName());
+    
+    // 执行数据插入
+    jdbcOperations.update(SQL_INSERT_SPITTER_NAMED_PARAMETER, paramMap);
+}
+```
+
+### 10.4 小结
+
+>
+数据是应用程序的血液。有些数据中心论者甚至主张数据即应用。鉴于数据的重要地位，以健壮、简单和清晰的方式开发应用程序的数据访问部分就显得举足轻重了。
+>
+在Java中，JDBC是与关系型数据库交互的最基本方式。但是按照规范，JDBC有些太笨重了。Spring能够解除我们使用JDBC中的大多数痛苦，包括消除样板式代码、简化JDBC异常处理，你所需要做的仅仅是关注要执行的SQL语句。
+>
+在本章中，我们学习了Spring对数据持久化的支持，以及Spring为JDBC所提供的基于模板的抽象，它能够极大地简化JDBC的使用。
+>
+在下一章中，我们会继续Spring数据持久化这一话题，将会学习Spring为Java持久化API所提供的功能。
+
+## 第十一章 使用对象-关系映射持久化数据
+
+本章内容：
+
+- 使用Spring和Hibernate
+- 借助上下文Session，编写不依赖于Spring的Repository
+- 通过Spring使用JPA
+- 借助Spring Data实现自动化的JPA Repository
+
+在数据持久化的世界中，JDBC是很基础的，对于份内的工作，它能很好地完成并且在一些特定的场景下表现出色。但随着应用程序变得越来越复杂，对持久化的需求也变得更复杂。我们需要将对象的属性映射到数据库的列上，并且需要自动生成语句和查询，这样我们就能从无休止的问号字符串中解脱出来。此外，我们还需要一些更复杂的特性：
+
+- 延迟加载（Lazy loading）：随着我们的对象关系变得越来越复杂，有时候我们并不希望立即获取完整的对象间关系。，假设我们在查询一组PurchaseOrder对象，而每个对象中都包含一个LineItem对象集合。如果我们只关心PurchaseOrder的属性，那查询出LineItem的数据就毫无意义。而且这可能是开销很大的操作。延迟加载允许我们只在需要的时候获取数据。
+- 预先抓取（Eager fetching）：这与延迟加载是相对的。借助于预先抓取，我们可以使用一个查询获取完整的关联对象。如果我们需要PurchaseOrder及其关联的LineItem对象，预先抓取的功能可以在一个操作中将它们全部从数据库中取出来，节省了多次查询的成本。
+- 级联（Cascading）：有时，更改数据库中的表会同时修改其他表。回到我们订购单的例子中，当删除Order对象时，我们希望同时在数据库中删除关联的LineItem。
+
+一些可用的框架提供了这样的服务，这些服务的通用名称是对象/关系映射（object-relational mapping，ORM）。在持久层使用ORM工具，可以节省数千行的代码和大量的开发时间。ORM工具能够把你的注意力从容易出错的SQL代码转向如何实现应用程序的真正需求。
+
+Spring对多个持久化框架都提供了支持，包括Hibernate、iBATIS（MyBatis）、Java数据对象（Java Data Objects，JDO）以及Java持久化API（JavaPersistence API，JPA）。与Spring对JDBC的支持那样，Spring对ORM框架的支持提供了与这些框架的集成点以及一些附加的服务：
+
+- 支持集成Spring声明式事务
+- 透明的异常处理
+- 线程安全的、轻量级的模板类
+- DAO支持类
+- 资源管理
+
+在本章中，我们将会看到Spring如何与最常用的两种ORM方案集成：Hibernate和JPA。同时还会通过Spring Data JPA了解一下Spring Data项目。借助这种方式，我们不仅可以学习到如何借助Spring Data JPA移除JPA Repository中的样板式代码，还能为下一章的如何将Spring Data用于无模式的存储打下基础。
+
+### 11.1 在Spring中集成Hibernate
+
+Hibernate是在开发者社区很流行的开源持久化框架。它不仅提供了基本的对象关系映射，还提供了ORM工具所应具有的所有复杂功能，比如缓存、延迟加载、预先抓取以及分布式缓存。
+
+*以下内容代码在工程sia4e-P3_Spring_in_the_back_end-C11_Persisting_data_with_object-relational_mapping-01_hibernate中*。
+
+#### 11.1.1 声明Hibernate的Session工厂
+
+使用Hibernate所需的主要接口是`org.hibernate.Session`。`Session`接口提供了基本的数据访问功能，如保存、更新、删除以及从数据库加载对象的功能。通过这个接口，应用程序的Repository能够满足所有的持久化需求。
+
+获取Hibernate Session对象的标准方式是借助于`HibernateSessionFactory`接口的实现类。除了一些其他的任务，`SessionFactory`主要负责Hibernate Session的打开、关闭以及管理。
+
+在Spring中，我们要通过Spring的某一个Hibernate Session工厂bean来获取`Hibernate SessionFactory`。
+
+这里使用的Spring 4.3.9提供了4个`SessionFactory` bean以供选择：
+
+- org.springframework.orm.hibernate3.annotation.AnnotationSessionFactoryBean（已废弃）
+- org.springframework.orm.hibernate3.LocalSessionFactoryBean（已废弃）
+- org.springframework.orm.hibernate4.LocalSessionFactoryBean
+- org.springframework.orm.hibernate5.LocalSessionFactoryBean（4.2版本开始支持）
+
+从对Hibernate4的支持开始，Spring在`LocalSessionFactoryBean`中合并了`AnnotationSessionFactoryBean`的功能。
+
+这些Session工厂bean都是Spring `FactoryBean`接口的实现，它们会产生一个`HibernateSessionFactory`，它能够装配进任何`SessionFactory`类型的属性中。这样的话，就能在应用的Spring上下文中，与其他的bean一起配置Hibernate Session工厂。（注意，`LocalSessionFactoryBean`并不是`SessionFactory`的实现类，实际上`LocalSessionFactoryBean`类中有一个`SessionFactory`类型的成员变量）
+
+至于选择使用哪一个Session工厂，这取决于使用哪个版本的Hibernate。这里使用5.0.1，所以选择`org.springframework.orm.hibernate5`包中的`LocalSessionFactoryBean`。
+
+```java
+@Bean
+public LocalSessionFactoryBean sessionFactory(DataSource dataSource) {
+    LocalSessionFactoryBean sessionFactory = new LocalSessionFactoryBean();
+    // 配置数据源
+    sessionFactory.setDataSource(dataSource);
+    // 配置映射文件的位置
+    sessionFactory.setMappingResources("spittr/domain/Spitter.hbm.xml");
+    // 设置Hibernate属性
+    Properties props = new Properties();
+    props.setProperty("hibernate.dialect", "org.hibernate.dialect.MySQL5Dialect");
+    props.setProperty("hibernate.current_session_context_class",
+            "org.springframework.orm.hibernate5.SpringSessionContext");
+    props.setProperty("hibernate.show_sql", "true");
+    props.setProperty("hibernate.format_sql", "true");
+    sessionFactory.setHibernateProperties(props);
+    return sessionFactory;
+
+}
+```
+
+在配置`LocalSessionFactoryBean`时，我们使用了三个属性。属性`dataSource`装配了一个`DataSource` bean的引用。属性`mappingResources`列出了一个或多个的Hibernate映射文件，在这些文件中定义了应用程序的持久化策略。最后，`hibernateProperties`属性配置了Hibernate如何进行操作的细节。在本示例中，我们配置Hibernate使用MySQL数据库并且要按照`MySQL5Dialect`来构建SQL。
+
+如果我们使用注解方式来定义持久化，那么应该这样定义：
+
+```java
+@Bean
+public LocalSessionFactoryBean sessionFactory(DataSource dataSource) {
+    LocalSessionFactoryBean sessionFactory = new LocalSessionFactoryBean();
+    // 配置数据源
+    sessionFactory.setDataSource(dataSource);
+    // 配置要扫描的包
+    sessionFactory.setPackagesToScan(new String[] { "spittr.domain" });
+    // 设置Hibernate属性
+    Properties props = new Properties();
+    props.setProperty("hibernate.dialect", "org.hibernate.dialect.MySQL5Dialect");
+    props.setProperty("hibernate.current_session_context_class",
+            "org.springframework.orm.hibernate5.SpringSessionContext");
+    props.setProperty("hibernate.show_sql", "true");
+    props.setProperty("hibernate.format_sql", "true");
+    sessionFactory.setHibernateProperties(props);
+    return sessionFactory;
+
+}
+```
+
+这里不再列出Hibernate配置的映射文件，而是使用`packagesToScan`属性来告诉框架应该扫描那个包来查找域类，这些类通过注解的方式（`@Entity`）表明要使用Hibernate进行持久化。
+
+我们还可以使用`annotatedClasses`属性直接指定要持久化的类：
+
+```java
+sessionFactory.setAnnotatedClasses(new Class<?>[] { Spitter.class, Spittle.class });
+```
+
+如果使用注解而不是XML映射文件的方式配置要持久化的类，`annotatedClasses`属性对于准确指定少量的域类是不错的选择。如果你有很多的域类并且不想将其全部列出，又或者你想自由地添加或移除域类而不想修改Spring配置的话，那使用`packagesToScan`属性是更合适的。
+
+#### 11.1.2 构建不依赖于Spring的Hibernate代码
+
+在Spring和Hibernate的早期岁月中，编写Repository类将会涉及到使用Spring的`HibernateTemplate`。`HibernateTemplate`能够保证每个事务使用同一个Session。但是这种方式的弊端在于我们的Repository实现会直接与Spring耦合。
+
+现在的最佳实践是不再使用`HibernateTemplate`，而是使用上下文Session（Contextual session）。通过这种方式，会直接将Hibernate SessionFactory装配到Repository中，并使用它来获取Session。
+
+```java
+package spittr.data;
+
+import java.util.List;
+
+import org.hibernate.Session;
+import org.hibernate.SessionFactory;
+import org.hibernate.criterion.Restrictions;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.Pbkdf2PasswordEncoder;
+import org.springframework.stereotype.Repository;
+
+import spittr.domain.Spitter;
+
+@Repository
+public class HibernateSpitterRepository implements SpitterRepository {
+    
+    @Autowired
+    private SessionFactory sessionfactory;
+
+    private Session currentSession() {
+        return sessionfactory.getCurrentSession();
+    }
+    
+    @Override
+    public void addSpitter(Spitter spitter) {
+        
+        currentSession().save(new Spitter(
+                spitter.getUsername(), 
+                new Pbkdf2PasswordEncoder("53cr3t").encode(spitter.getPassword()), 
+                spitter.getFirstName(), 
+                spitter.getLastName())
+            );
+    }
+
+    @Override
+    public Spitter findByUsername(String username) {
+        return (Spitter) currentSession().createCriteria(Spitter.class)
+            .add(Restrictions.eq("username", username)).list().get(0);
+    }
+
+    @Override
+    public long count() {
+        return findAll().size();
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public List<Spitter> findAll() {
+        return (List<Spitter>) currentSession().createCriteria(Spitter.class).list();
+    }
+
+    @Override
+    public Spitter findOne(long id) {
+        return currentSession().get(Spitter.class, id);
+    }
+
+}
+```
+
+我们通过`@Autowired`注解让Spring自动装配一个`SessionFactory`，然后在`currentSession()`方法中，使用这个`SessionFactory`来获取当前事务的`Session`。
+
+如果我们使用Hibernate上下文Session而不是Hibernate模板的话，那异常转换会怎么处理呢？
+
+为了给不使用模板的Hibernate Repository添加异常转换功能，我们只需在Spring应用上下文中添加一个`PersistenceExceptionTranslationPostProcessor` bean：
+
+```java
+@Bean
+public BeanPostProcessor persistenceTranslation() {
+    return new PersistenceExceptionTranslationPostProcessor();
+}
+```
+
+`PersistenceExceptionTranslationPostProcessor`是一个bean后置处理器（bean post-processor），他会在所有拥有`@Repository`注解的类上添加一个顾问（advisor），这样就会捕获任何平台相关的异常并以Spring非检查型数据访问异常的形式重新抛出。
+
+由于我们获取Session时使用的是`SessionFactory`的`getCurrentSession()`方法，这个Session要求必须使用事务，所以我们还需要配置事务管理器：
+
+```java
+@Bean
+public PlatformTransactionManager txManager(LocalSessionFactoryBean sessionFactory) {
+    HibernateTransactionManager manager = new HibernateTransactionManager();
+    manager.setSessionFactory(sessionFactory.getObject());
+    return manager;
+}
+```
+
+`HibernateTransactionManager`类的构造器需要我们传入一个`SessionFactory`作为参数，这个参数由`LocalSessionFactoryBean`的`getObject()`方法获取。
+
+配置后还需要开启事务管理，这里需要使用注解：
+
+```java
+@Configuration
+@EnableTransactionManagement
+public class HibernateConfig {
+    // bean definitions ...
+}
+```
+
+最后，我们需要配置事务，例如：
+
+```java
+@Override
+@Transactional
+public void addSpitter(Spitter spitter) {
+    
+    currentSession().save(new Spitter(
+            spitter.getUsername(), 
+            new Pbkdf2PasswordEncoder("53cr3t").encode(spitter.getPassword()), 
+            spitter.getFirstName(), 
+            spitter.getLastName())
+        );
+}
+```
+
+使用`@Transactional`注解会在方法上使用事务（实际上事务通常不配置在这里，而是配置在service上。由于我们的应用只有controller和dao，所以将事务配置在了dao上）。这里的事务属性均使用默认配置。
+
+接下来我们需要定义hibernate的映射文件，Spitter.hbm.xml，这个文件与Spitter类在一个包中：
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE hibernate-mapping PUBLIC 
+    "-//Hibernate/Hibernate Mapping DTD 3.0//EN"
+    "http://www.hibernate.org/dtd/hibernate-mapping-3.0.dtd">
+<hibernate-mapping package="spittr.domain">
+    <class name="Spitter" table="spitter">
+        <id name="id" column="id">
+            <generator class="identity" />
+        </id>
+        <property name="username" column="username" />
+        <property name="password" column="password" />
+        <property name="firstName" column="firstname" />
+        <property name="lastName" column="lastname" />
+    </class>
+</hibernate-mapping>
+```
+
+这里设置主键生成策略为`identity`，即由MySQL维护主键。
+
+最后还有一个问题，由于我们使用了Hibernate validator来校验页面传来的参数是否合法，设置了密码长度在5-25个字符之内：`@Size(min = 5, max = 25, message = "{password.size}")`。同时，在`addSpitter()`方法中，我们对存入数据库的密码进行了加密：
+
+```java
+public void addSpitter(Spitter spitter) {
+    
+    currentSession().save(new Spitter(
+            spitter.getUsername(), 
+            new Pbkdf2PasswordEncoder("53cr3t").encode(spitter.getPassword()), 
+            spitter.getFirstName(), 
+            spitter.getLastName())
+        );
+}
+```
+
+这个加密会将密码转为一个长度为80的字符串，这会导致加密后的密码和我们设置的密码长度范围发生冲突（如果配置了Hibernate validator，则Hibernate在将数据存入数据库时会默认的使用这些规则），发生异常。即在将数据存入数据库时应该不使用我们自定义的校验规则（毕竟数据在传入时已经经过校验了），这需要设置Hibernate properties：
+
+```java
+props.setProperty("javax.persistence.validation.mode", "none");
+```
+
+现在，Hibernate版本的`Repository`已经完成了。我们开发时，没有依赖Spring的特定类（除了`@Repository`注解以外）。这种不使用模板的方式也适用于开发纯粹的基于JPA的Repository，让我们再尝试开发另一个`SpitterRepository`实现类，这次我们使用的是JPA。
+
+### 11.2 Spring与Java持久化API
+
+Java持久化API（Java Persistence API，JPA），是基于POJO的持久化机制，它从Hibernate和Java数据对象（Java Data Object，JDO）上借鉴了很多理念并假如了Java 5注解的特性。
+
+在Spring中使用JPA的第一步是要在Spring应用上下文中将实体管理器工厂（entity manager factory）按照bean的形式来进行配置。
+
+（JPA有多种实现提供者，这里使用hibernate-jpa-2.1-api）
+
+#### 11.2.1 配置实体管理器工厂
+
+*以下内容代码在工程sia4e-P3_Spring_in_the_back_end-C11_Persisting_data_with_object-relational_mapping-02_jpa中*。
+
+简单来讲，基于JPA的应用程序需要使用EntityManagerFactory的实现类来获取EntityManager实例。JPA定义了两种类型的实体管理器：
+
+- 应用程序管理类型（Application-managed）：当应用程序向实体管理器工厂直接请求实体管理器时，工厂会创建一个实体管理器。在这种模式下，程序要负责打开或关闭实体管理器并在事务中对其进行控制。这种方式的实体管理器适合于不运行在Java EE容器中的独立应用程序。
+- 容器管理类型（Container-managed）：实体管理器由Java EE容器创建和管理。应用程序根本不与实体管理器工厂打交道。相反，实体管理器直接通过注入或JNDI来获取。容器负责配置实体管理器工厂。这种类型的实体管理器最适用于Java EE容器，在这种情况下会希望在persistence.xml指定的JPA配置之外保持一些自己对JPA的控制。
+
+以上的两种实体管理器实现了同一个`EntityManager`接口。关键的区别不在于`EntityManager`本身，而是在于`EntityManager`的创建和管理方式。应用程序管理类型的`EntityManager`是由`EntityManagerFactory`创建的，而后者是通过`PersistenceProvider`的`createEntityManagerFactory()`方法得到的。
+
+这对想使用JPA的Spring开发者来说又意味着什么呢？其实这并没太大的关系。不管你希望使用哪种`EntityManagerFactory`，Spring都会负责管理`EntityManager`。如果你使用的是应用程序管理类型的实体管理器，Spring承担了应用程序的角色并以透明的方式处理`EntityManager`。在容器管理的场景下，Spring会担当容器的角色。
+
+这两种实体管理器工厂分别由对应的Spring工厂Bean创建：
+
+- `LocalEntityManagerFactoryBean`生成应用程序管理类型的`EntityManagerFactory`
+- `LocalContainerEntityManagerFactoryBean`生成容器管理类型的`EntityManagerFactory`
+
+需要说明的是，选择应用程序管理类型的还是容器管理类型的`EntityManagerFactory`，对于基于Spring的应用程序来讲是完全透明的。当组合使用Spring和JPA时，处理`EntityManagerFactory`的复杂细节被隐藏了起来，数据访问代码只需关注它们的真正目标即可，也就是数据访问。
+
+应用程序管理类型和容器管理类型的实体管理器工厂之间唯一值得关注的区别是在Spring应用上下文中如何进行配置。让我们先看看如何在Spring中配置应用程序管理类型的`LocalEntityManagerFactoryBean`，然后再看看如何配置容器管理类型的`LocalContainerEntityManagerFactoryBean`。
+
+**配置应用程序管理类型的JPA**
+
+对于应用程序管理类型的实体管理器工厂来说，它绝大部分配置信息来源于一个名为persistence.xml的配置文件。这个文件必须位于类路径下的META-INF目录下。
+
+persistence.xml的作用在于定义一个或多个持久化单元。持久化单元是同一个数据源下的一个或多个持久化类。简单来讲，persistence.xml列出了一个或多个的持久化类以及一些其他的配置如数据源和基于XML的配置文件。如下是一个典型的persistence.xml文件，它是用于Spittr应用程序的：
+
+```xml
+<persistence xmlns="http://java.sun.com/xml/ns/persistence" version="1.0">
+    <persistence-unit name="spitterPU">
+        <class>spittr.domain.Spitter</class>
+        <class>spittr.domain.Spittle</class>
+        <properties>
+            <property name="toplink.jdbc.driver" value="com.mysql.jdbc.Driver" />
+            <property name="toplink.jdbc.url" value="jdbc:mysql://localhost:3306/test" />
+            <property name="toplink.jdbc.user" value="root" />
+            <property name="toplink.jdbc.password" value="mysql" />
+        </properties>
+    </persistence-unit>
+</persistence>
+```
+
+因为在persistence.xml文件中包含了大量的配置信息，所以在Spring中需要配置的就很少了。可以通过以下的`@Bean`注解方法在Spring中声明`LocalEntityManagerFactoryBean`：
+
+```java
+@Bean
+public LocalEntityManagerFactoryBean entityManagerFactoryBean() {
+    LocalEntityManagerFactoryBean lemfb = new LocalEntityManagerFactoryBean();
+    lemfb.setPersistenceUnitName("spitterPU");
+    return lemfb;
+}
+```
+
+赋给`persistenceUnitName`属性的值就是persistence.xml中持久化单元的名称。
+
+创建应用程序管理类型的`EntityManagerFactory`都是在persistence.xml中进行的，而这正是应用程序管理的本意。在应用程序管理的场景下（不考虑Spring时），完全由应用程序本身来负责获取`EntityManagerFactory`，这是通过JPA实现的`PersistenceProvider`做到的。如果每次请求`EntityManagerFactory`时都需要定义持久化单元，那代码将会迅速膨胀。通过将其配置在persistence.xml中，JPA就能够在这个特定的位置查找持久化单元定义了。
+
+但借助于Spring对JPA的支持，我们不再需要直接处理`PersistenceProvider`了。因此，再将配置信息放在persistence.xml中就显得不那么明智了。
+
+**使用容器管理类型的JPA**
+
+容器管理的JPA采取了一个不同的方式。当运行在容器中时，可以使用容器（例如Spring）提供的信息来生成`EntityManagerFactory`。
+
+现在我们可以将数据源信息配置在Spring应用上下文中，而不是在persistence.xml中了。例如使用`@Bean`注解方法声明了在Spring中如何使用`LocalContainerEntityManagerFactoryBean`来配置容器管理类型的JPA：
+
+```java
+@Bean
+public LocalContainerEntityManagerFactoryBean entityManagerFactory(DataSource dataSource, JpaVendorAdapter jpaVendorAdapter) {
+    
+    LocalContainerEntityManagerFactoryBean manager = new LocalContainerEntityManagerFactoryBean();
+    
+    manager.setDataSource(dataSource);
+    
+    manager.setJpaVendorAdapter(jpaVendorAdapter);
+    
+    manager.setPackagesToScan("spittr.domain");
+    
+    // 由于我们要加密密码，所以在将数据储存到数据库时关闭了validation
+    manager.setValidationMode(ValidationMode.NONE);
+
+    return manager;
+    
+}
+```
+
+这里，我们使用了Spring配置的数据源来设置`dataSource`属性。任何`javax.sql.DataSource`的实现都是可以的。尽管数据源还可以在persistence.xml中进行配置，但是这个属性指定的数据源具有更高的优先级。
+
+`jpaVendorAdapter`属性用于指明所使用的是哪一个厂商的JPA实现。Spring提供了多个JPA厂商适配器：
+
+- EclipseLinkJpaVendorAdapter
+- HibernateJpaVendorAdapter
+- OpenJpaVendorAdaptor
+
+这里我们使用Hibernate的JPA实现（需要添加依赖hibernate-entitymanager）：
+
+```java
+@Bean
+public JpaVendorAdapter jpaVendorAdapter() {
+    HibernateJpaVendorAdapter adapter = new HibernateJpaVendorAdapter();
+    adapter.setDatabase(Database.MYSQL);
+    adapter.setShowSql(true);
+    adapter.setDatabasePlatform("org.hibernate.dialect.MySQL5Dialect");
+    adapter.setGenerateDdl(false);
+    return adapter;
+}
+```
+
+Hibernate的JPA适配器支持多种数据库，可以通过其`database`属性配置使用哪个数据库：
+
+```java
+public enum Database {
+    DEFAULT, DB2, DERBY, H2, HSQL, INFORMIX, MYSQL, ORACLE, POSTGRESQL,  SQL_SERVER, SYBASE
+}
+```
+
+最后我们通过属性`packagesToScan`来指定我们要扫描的实体类所在包。在上述配置中`LocalContainerEntityManagerFactoryBean`会扫描`spittr.domain`包，查找带有`@Entity`注解的类。
+
+例如：
+
+```java
+@Entity
+public class Spitter {
+
+    @Id
+    @GeneratedValue(strategy=GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "username")
+    @NotBlank(message = "{username.blank}")
+    @Size(min = 5, max = 16, message = "{username.size}")
+    private String username;
+
+    @Column(name = "password")
+    @NotBlank(message = "{password.blank}")
+    @Size(min = 5, max = 25, message = "{password.size}")
+    private String password;
+
+    @Column(name = "firstname")
+    @NotBlank(message = "{firstName.blank}")
+    @Size(min = 2, max = 30, message = "{firstName.size}")
+    private String firstName;
+
+    @Column(name = "lastname")
+    @NotBlank(message = "{lastName.blank}")
+    @Size(min = 2, max = 30, message = "{lastName.size}")
+    private String lastName;
+
+    // ...
+
+}
+```
+
+最后，我们还要配置事务管理并开启事务：
+
+```java
+@Configuration
+@EnableTransactionManagement
+public static class TransactionConfig implements TransactionManagementConfigurer {
+
+    @Autowired
+    private EntityManagerFactory emf;
+
+    @Override
+    public PlatformTransactionManager annotationDrivenTransactionManager() {
+        JpaTransactionManager transactionManager = new JpaTransactionManager();
+        transactionManager.setEntityManagerFactory(emf);
+        return transactionManager;
+    }
+}
+```
+
+这个静态内部类定义在JpaConfig类中。
+
+**从JNDI获取实体管理器工厂**
+
+如果将Spring应用程序部署在应用服务器中，`EntityManagerFactory`可能已经创建好了并且位于JNDI中等待查询使用。在这种情况下可以使用Spring `jee`命名空间下的`<jee:jndi-lookup>`元素来获取对`EntityManagerFactory`的引用。
+
+```xml
+<jee:jndi-lookup id="lemfb" jndi-name="persistence/spitterPU" />
+```
+
+同样地，也可以使用JavaConfig的方式：
+
+```java
+@Bean
+public JndiObjectFactoryBean entityManagerFactory() {
+    JndiObjectFactoryBean jndiObjectFB = new JndiObjectFactoryBean();
+    jndiObjectFB.setJndiName("jdbc/SpitterDS");
+    return jndiObjectFB;
+}
+```
+
+尽管这种方法没有返回`EntityManagerFactory`，但是它的结果就是一个`EntityManagerFactory` bean。这是因为它所返回的`JndiObjectFactoryBean`是`FactoryBean`接口的实现，它能够创建`EntityManagerFactory`。
+
+#### 11.2.2 编写基于JPA的Repository
+
+正如Spring对其他持久化方案的集成一样，Spring对JPA集成也提供了`JpaTemplate`模板以及对应。的支持类`JpaDaoSupport`。但是，为了实现更纯粹的JPA方式，基于模板的JPA已经被弃用了。
+
+鉴于纯粹的JPA方式远胜于基于模板的JPA，所以在本节中我们将会重点关注如何构建不依赖Spring的JPA Repository。
+
+```java
+@Repository
+@Transactional
+public class JpaSpitterRepository implements SpitterRepository {
+
+    @PersistenceUnit
+    private EntityManagerFactory emf;
+    
+    @Override
+    public long count() {
+        return findAll().size();
+    }
+
+    @Override
+    public void addSpitter(Spitter spitter) {
+
+        spitter.setPassword(new Pbkdf2PasswordEncoder("53cr3t").encode(spitter.getPassword()));
+
+        emf.createEntityManager().persist(spitter);
+    }
+
+    @Override
+    public Spitter findByUsername(String username) {
+        return (Spitter) emf.createEntityManager()
+                .createQuery("select s from Spitter s where s.username=?")
+                .setParameter(1, username)
+                .getSingleResult();
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public List<Spitter> findAll() {
+        return (List<Spitter>) emf.createEntityManager().createQuery("SELECT s FROM spitter").getResultList();
+    }
+    
+    @Override
+    public Spitter findOne(long id) {
+        return emf.createEntityManager().find(Spitter.class, id);
+    }
+
+}
+```
+
+（这里`createQuery()`方法中的语句是JPQL语句）
+
+
+这里使用了`@PersistenceUnit`注解，因此Spring会将`EntityManagerFactory`注入进来。有了`EntityManagerFactory`之后，`JpaSpitterRepository`的方法就能使用它来创建`EntityManager`了，然后`EntityManager`可以针对数据库执行操作。
+
+在`JpaSpitterRepository`中，唯一的问题在于每个方法都会调用`createEntityManager()`。除了引入易出错的重复代码以外，这还意味着每次调用Repository的方法时，都会创建一个新的`EntityManager`。这种复杂性源于事务。如果我们能够预先准备好`EntityManager`，那会不会更加方便呢？
+
+这里的问题在于`EntityManager`并不是线程安全的，一般来讲并不适合注入到像Repository这样共享的单例bean中。但是，这并不意味着我们没有办法要求注入`EntityManager`。
+
+我们需要使用`@PersistenceContext`注解：
+
+```java
+@Repository
+@Transactional
+public class JpaSpitterRepository implements SpitterRepository {
+
+    @PersistenceContext
+    private EntityManager manager;
+    
+    @Override
+    public long count() {
+        return findAll().size();
+    }
+
+    @Override
+    public void addSpitter(Spitter spitter) {
+
+        spitter.setPassword(new Pbkdf2PasswordEncoder("53cr3t").encode(spitter.getPassword()));
+
+        manager.persist(spitter);
+    }
+
+    @Override
+    public Spitter findByUsername(String username) {
+        
+        return (Spitter) manager
+                .createQuery("select s from Spitter s where s.username=:username")
+                .setParameter("username", username)
+                .getSingleResult();
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public List<Spitter> findAll() {
+        return (List<Spitter>) manager.createQuery("SELECT s FROM spitter").getResultList();
+    }
+    
+    @Override
+    public Spitter findOne(long id) {
+        return manager.find(Spitter.class, id);
+    }
+}
+```
+
+在这个新版本的`JpaSpitterRepository`中，直接为其设置了`EntityManager`，这样的话，在每个方法中就没有必要再通过`EntityManagerFactory`创建`EntityManager`了。尽管这种方式非常便利，但是你可能会担心注入的`EntityManager`会有线程安全性的问题。
+
+这里的真相是`@PersistenceContext`并不会真正注入`EntityManager`——至少，精确来讲不是这样的。它没有将真正的`EntityManager`设置给Repository，而是给了它一个`EntityManager`的代理。真正的`EntityManager`是与当前事务相关联的那一个，如果不存在这样的`EntityManager`的话，就会创建一个新的。这样的话，我们就能始终以线程安全的方式使用实体管理器。
+
+另外，还需要了解`@PersistenceUnit`和`@PersistenceContext`并不是Spring的注解，它们是由JPA规范提供的。为了让Spring理解这些注解，并注入`EntityManagerFactory`或`EntityManager`，我们必须要配置Spring的`PersistenceAnnotationBeanPostProcessor`。
+
+这里可以使用XML配置的`<context:annotation-config>`或`<context:component-scan>`（使用后者可以省略前者），这样这些配置元素会自动注册`PersistenceAnnotationBeanPostProcessor` bean。
+
+我们也可以显式的注册它：
+
+```java
+@Bean
+public PersistenceAnnotationBeanPostProcessor processor() {
+    return new PersistenceAnnotationBeanPostProcessor();
+}
+```
+
+最后，与Hibernate的配置相同，我么需要配置异常处理器：
+
+```java
+@Bean
+public BeanPostProcessor persistenceTranslation() {
+    return new PersistenceExceptionTranslationPostProcessor();
+}
+```
+
+事实上，不管对于JPA还是Hibernate，异常转换都不是强制要求的。如果你希望在Repository中抛出特定的JPA或Hibernate异常，只需将`PersistenceExceptionTranslationPostProcessor`省略掉即可，这样原来的异常就会正常地处理。但是，如果使用了Spring的异常转换，你会将所有的数据访问异常置于Spring的体系之下，这样以后切换持久化机制的话会更容易。
+
+### 11.3 借助Spring Data实现自动化的JPA Repository
+
+*以下内容代码在工程sia4e-P3_Spring_in_the_back_end-C11_Persisting_data_with_object-relational_mapping-03_springdata中*。
+
+（这里我们使用的spring-data-jpa版本为1.11.14，由于我们使用的Spring框架版本不是5，我们配置的是Thymeleaf-spring4，所以不能使用spring-data-jpa 2。如果使用，在访问引用首页是就会报错：`java.lang.ClassNotFoundException: org.thymeleaf.spring5.expression.IThymeleafEvaluationContext`。）
+
+尽管上一节的JPA实现很简单，但它们依然会直接与`EntityManager`交互来查询数据库。并且，仔细看一下的话，这些代码多少还是样板式的。例如`addSpitter()`方法：
+
+```java
+public void addSpitter(Spitter spitter) {
+    entityManager.persisit(spitter);
+}
+```
+
+在任何具有一定规模的应用中，你可能会以几乎完全相同的方式多次编写这种方法。
+
+为什么我们需要一遍遍地编写相同的持久化方法呢？Spring Data JPA能够终结这种样板式的愚蠢行为。我们不再需要一遍遍地编写相同的Repository实现，Spring Data能够让我们只编写Repository接口就可以了。根本就不再需要实现类了。
+
+首先重新定义`SpitterRepository`接口：
+
+```java
+public interface SpitterRepository extends JpaRepository<Spitter, Long> {
+    
+}
+```
+
+此时，`SpitterRepository`看上去并没有什么作用。但是，它的功能远超出了表面上所看到的那样。
+
+编写Spring Data JPA Repository的关键在于要从一组接口中挑选一个进行扩展。这里，`SpitterRepository`扩展了Spring Data JPA的`JpaRepository`。通过这种方式，`JpaRepository`进行了参数化，所以它知道这是一个用来持久化`Spitter`对象的Repository，并且`Spitter`对象的ID类型为`Long`。如果此时有一个`SpitterRepository`的实现类，那么这个实现类需要实现24个相关的数据操作方法。
+
+此时，我们可能会来编写这个实现类了。但是，事实上，我们根本不需要编写任何实现。相反，我们让Spring Data来做这件事，而我们要做的就是对它提出要求。
+
+为了要求Spring Data创建`SpitterRepository`实现，我们需要在Spring配置中添加一个元素：
+
+```xml
+<jpa:repositories base-package="spittr.data" />
+```
+
+`<jpa:repositories>`元素与`<context:component-scan>`一样，需要指定一个要进行扫描的包。`<jpa:repositories>`会扫描指定的基础包以及子包来查找扩展自Spring Data Jpa Repository接口的所有接口。如果发现了这个接口，他会在运行时自动生成这个接口的实现。
+
+当然，我们可以使用JavaConfig的方式来代替XML配置，这需要使用注解`@EnableJpaRepositories`：
+
+```java
+@Configuration
+@EnableJpaRepositories("spittr.data")
+public class SpringDataJpaConfig {
+    // ...
+}
+```
+
+让我们回到`SpitterRepository`接口，它扩展自`JpaRepository`，而`JpaRepository`又扩展自`Repository`标记接口（虽然是间接的，`JpaRepository`扩展了`PagingAndSortingRepository`和`QueryByExampleExecutor`两个接口。其中`PagingAndSortingRepository`接口扩展了`CrudRepository`接口，而`CrudRepository`接口扩展自`Repository`接口）。因此，`SpitterRepository`就传递性地扩展了`Repository`接口。当Spring Data找到它后，就会创建其的实现类，其中包含所有应该实现的24个方法。
+
+（这里原书中说是18个方法，应该是没有算上`QueryByExampleExecutor`接口中的6个方法。因为这个接口是spring-data-commons 1.12中才出现的。由于我们引入的spring-data-jpa的版本为1.11.14，而这个jar包使用的spring-data-commons的版本为1.13.14，所以我们的`SpitterRepository`会获得24个方法）
+
+很重要的一点在于Repository的实现类是在应用启动的时候生成的，也就是Spring的应用上下文创建的时候。它并不是在构建时通过代码生成技术产生的。
+
+Spring Data JPA很棒的一点在于它能为Spitter对象提供24个便利的方法来进行通用的JPA操作，而无需你编写任何持久化代码。但是，如果你的需求超过了它所提供的这24个方法的话，该怎么办呢？幸好，Spring Data JPA提供了几种方式来为Repository添加自定义的方法。让我们看一下如何为Spring Data JPA编写自定义的查询方法。
+
+#### 11.3.1 定义查询方法
+
+现在，`SpitterRepository`需要完成的一项功能是根据给定的`username`查找`Spitter`对象。比如，我们将`SpitterRepository`接口修改为如下所示的样子：
+
+```java
+public interface SpitterRepository extends JpaRepository<Spitter, Long> {
+    Spitter findByUsername(String username);
+}
+```
+
+这个新的`findByUserName()`非常简单，但是足以满足我们的需求。现在，该如何让Spring Data JPA提供这个方法的实现呢？
+
+**实际上，我们并不需要实现`findByUsername()`。方法签名已经告诉Spring Data JPA足够的信息来创建这个方法的实现了。**
+
+当创建Repository实现的时候，Spring Data会检查Repository接口的所有方法，解析方法的名称，并基于被持久化的对象来试图推测方法的目的。
+
+本质上，Spring Data定义了一组小型的领域特定语言（Domain Specific Language ，DSL），在这里，持久化的细节都是通过Repository方法的签名来描述的。
+
+Spring Data能够知道这个方法是要查找`Spitter`的，因为我们使用`Spitter`对`JpaRepository`进行了参数化（泛型`<Spitter, Long>`）。方法名`findByUsername`确定该方法需要根据`username`属性相匹配来查找`Spitter`，而`username`是作为参数传递到方法中来的。另外，因为在方法签名中定义了该方法要返回一个`Spitter`对象，而不是一个集合，因此它只会查找一个`username`属性匹配的`Spitter`。
+
+`findByUsername()`方法非常简单，但是Spring Data也能处理更加有意思的方法名称。Repository方法是由一个动词、一个可选的主题（Subject）、关键词*By*以及一个断言所组成。在`findByUsername()`这个样例中，动词是*find*，断言是*Username*，主题并没有指定，暗含的主题是*Spitter*。
+
+作为示例，我们使用方法`readSpitterByFirstnameOrLastname()`来看一下方法中的各个部分是如何映射的。
+
+<center>
+    ![图10.3-Repository方法的命名遵循的模式](images\图10.3-Repository方法的命名遵循的模式.PNG)
+    **Repository方法的命名遵循一种模式，有助于Spring Data生成针对数据库的查询**
+</center>
+
+这里的动词是*read*，与之前的*find*类似。Spring Data允许方法名中使用四种动词：*get*、*read*、*find*和*count*。其中*get*、*read*和*find*是同义的，这三个动词对应的Repository方法都会查询数据并返回对象。而动词*count*则返回匹配对象的数量而不是对象本身。
+
+Repository方法的主题是可选的。它的主要目的是让我们在命名方法的时候有更多的灵活性。也就是说，在大多数场景下，主题会被省略，同时`readSpittersByFirstnameOrLastname()`与`readPuppiesByFirstnameOrLastname()`并没有什么差别，甚至与`readThoseThingsWeWantByFirstnameOrLastname()`也没什么区别。因为要查询的对象类型是通过`JpaRepository`接口的泛型决定的。
+
+在省略主题的时候，有一种例外情况。如果主题的名称以*Distinct*开头的话，那么在生成查询的时候会确保所返回结果集中不包含重复记录。
+
+断言是方法名称中最为有意思的部分，它指定了限制结果集的属性。在`readByFirstnameOrLastname()`这个样例中，会通过`firstname`属性或`lastname`属性的值来限制结果。
+
+在断言中，会有一个或多个限制结果的条件。每个条件必须引用一个属性，并且还可以指定一种比较操作。如果省略比较操作符的话，那么这暗指是一种相等比较操作。不过，我们也可以选择其他的比较操作，包括如下的种类：
+
+- IsAfter、After、IsGreaterThan、GreaterThan
+- IsGreaterThanEqual、GreaterThanEqual
+- IsBefore、Before、IsLessThan、LessThan
+- IsLessThanEqual、LessThanEqual
+- IsBetween、Between
+- IsNull、Null
+- IsNotNull、NotNull
+- IsIn、In
+- IsNotIn、NotIn
+- IsStartingWith、StartingWith、StartsWith
+- IsEndingWith、EndingWith、EndsWith
+- IsContaining、Containing、Contains
+- IsLike、Like
+- IsNotLike、NotLike
+- IsTrue、True
+- IsFalse、False
+- Is、Equals
+- IsNot、Not
+
+要对比的属性值就是方法的参数：
+
+```java
+List<Spitter> readByFirstnameOrLastname(String first, String last);
+```
+
+要处理`String`类型的属性时，条件中可能还可以包含*IgnoringCase*或*IgnoresCase*（二者同义），这样在执行对比的时候就会不再考虑字符是大写还是小写。例如，要在`firstname`和`lastname`属性上忽略大小写：
+
+```java
+List<Spitter> readByFirstnameIgnoringCaseOrLastnameIgnoresCase(String first, String last);
+```
+
+作为*IgnoringCase*/*IgnoresCase*的替代方案，我们还可以在所有条件的后面添加*AllIgnoringCase*或*AllIgnoresCase*，这样它就会忽略所有条件的大小写：
+
+```java
+List<Spitter> readByFirstnameOrLastnameAllIgnoresCase(String first, String last);
+```
+
+注意，参数的名称是无关紧要的，但是它们的顺序必须要与方法名称中的操作符相匹配。
+
+最后，我们还可以在方法名称的结尾处添加*OrderBy*，实现结果集排序。例如，我们可以按照`lastname`属性升序排列结果集：
+
+```java
+List<Spitter> readByFirstnameOrLastnameOrderByLastnameAsc(String first, String last);
+```
+
+如果要根据多个属性排序的话，只需将其依序添加到*OrderBy*中即可。例如，下面的样例中，首先会根据`lastname`升序排列，然后根据`firstname`属性降序排列：
+
+```java
+List<Spitter> readByFirstnameOrLastnameOrderByLastnameAscFirstnameDesc(String first, String last);
+```
+
+可以看到，条件部分是通过*And*或者*Or*进行分割的。
+
+我们只是初步体验了所能声明的方法种类，Spring Data JPA会为我们实现这些方法。现在，我们只需知道通过使用属性名和关键字构建Repository方法签名，就能让Spring Data JPA生成方法实现，完成几乎所有能够想象到的查询。
+
+#### 11.3.2 声明自定义查询
+
+假设我们想要创建一个Repository方法，用来查找E-mail地址是Gmail邮箱的Spitter。有一种方式就是定义一个`findByEmailLike()`方法，然后每次想查找Gmail用户的时候就将“%gmail.com”传递进来。不过，更好的方案是定义一个更加便利的`findAllGmailSpitters()`方法，这样的话，就不用将Email地址的一部分传递进来了：
+
+```java
+List<Spitter> findAllGmailSpitters();
+```
+
+**不过，这个方法并不符合Spring Data的方法命名约定。**当Spring Data试图生成这个方法的实现时，无法将方法名的内容与Spitter元模型进行匹配，因此会抛出异常。
+
+如果所需的数据无法通过方法名称进行恰当地描述，那么我们可以使用`@Query`注解，为Spring Data提供要执行的查询。对于`findAllGmailSpitters()`方法，我们可以按照如下的方式来使用`@Query`注解：
+
+```java
+@Query("select s from spitter s where s.email like '%gmail.com'")
+List<Spitter> findAllGmailSpitters();
+```
+
+我们依然不需要编写`findAllGmailSpitters()`方法的实现，只需提供查询即可，让Spring Data JPA知道如何实现这个方法。
+
+可以看到，当使用方法命名约定很难表达预期的查询时，`@Query`注解能够发挥作用。如果按照命名约定，方法的名称特别长的时候，也可以使用这个注解。例如，考虑如下的查询方法：
+
+```java
+List<Order> findByCustomerAddressZipCodeOrCustomerNameAndCustomerAddressState();
+```
+
+在现实世界中，确实存在这样的需求，使用Repository方法所执行的查询要使用一个很长的方法名。在这种情况下，我们最好使用一个较短的方法名，并使用`@Query`来指定该方法要如何查询数据库。
+
+对于Spring Data JPA的接口来说，`@Query`是一种添加自定义查询的便利方式。但是，它仅限于单个JPA查询。如果我们需要更为复杂的功能，无法在一个简单的查询中处理的话，该怎么办呢？
+
+#### 11.3.3 混合自定义的功能
+
+有些时候，我们需要Repository所提供的功能是无法用Spring Data的方法命名约定来描述的，甚至无法用`@Query`注解设置查询来实现。尽管Spring Data JPA非常棒，但是它依然有其局限性，可能需要我们按照传统的方式来编写Repository方法：也就是直接使用`EntityManager`。当遇到这种情况的时候，我们是不是要放弃Spring Data JPA，重新来编写Repository呢？
+
+简单来说，是这样的。如果你需要做的事情无法通过Spring Data JPA来实现，那就必须要在一个比Spring Data JPA更低的层级上使用JPA。好消息是我们没有必要完全放弃Spring Data JPA。我们只需在必须使用较低层级JPA的方法上，才使用这种传统的方式即可，而对于Spring Data JPA知道该如何处理的功能，我们依然可以通过它来实现。
+
+当Spring Data JPA为Repository接口生成实现的时候，它还会查找名字与接口相同，并且添加了Impl后缀的一个类。如果这个类存在的话，Spring Data JPA将会把它的方法与Spring Data JPA所生成的方法合并在一起。对于`SpitterRepository`接口而言，要查找的类名为`SpitterRepositoryImpl`。
+
+为了阐述该功能，假设我们需要在`SpitterRepository`中添加一个方法，发表Spittle数量在10,000及以上的Spitter将会更新为Elite状态。使用Spring Data JPA的方法命名约定或使用`@Query`均没有办法声明这样的方法。最为可行的方案是使用如下的`eliteSweep()`方法。
+
+```java
+public class SpitterRepositoryImpl implements SpitterSweeper {
+    @PersistenceContext
+    private EntityManager manager;
+
+    @Override
+    public int eliteSweep() {
+        String update = 
+            "update Spitter spitter set spitter.status = 'Elite' " + 
+            "where spitter.status = 'Newbie' and spitter id in " +
+            "(select s from spitter s where " +
+            "(select count(spittles) from s.spittles spittles) > 10000)"
+
+        return manager.createQuery(update).executeUpdate();
+    }
+}
+```
+
+`SpitterRepositoryImpl`没有什么特殊之处，它使用被注入的`EntityManager`来完成预期的任务。
+
+**需要注意的是，`SpitterRepositoryImpl`并没有实现`SpitterRepository`接口。**Spring Data JPA负责实现这个接口。`SpitterRepositoryImpl`（将它与Spring Data的Repository关联起来的是它的名字）实现了`SpitterSweeper`接口，它如下所示：
+
+```java
+public interface SpitterSweeper {
+    int eliteSweep();
+}
+```
+
+我们还需要确保`eliteSweep()`方法会被声明在`SpitterRepository`接口中。要实现这一点，避免代码重复的简单方式就是修改`SpitterRepository`，让它扩展`SpitterSweeper`：
+
+```java
+public interface SpitterRepostory extends JpaRepository<Spitter, Long>,
+                                             SpitterSweeper {
+
+}
+```
+
+如前所述，Spring Data JPA将实现类与接口关联起来是基于接口的名称。但是，Impl后缀只是默认的做法，如果你想使用其他后缀的话，只需在配置`@EnableJpaRepositories`的时候，设置`repositoryImplementationPostfix`属性即可：
+
+```java
+@EnableJpaRepository(
+        basePackages = "spittr.data",
+        repositoryImplementationPostfix = "Helper"
+    )
+```
+
+或在XML中定义：
+
+```xml
+<jpa:repositories base-package="spittr.data" repository-impl-postfix="Helper" />
+```
+
+我们将后缀设置成了Helper，Spring Data JPA将会查找名为`SpitterRepositoryHelper`的类，用它来匹配`SpitterRepository`接口。
+
+### 11.4 小结
+
+>
+对于很多应用来讲，关系型数据库是主流的数据存储形式，并且这种情况已经持续了很多年。使用JDBC并且将对象映射为数据库表是很烦琐乏味的事情，像Hibernate和JPA这样的ORM方案能够让我们以更加声明式的模型实现数据持久化。尽管Spring没有为ORM提供直接的支持，但是它能够与多种流行的ORM方案集成，包括Hibernate与Java持久化API。
+>
+在本章中，我们看到了如何在Spring应用中使用Hibernate的上下文Session，这样我们的Repository就能包含很少甚至不包含Spring相关的代码。与之类似，我们还看到了如何将EntityManagerFactory或EntityManager注入到Repository实现中，从而实现不依赖于Spring的JPA Repository。
+>
+我们稍后初步了解了Spring Data，在这个过程中，只需声明JPARepository接口即可，让Spring Data JPA在运行时自动生成这些接口的实现。当我们需要的Repository方法超出了Spring Data JPA所提供的功能时，可以借助@Query注解以及编写自定义的Repository方法来实现。
+>
+但是，对于Spring Data的整体功能来说，我们只是接触到了皮毛。在下一章中，我们将会更加深入地学习Spring Data的方法命名DSL，以及Spring Data如何为关系型数据库以外的领域带来帮助。也就是说：我们将会看到Spring Data如何支持新兴的NoSQL数据库，这些数据库在最近几年变得越来越流行。
