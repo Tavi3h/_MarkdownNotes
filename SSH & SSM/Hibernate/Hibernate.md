@@ -6978,7 +6978,7 @@ Hibernate主配置文件：
 
 注意：
 
-- @GeneratedValue注解中的strategy不能选AUTO，因为这里AUTO对默认是SEQUENCE。
+- @GeneratedValue注解中的strategy不能选AUTO，因为这里AUTO默认是SEQUENCE。
 - @Basic注解默认存在，无需显式指定；反之@Transient注解必须显式指定。
 - 当类名与表名相同时，可省略@Table。
 - 当属性名与字段名相同时，可省略@Column。
