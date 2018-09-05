@@ -12113,3 +12113,468 @@ public interface SpitterRepostory extends JpaRepository<Spitter, Long>,
 我们稍后初步了解了Spring Data，在这个过程中，只需声明JPARepository接口即可，让Spring Data JPA在运行时自动生成这些接口的实现。当我们需要的Repository方法超出了Spring Data JPA所提供的功能时，可以借助@Query注解以及编写自定义的Repository方法来实现。
 >
 但是，对于Spring Data的整体功能来说，我们只是接触到了皮毛。在下一章中，我们将会更加深入地学习Spring Data的方法命名DSL，以及Spring Data如何为关系型数据库以外的领域带来帮助。也就是说：我们将会看到Spring Data如何支持新兴的NoSQL数据库，这些数据库在最近几年变得越来越流行。
+
+## 第十二章 使用NoSQL数据库
+
+本章内容：
+
+- 为MongoDB和Neo4j编写Repository
+- 为多种数据存储形式持久化数据
+- 组合使用Spring和Redis
+
+在数据库领域，多年来，我们一直被告知，我们可以使用任意想要的数据库，只要它是关系型数据库就行。关系型数据库已经垄断应用开发领域好多年了。
+
+随着一些竞争者进入数据库领域，关系型数据库的垄断地位开始被弱化。所谓的“NoSQL”数据库开始侵入生产型的应用之中，我们也认识到并没有一种全能型的数据库。现在有了更多的可选方案，所以能够为要解决的问题选择最佳的数据库。
+
+Spring Data还提供了对多种NoSQL数据库的支持，包括MongoDB、Neo4j和Redis。它不仅支持自动化的Repository，还支持基于模板的数据访问和映射注解。
+
+### 12.1 使用MongoDB持久化文档数据
+
+这里我们使用4.0.2版本的MongoDB和2.0.9版本的Spring Data MongoDB以及2.0.9版本的spring-data-jpa。同时这个版本的Spring Data MongoDB要求我们的Spring框架的版本为5.0.8。mongodb-driver使用3.8.1版本。
+
+有一些数据的最佳表现形式是文档（document）。也就是说，不要把这些数据分散到多个表、节点或实体中，将这些信息收集到一个非规范化（也就是文档）的结构中会更有意义。尽管两个或两个以上的文档有可能会彼此产生关联，但是通常来讲，文档是独立的实体。能够按照这种方式优化并处理文档的数据库，我们称之为文档数据库。
+
+例如，假设我们要编写一个应用程序来获取大学生的成绩单，可能需要根据学生的名字来查询其成绩单，或者根据一些通用的属性来查询成绩单。但是，每个学生是相互独立的，任意的两个成绩单之间没有必要相互关联。尽管我们能够使用关系型数据库模式来获取成绩单数据（也许你曾经这样做过），但文档型数据库可能才是更好的方案。
+
+**文档数据库不适用于什么场景**
+
+了解文档型数据库能够用于什么场景是很重要的。但是，知道文档型数据库在什么情况下不适用同样也是很重要的。文档数据库不是通用的数据库，它们所擅长解决的是一个很小的问题集。
+
+有些数据具有明显的关联关系，文档型数据库并没有针对存储这样的数据进行优化。例如，社交网络表现了应用中不同的用户之间是如何建立关联的，这种情况就不适合放到文档型数据库中。在文档数据库中存储具有丰富关联关系的数据也并非完全不可能，但这样做的话，你通常会发现遇到的挑战要多于所带来的收益。
+
+MongoDB是最为流行的开源文档数据库之一。Spring Data MongoDB提供了三种方式在Spring应用中使用MongoDB：
+
+- 通过注解实现对象-文档映射
+- 使用`MongoTemplate`实现基于模板的数据库访问
+- 自动化的运行时Repository生成功能
+
+我们已经看到Spring Data JPA如何为基于JPA的数据访问实现自动化Repository生成功能。Spring Data MongoDB为基于MongoDB的数据访问提供了相同的功能。
+
+不过，与Spring Data JPA不同的是，Spring Data MongoDB提供了将Java对象映射为文档的功能。（Spring Data JPA没有必要为JPA提供这样的注解，因为JPA规范本身就提供了对象-关系映射注解）。除此之外，Spring Data MongoDB为通用的文档操作任务提供了基于模板的数据访问方式。
+
+#### 12.1.1 启用MongoDB
+
+为了有效地使用Spring Data MongoDB，我们需要在Spring配置中添加几个必要的bean。首先，我们需要配置MongoClient，以便于访问MongoDB数据库。同时，我们还需要有一个`MongoTemplate` bean，实现基于模板的数据库访问。此外，不是必须，但是强烈推荐启用Spring Data MongoDB的自动化Repository生成功能。
+
+```java
+@Configuration
+@EnableMongoRepositories("orders.db") // 启用MongoDB的Repository功能
+public class MongoConfig {
+    @Bean
+    public MongoClientFactoryBean mongo() {
+        MongoClientFactoryBean mongo = new MongoClientFactoryBean();
+        mongo.setHost("localhost");
+        return mongo;
+    }
+    
+    @Bean
+    public MongoOperations mongoTemplate(MongoClientFactoryBean mongo) throws Exception {
+        return new MongoTemplate(mongo.getObject(), "OrdersDB");
+    }
+} 
+```
+
+`@EnableMongoRepositories`为MongoDB实现了自动化JPA Repository生成功能。
+
+（原书使用的spring-data-mongodb的版本是1.5.2并使用`MongoFactoryBean`。在我们使用的2.0.9中，这个类已经被标记为`@Deprecated`，并推荐使用`MongoClientFactoryBean`）
+
+第一个`@Bean`方法使用`MongoClientFactoryBean`声明了一个`Mongo`实例。这个bean将Spring Data MongoDB与数据库本身连接了起来。另外一个`@Bean`方法声明了`MongoTemplate` bean，在它构造时，使用了其他`@Bean`方法所创建的`Mongo`实例的引用以及数据库的名称。
+
+除了上述的配置方法，我们还可以让配置类继承`AbstractMongoConfiguration`并重写`getDatabaseName()`和`mongoClient()`方法：
+
+```java
+@Configuration
+@EnableMongoRepositories("orders.db") // 启用MongoDB的Repository功能
+public class MongoConfig extends AbstractMongoConfiguration {
+
+    // 指定数据库的名字
+    @Override
+    public MongoClient mongoClient() {
+        return new MongoClient();
+    }
+
+    // 创建Mongo客户端
+    @Override
+    protected String getDatabaseName() {
+        return "OrdersDB";
+    }
+} 
+```
+
+上述配置与第一个配置在功能上是相同的，但最显著的区别是这个配置中没有直接声明`MongoTemplate` bean，当然它还是会被隐式地创建。
+
+如果我们的MongoDB运行在本地上，那么上述配置就可以了。如果MongoDB服务器运行在其他的的机器上，那么可以在创建`MongoClient`的时候进行指定：
+
+```java
+@Override
+public MongoClient mongoClient() {
+    return new MongoClient("mongodbserver");
+}
+```
+
+另外MongoDB服务器有可能监听的端口并不是默认的27017，如果是这样的话，我们还需要在创建`MongoClient`的时候指定端口：
+
+```java
+@Override
+public MongoClient mongoClient() {
+    return new MongoClient("mongodbserver", 37017);
+}
+```
+
+如果MongoDB服务器运行在生产配置上，我认为你可能还启用了认证功能。在这种情况下，为了访问数据库，我们还需要提供应用的凭证。访问需要认证的MongoDB服务器稍微有些复杂，如下所示：
+
+```java
+@Autowired
+private Environment env;
+
+@Override
+public MongoClient mongoClient() {
+    MongoCredential credential = MongoCredential.createCredential(
+        env.getProperty("mongo.username"), 
+        "OrdersDB", 
+        env.getProperty("mongo.password").toCharArray());
+
+    return new MongoClient(new ServerAddress("localhost", 37017), Arrays.asList(credential));
+
+}
+```
+
+（上述代码中`MongoClient(ServerAddress, List)`这个构造器已经被标注为`@Deprecated`）
+
+Spring Data MongoDB同样支持通过XML来进行配置，这需要使用`mongo`命名空间：
+
+```xml
+    <!-- 启用Repository生成功能 -->
+    <mongo:repositories base-package="orders.db" />
+    
+    <!-- 声明MongoClient -->
+    <mongo:mongo-client id="mongo-client"/>
+    
+    <!-- 创建MongoTemplate bean -->
+    <bean id="mongoTemplate" class="org.springframework.data.mongodb.core.MongoTemplate">
+        <constructor-arg ref="mongo-client" />
+        <constructor-arg value="OrdersDB" />
+    </bean>
+```
+
+现在Spring Data MongoDB已经配置完成了，我们很快就可以使用它来保存和查询文档了。但首先，需要使用Spring Data MongoDB的对象-文档映射注解为Java领域对象建立到持久化文档的映射关系。
+
+#### 12.1.2 为模型添加注解，实现MongoDB持久化
+
+当使用JPA的时候，我们需要将Java实体类映射到关系型表和列上。JPA规范提供了一些支持对象-关系映射的注解，而有一些JPA实现，如Hibernate，也添加了自己的映射注解。
+
+但是，MongoDB并没有提供对象-文档映射的注解。Spring DataMongoDB填补了这一空白，提供了一些将Java类型映射为MongoDB文档的注解：
+
+注解 | 描述
+----- | -----
+`@Document` | 标示映射到MongoDB文档上的领域对象
+`@Id` | 标示某个域为ID域
+`@DbRef` | 标示某个域要引用其他的文档，这个文档有可能位于另外一个数据库中
+`@Field` | 为文档域指定自定义的元数据
+`@Version` | 标示某个属性用作版本域
+
+`@Document`和`@Id`注解类似于JPA的`@Entity`和`@Id`注解。我们将会经常使用这两个注解，对于要以文档形式保存到MongoDB数据库的每个Java类型都会使用这两个注解。
+
+例如，如下的程序展现了如何为`Order`类添加注解，它会被持久化到MongoDB：
+
+```java
+package orders;
+
+import java.util.Collection;
+import java.util.LinkedHashSet;
+
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.mapping.Field;
+
+@Document
+public class Order {
+
+    @Id
+    private String id;
+
+    @Field("client") // 覆盖默认的域名
+    private String customer;
+
+    private String type;
+
+    private Collection<Item> items = new LinkedHashSet<>();
+
+    public String getCustomer() {
+        return customer;
+    }
+
+    public void setCustomer(String customer) {
+        this.customer = customer;
+    }
+
+    public String getType() {
+        return type;
+    }
+
+    public void setType(String type) {
+        this.type = type;
+    }
+
+    public Collection<Item> getItems() {
+        return items;
+    }
+
+    public void setItems(Collection<Item> items) {
+        this.items = items;
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    @Override
+    public String toString() {
+        return "Order [id=" + id + ", customer=" + customer + ", type=" + type + ", items=" + items + "]";
+    }
+}
+```
+
+`Order`类使用了`@Document`注解，这样它就能够借助`MongoTemplate`或自动生成的Repository进行持久化。其`id`属性上使用`@Id`注解，用来指定它作为文档的ID。除此之外，`customer`属性上使用了`@Field`注解，这样的话，当文档持久化的时候`customer`属性将会映射为名为`client`的域。
+
+注意，其他的属性并没有添加注解。除非将属性设置为瞬时态（`transient`）的，否则Java对象中所有的域都会持久化为文档中的域。并且如果我们不使用`@Field`注解进行设置的话，那么文档域中的名字将会与对应的Java属性相同。
+
+同时，需要注意的是`items`属性，它指的是订单中具体条目的集合。在传统的关系型数据库中，这些条目将会保存在另外的一个数据库表中，通过外键进行应用，`items`域上很可能还会使用JPA的`@OneToMany`注解。但在这里，情形完全不同。
+
+<center>
+    ![图12.1-文档展现了关联但非规范化的数据](images\图12.1-文档展现了关联但非规范化的数据.PNG)
+    **文档展现了关联但非规范化的数据。相关的概念（如订单中的条目）被嵌入到顶层的文档数据中**
+</center>
+
+如前所述，文档可以与其它文档产生关联，但这并不是文档数据库所擅长的功能。在本例购买订单与行条目之间的关联关系中，行条目只是同一个订单文档里面内嵌的一部分。因此，没有必要为这种关联关系添加任何注解。实际上，`Item`类本身并没有任何注解：
+
+```java
+package orders;
+
+public class Item {
+
+    private Long id;
+
+    private Order order;
+
+    private String product;
+
+    private double price;
+
+    private int quantity;
+
+    public Order getOrder() {
+        return order;
+    }
+
+    public String getProduct() {
+        return product;
+    }
+
+    public void setProduct(String product) {
+        this.product = product;
+    }
+
+    public double getPrice() {
+        return price;
+    }
+
+    public void setPrice(double price) {
+        this.price = price;
+    }
+
+    public int getQuantity() {
+        return quantity;
+    }
+
+    public void setQuantity(int quantity) {
+        this.quantity = quantity;
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    @Override
+    public String toString() {
+        return "Item [id=" + id + ", order=" + order + ", product=" + product + ", price=" + price + ", quantity="
+                + quantity + "]";
+    }    
+}
+```
+
+我们没有必要为`Item`添加`@Document`注解，也没有必要为它的域指定`@Id`。这是因为我们不会单独将`Item`持久化为文档。它始终会是`Order`文档中`Item`列表的一个成员，并且会作为文档中的嵌入元素。
+
+#### 12.1.3 使用MongoTemplate访问MongoDB
+
+我们已经在配置类中配置了`MongoTemplate` bean，不管是显式声明还是扩展`AbstractMongoConfiguration`都能实现相同的效果。接下来，需要做的就是将其注入到使用它的地方：
+
+```java
+@Autowired
+private MongoOperations mongo;
+```
+
+`MongoOperations`暴露了多个使用MongoDB文档数据库的方法。在这里，我们不可能讨论所有的方法，但是可以看一下最为常用的几个操作，比如计算文档集合中有多少条文档。使用注入的`MongoOperations`，我们可以得到`Order`集合并调用`count()`来得到数量：
+
+```java
+long orderCount = mongo.getCollection("order").count();
+```
+
+假设要保存一个新的`Order`，我们可以使用`save()`方法：
+
+```java
+Order order = new Order();
+// set properties...
+mongo.save(order, "order");
+```
+
+`save()`方法的第一个参数是新创建的`Order`，第二个参数是要保存的文档存储的名称。
+
+我们还可以调用`findById()`方法来根据ID查找顶顶那：
+
+```java
+String orderId = "oxd1125ss3gcf11sad";
+Order order = mongo.findById(orderId, Order.class);
+```
+
+对于更高级的查询，我们需要构造Query对象并将其传递给`find()`方法。例如，要查找所有`client`域等于“Chuck Wagon”的订单，可以使用如下的代码：
+
+```java
+List<Order> orders = mongo.find(Query.query(Criteria.where("client").is("Chuck Wagon")), Order.class);
+```
+
+还可以更复杂，例如检查Chuck Wagon所有通过web创建的订单：
+
+```java
+List<Order> chucksWebOrders = mongo.find(Query.query(Criteria.where("customer").is("Chuck Wagon").and("type").is("WEB")), Order.class);
+```
+
+如果要移除某一个文档，可以使用`remove()`方法：
+
+```java
+mongo.remove(order);
+```
+
+通常来讲，我们会将`MongoOperations`注入到自己设计的Repository类中，并使用它的操作来实现Repository方法。但是，如果你不愿意编写Repository的话，那么Spring Data MongoDB能够自动在运行时生成Repository实现。
+
+#### 12.1.4 编写MongoDB Repository
+
+为了理解如何使用Spring Data MongoDB来创建Repository，让我们先回忆一下在第11章中是如何使用Spring Data JPA的。我们创建了一个扩展自`JpaRepository`的`SpitterRepository`接口。在那一小节中，我们还启用了SpringData JPA Repository功能。这样的结果就是Spring Data JPA能够自动创建接口的实现，其中包括了多个内置的方法以及我们所添加的遵循命名约定的方法
+
+现在，我们已经通过`@EnableMongoRepositories`注解启用了Spring DataMongoDB的Repository功能，接下来需要做的就是创建一个接口，Repository实现要基于这个接口来生成。不过，在这里，我们不再扩展`JpaRepository`，而是要扩展`MongoRepository`。如下的`OrderRepository`扩展了`MongoRepository`，为Order文档提供了基本的CRUD操作。
+
+```java
+package orders.db;
+
+import org.springframework.data.mongodb.repository.MongoRepository;
+
+import orders.Order;
+
+public interface OrderRepository extends MongoRepository<Order, String> {
+
+}
+```
+
+因为`OrderRepository`扩展了`MongoRepository`，因此它就会传递性地扩展`Repository`标记接口。任何扩展Repository的接口将会在运行时自动生成实现。
+
+`MongoRepository`接口有两个参数，第一个是带有`@Document`注解的对象类型，也就是该Repository要处理的类型。第二个参数是带有`@Id`注解的属性类型。
+
+尽管`OrderRepository`本身并没有定义任何方法，但是它会继承多个方法，包括对Order文档进行CRUD操作的方法。并且与上一章相同，如果我们编写`OrderRepository`的实现类，那么我们要实现21个方法。
+
+**添加自定义的查询方法**
+
+通常来讲，CRUD操作是很有用的，但我们有时候可能希望Repository提供除内置方法以外的其他方法。
+
+实际上，为MongoRepository自定义方法的命名约定与Spring Data JPA的约定相同。
+
+例如：
+
+```java
+Order findOrderById(String id);
+```
+
+同样地，我们也可以使用`@Query`注解为Repository方法指定自定义的查询。与JPA唯一不同的是，这里`@Query`会接受一个JSON查询，而不是JPA查询。
+
+例如：
+
+```java
+@Query("{'customer':'Tavish', 'type':?0}")
+List<Order> findOrderByType(String type); 
+```
+
+`@Query`中给定的JSON将会与所有的Order文档进行匹配，并返回匹配的文档。需要注意的是，`type`属性映射成了“?0”，这表明`type`属性应该与查询方法的第零个参数相等。如果有多个参数的话，它们可以通过“?1”、“?2”等方式进行引用。
+
+**混合自定义功能**
+
+对于Spring Data MongoDB来说，创建完全自定义的方法混合到自动生成的Repository的步骤是与Spring Data JPA完全相同的。
+
+假设我们想要查询文档中`type`属性匹配给定值的`Order`对象。我们可以通过创建签名为`List<Order> findByType(String t)`的方法，很容易实现这个功能。但是，如果给定的类型是“NET”，那我们就查找`type`值为“WEB”的`Order`对象。要实现这个功能的话，这就有些困难了，即便使用`@Query`注解也不容易实现。不过，混合实现的做法能够完成这项任务。
+
+首先定义中间接口：
+
+```java
+package orders.db;
+
+import java.util.List;
+
+import orders.Order;
+
+public interface OrderOperations {
+    List<Order> findOrdersByType(String type);
+}
+```
+
+接下来编写混合实现：
+
+```java
+package orders.db;
+
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.mongodb.core.MongoOperations;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+
+import orders.Order;
+
+public class OrderRepositoryImpl implements OrderOperations {
+
+    @Autowired
+    private MongoOperations mongo;
+
+    @Override
+    public List<Order> findOrdersByType(String t) {
+
+        String type = t.equals("NET") ? "WEB" : t;
+
+        Criteria where = Criteria.where("type").is(type);
+
+        return mongo.find(Query.query(where), Order.class);
+    }
+}
+```
+
+可以看到，混合实现中注入了`MongoOperations`（也就是`MongoTemplate`所实现的接口）。`findOrdersByType()`方法使用`MongoOperations`对数据库进行了查询，查找匹配条件的文档。
+
+最后修改`OrderRepository`，让其扩展中间接口`OrderOperations`：
+
+```java
+public interface OrderRepository extends MongoRepository<Order, String>, OrderOperations {
+    // ...    
+}
+```
+
+将这些关联起来的关键点在于实现类的名称为`OrderRepositoryImpl`。这个名字前半部分与`OrderRepository`相同，只是添加了“Impl”后缀。当Spring Data MongoDB生成Repository实现时，它会查找这个类并将其混合到自动生成的实现中。
+
+当然，我们可以更改后缀“Impl”：
+
+```java
+@EnableMongoRepositories(basePackages = "orders.db", repositoryImplementationPostfix = "Stuff")
+```
+
+使用XML配置的话可以使用`<mongo:repositories>`的`repository-impl-postfix`属性。
+
+像MongoDB这样的文档数据库能够解决特定类型的问题，但是就像关系型数据库不是全能型数据库那样，MongoDB同样如此。有些问题并不是关系型数据库或文档型数据库适合解决的，不过，幸好我们的选择并不仅限于这两种。
+
+### 12.2 使用Neo4j操作图数据
