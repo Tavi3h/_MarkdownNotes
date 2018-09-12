@@ -12130,9 +12130,9 @@ Spring Data还提供了对多种NoSQL数据库的支持，包括MongoDB、Neo4j�
 
 ### 12.1 使用MongoDB持久化文档数据
 
-这里我们使用4.0.2版本的MongoDB和2.0.9版本的Spring Data MongoDB以及2.0.9版本的spring-data-jpa。同时这个版本的Spring Data MongoDB要求我们的Spring框架的版本为5.0.8。mongodb-driver使用3.8.1版本。
+这里我们使用4.0.2版本的MongoDB和2.0.9版本的Spring Data MongoDB以及2.0.9版本的spring-data-jpa。同时这个版本的Spring Data MongoDB要求我们的Spring框架的版本为5.0.8。
 
-有一些数据的最佳表现形式是文档（document）。也就是说，不要把这些数据分散到多个表、节点或实体中，将这些信息收集到一个非规范化（也就是文档）的结构中会更有意义。尽管两个或两个以上的文档有可能会彼此产生关联，但是通常来讲，文档是独立的实体。能够按照这种方式优化并处理文档的数据库，我们称之为文档数据库。
+有一些数据的最佳表现形式是文档（document）。也就是说，不要把这些数据分散到多个表、结点或实体中，将这些信息收集到一个非规范化（也就是文档）的结构中会更有意义。尽管两个或两个以上的文档有可能会彼此产生关联，但是通常来讲，文档是独立的实体。能够按照这种方式优化并处理文档的数据库，我们称之为文档数据库。
 
 例如，假设我们要编写一个应用程序来获取大学生的成绩单，可能需要根据学生的名字来查询其成绩单，或者根据一些通用的属性来查询成绩单。但是，每个学生是相互独立的，任意的两个成绩单之间没有必要相互关联。尽管我们能够使用关系型数据库模式来获取成绩单数据（也许你曾经这样做过），但文档型数据库可能才是更好的方案。
 
@@ -12153,6 +12153,8 @@ MongoDB是最为流行的开源文档数据库之一。Spring Data MongoDB提供
 不过，与Spring Data JPA不同的是，Spring Data MongoDB提供了将Java对象映射为文档的功能。（Spring Data JPA没有必要为JPA提供这样的注解，因为JPA规范本身就提供了对象-关系映射注解）。除此之外，Spring Data MongoDB为通用的文档操作任务提供了基于模板的数据访问方式。
 
 #### 12.1.1 启用MongoDB
+
+*以下内容代码在工程sia4e-P3_Spring_in_the_back_end-C12_Working_with_NoSQL_databases-01_mongodb中*。
 
 为了有效地使用Spring Data MongoDB，我们需要在Spring配置中添加几个必要的bean。首先，我们需要配置MongoClient，以便于访问MongoDB数据库。同时，我们还需要有一个`MongoTemplate` bean，实现基于模板的数据库访问。此外，不是必须，但是强烈推荐启用Spring Data MongoDB的自动化Repository生成功能。
 
@@ -12578,3 +12580,1068 @@ public interface OrderRepository extends MongoRepository<Order, String>, OrderOp
 像MongoDB这样的文档数据库能够解决特定类型的问题，但是就像关系型数据库不是全能型数据库那样，MongoDB同样如此。有些问题并不是关系型数据库或文档型数据库适合解决的，不过，幸好我们的选择并不仅限于这两种。
 
 ### 12.2 使用Neo4j操作图数据
+
+文档型数据库会将数据存储到粗粒度的文档中，而图数据库会将数据存储到多个细粒度的结点中，这些结点之间通过关系建立关联。图数据库中的一个结点通常会对应数据库中的一个概念（concept），它会具备描述结点状态的属性。连接两个结点的关联关系可能也会带有属性。
+
+按照其最简单的形式，图数据库比文档数据库更加图用，有可能会成为关系型数据库的无模式（schemaless）提到带方案。因为数据的结构是图，所以可以遍历关联关系以查找数据中你所关心的内容，这在其他数据库中是很难甚至无法实现的。
+
+Spring Data Neo4j提供了很多与Spring Data JPA和Spring Data MongoDB相同的功能，当然所针对的是Neo4j图数据库。它提供了将Java对象映射到结点和关联关系的注解、面向模板的Neo4j访问方式以及Repository实现的自动化生成功能。
+
+#### 12.2.1 配置Spring Data Neo4j
+
+*以下内容代码在工程sia4e-P3_Spring_in_the_back_end-C12_Working_with_NoSQL_databases-02_neo4j中*。
+
+这里使用的spring-data-neo4j版本为5.0.8，并搭配Spring 5.0.8.Neo4j数据库版本为3.4.7。
+
+```java
+package orders.config;
+
+import org.neo4j.ogm.session.SessionFactory;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.data.neo4j.repository.config.EnableNeo4jRepositories;
+import org.springframework.data.neo4j.transaction.Neo4jTransactionManager;
+import org.springframework.transaction.annotation.EnableTransactionManagement;
+
+@Configuration
+@EnableNeo4jRepositories("orders.db")
+@EnableTransactionManagement
+public class Neo4jConfig {
+    
+    // 注册SessionFactory，指定我们的domain所在包
+    @Bean
+    public SessionFactory sessionFactory() {
+        return new SessionFactory(configuration(), "orders");
+    }
+
+    // 配置Neo4j事务管理器
+    @Bean
+    public Neo4jTransactionManager transactionManager(SessionFactory sessionFactory) throws Exception {
+        return new Neo4jTransactionManager(sessionFactory);
+    }
+
+    // 配置链接数据库的uri以及用户名和密码
+    @Bean
+    public org.neo4j.ogm.config.Configuration configuration() {
+        return new org.neo4j.ogm.config.Configuration.Builder().uri("bolt://localhost").credentials("neo4j", "myNeo4j").build();
+    }
+}
+```
+
+这里的配置与原书中的配置完全不同，原书中该配置类继承`Neo4jConfiguration`，并在此基础上进行配置。但在Spring Data Neo4j的4.2版本中，这个类被标注为`@Deprecated`。
+
+这里`@EnableNeo4jRepositories`注解能够让Spring Data Neo4j自动生成Neo4j Repository实现。通过`value`属性或`basePackages`属性来指定要扫描的包，这样框架就会来查找（直接或间接）扩展Repository标记接口的其他接口。
+
+（注意，`@EnableNeo4jRepositories`有一个属性`sessionFactoryRef`，默认值是sessionFactory。当我们没有显式指定这个属性时，在使用`Session`进行CRUD操作时，框架会默认的寻找名为`sessionFactory`的bean，并用其生成`Session`。也就是说，上述配置类中，如果我们不指定属性`sessionFactoryRef`，那么第一个配置方法的名字必须为`sessionFactory`，因为这个方法名会作为这个方法产生的bean的名字。）
+
+当我们要连接远程的Neo4j服务器时，我们可以配置spring-data-neo4j-rest（需要导入依赖）中的`SpringCypherRestGraphDatabase`，它会通过RESTful API来访问远程的Neo4j数据库：
+
+```java
+@Bean
+public GraphDatabaseService springCypherRestGraphDatabase() {
+    return new SpringCypherRestGraphDatabase("http://graphdbserver/db/data");
+}
+```
+
+（注意，`SpringCypherRestGraphDatabase`需要依赖`org.springframework.data.neo4j.core.GraphDatabase`，而从spring-data-neo4j 4.0.0开始，库中就不存在这个类了。由于这里我们使用的是5.0.8版本，所以编译会失败。）
+
+也许我们想要使用XML来配置Spring Data Neo4j，但是从4.0.0版本开始，Spring Data Neo4j已经不再支持使用XML配置了：
+
+>Right now SDN only supports JavaConfig. There is no XML based support but this may change in future.
+
+#### 12.2.2 使用注解标注图实体
+
+Neo4j定义了两种类型的实体：结点（node）和关联关系（relationship）。一般来讲，结点反映了应用中的事物，而关联关系定义了这些事物是如何联系在一起的。
+
+Spring Data Neo4j提供了多个注解，它们可以应用在模型类型及其域上，实现Neo4j中的持久化。
+
+注解 | 描述
+-----|-----
+`@NodeEntity` | 将Java类型声明为结点实体
+`@RelationshipEntity` | 将Java类型声明为关联关系实体
+`@StartNode` | 将某个属性声明为关联关系实体的开始结点
+`@EndNode` | 将某个属性声明为关联关系实体的结束结点
+`@Fetch` | 将实体的属性声明为立即加载
+`@GraphId` | 将某个属性设置为实体的ID域（这个域的类型必须是`Long`）
+`@GraphProperty` | 明确声明某个属性
+`@GraphTraversal` | 声明某个属性会自动提供一个iterable元素，这个元素是图遍历所构建的
+`@Indexed` | 声明某个属性应该被索引
+`@Labels` | 为@NodeEntity声明标签
+`@Query` | 声明某个属性会自动提供一个iterable元素，这个元素是执行给定的Cypher查询所构建的
+`@QueryResult` | 声明某个Java或接口能够持有查询的结果
+`@RelatedTo` | 通过某个属性，声明当前的`@NodeEntity`与另外一个`@NodeEntity`之间的关联关系
+`@RelatedToVia` | 在`@NodeEntity`上声明某个属性，指定其引用该结点所属的某一个`@RelationshipEntity`
+`@RelationshipType` | 将某个域声明为关联实体类型
+`@ResultColumn` | 在带有`@QueryResult`注解的类型上，将某个属性声明为获取查询结果集中的某个特定列
+
+（注意，上述很多注解在当前使用的版本中已不再使用了）
+
+在我们的订单示例中，数据建模的一种方式就是将订单设定为一个结点，他会与一个或多个条目关联：
+
+<center>
+    ![图12.2-连接两个节点的简单关联关系](images\图12.2-连接两个节点的简单关联关系.PNG)
+    **连接两个节点的简单关联关系，关系本身不包含任何属性**
+</center>
+
+为了将订单指定为节点，我们需要为`Order`类添加`@NodeEntity`注解。
+
+```java
+package orders;
+
+import java.util.Collection;
+import java.util.LinkedHashSet;
+
+import org.neo4j.ogm.annotation.GeneratedValue;
+import org.neo4j.ogm.annotation.Id;
+import org.neo4j.ogm.annotation.NodeEntity;
+import org.neo4j.ogm.id.InternalIdStrategy;
+
+@NodeEntity
+public class Order {
+
+    @Id
+    @GeneratedValue(strategy = InternalIdStrategy.class)
+    private Long id;
+
+    private String customer;
+
+    private String type;
+
+    @Relationship(type = "HAS_ITEMS")
+    private Collection<Item> items = new LinkedHashSet<>();
+
+    // ...
+}
+```
+
+除了类级别上的`@NodeEntity`，还要注意id属性上使用了`@Id`注解和`@GeneratedValue`注解。（原书中使用`@GraphId`注解，但这个注解已经被标注为`@Deprecated`，并推荐组合使用`@Id`注解和`@GeneratedValue`注解）
+
+`customer`和`type`属性上没有任何注解。只要这些属性不是瞬态的，它们都会成为数据库中节点的属性。
+
+`items`属性上使用了`@Relationship`注解（原书使用`@RelateTo`注解，这个注解在当前版本已无法使用），这表明`Order`与一个`Item`的集合存在关联关系。注解的`type`属性实际上就是为关联关系建立了一个文本标记，它可以设置成任意的值，但通常会给定一个易于人类阅读的文本，用来简单描述这个关联关系的特征。
+
+下面对`Item`添加注解实现图的持久化：
+
+```java
+package orders;
+
+import org.neo4j.ogm.annotation.GeneratedValue;
+import org.neo4j.ogm.annotation.Id;
+import org.neo4j.ogm.annotation.NodeEntity;
+import org.neo4j.ogm.id.InternalIdStrategy;
+
+@NodeEntity
+public class Item {
+
+    @Id
+    @GeneratedValue(strategy = InternalIdStrategy.class)
+    private Long id;
+
+    private Order order;
+
+    private String product;
+
+    private double price;
+
+    private int quantity;
+
+    // ...
+
+}
+```
+
+`Item`也使用了`@NodeEntity`注解，将其标记为一个节点。它同时也有一个`Long`类型的属性，借助`@Id`和`@GeneratedValue`将其标注为结点的图ID，而其余属性均会作为图数据库中结点的属性。
+
+`Order`和`Item`之间的关联关系很简单，关系本身并不包含任何的数据。因此`@Relationship`注解就足以定义关联关系。但是，并不是所有的关联关系都这么简单。
+
+重新考虑该如何为数据建模，我们会发现订单会与一个或多个产品相关联。订单和铲平之间的关系构成了订单的一个条目：
+
+<center>
+    ![图12.3-关联关系实体自身具有属性](images\图12.3-关联关系实体自身具有属性.PNG)
+    **关联关系实体自身具有属性**
+</center>
+
+在这个新的模型中，订单中产品的数量是条目中的一个属性，而产品本身是另外一个概念。与前面一样，订单和产品都是节点，而条目是关联关系。因为现在的条目必须要包含一个数量值，关联关系不像前面那么简单。我们需要定义一个类来代表条目：
+
+```java
+package orders;
+
+import org.neo4j.ogm.annotation.EndNode;
+import org.neo4j.ogm.annotation.GeneratedValue;
+import org.neo4j.ogm.annotation.Id;
+import org.neo4j.ogm.annotation.RelationshipEntity;
+import org.neo4j.ogm.annotation.StartNode;
+
+@RelationshipEntity(type = "HAS_LINE_ITEM_FOR")
+public class LineItem {
+    
+    @Id
+    @GeneratedValue(strategy = InternalIdStrategy.class)    
+    private Long id;
+    
+    @StartNode
+    private Order order;
+    
+    @EndNode
+    private Product product;
+
+    private int quantity;
+    
+    // ...
+}
+```
+
+`LineItem`类则使用了`@RelationshipEntity`注解表明它是关联关系实体。关联关系实体的特殊之处在于它们连接了两个节点。`@StartNode`和`@EndNode`注解用在定义关联关系两端的属性上。在本例中，`Order`是开始节点，`Product`是结束节点。
+
+最后，`LineItem`类有一个`quantity`属性，当关联关系创建的时候，它会持久化到数据库中。
+
+#### 12.2.3 使用Neo4jTemplate
+
+Spring Data Neo4j提供了`Neo4jTemplate`来操作Neo4j图数据库中的节点和关联关系。根据我们的配置，在Spring应用上下文中就已经具备了一个`Neo4jTemplate`bean。接下来需要做的就是将其注入到任意想使用它的地方。
+
+例如：
+
+```java
+@Autowired
+private Neo4jOperations neo4j;
+```
+
+`Neo4jTemplate`定义了很多的方法，包括保存节点、删除节点以及创建节点间的关联关系。
+
+（实际上，当前版本已经移除了`Neo4jTemplate`，这里我们使用`Session`）
+
+```java
+package orders.test;
+
+import java.util.LinkedHashSet;
+import java.util.Set;
+
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.Before;
+import org.neo4j.ogm.session.Session;
+import org.neo4j.ogm.session.SessionFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+
+import orders.Item;
+import orders.Order;
+import orders.config.Neo4jConfig;
+
+@ContextConfiguration(classes = Neo4jConfig.class)
+@RunWith(SpringJUnit4ClassRunner.class)
+public class SessionTest {
+    
+    // 注入SessionFactory
+    @Autowired
+    private SessionFactory sessionFactory;
+    
+    private Session session;
+    
+    @Before()
+    public void Before() {
+        // 测试方法执行前获取session
+        session = sessionFactory.openSession();
+    }
+    
+    @Test
+    public void saveTest() {
+        Order order = new Order();
+        
+        order.setCustomer("Tavish");
+
+        order.setType("Web");
+        
+        Set<Item> items = new LinkedHashSet<>();
+        
+        Item item = new Item();
+        item.setPrice(19.99);
+        item.setProduct("T-shirt");
+        item.setQuantity(3);
+        items.add(item);
+        
+        order.setItems(items);
+        
+        session.save(order);
+    }
+    
+    @Test
+    public void findTest() {
+        Order order = session.load(Order.class, 0L);
+        System.out.println(order);
+    }
+}
+```
+
+当实体保存之后，`save()`方法将会返回被保存的实体，如果之前它使用`@Id`、`@GeneratedValue`注解的属性值为`null`的话，此时这个属性将会被填充上值。
+
+#### 12.2.4 创建自动化的Neo4j Repository
+
+大多数Spring Data项目都具备的最棒的一项功能就是为Repository接口自动生成实现。我们已经在Spring Data JPA和Spring Data MongoDB中看到了这项功能。Spring Data Neo4j也不例外，它同样支持Repository自动化生成功能。
+
+这里我们的`OrderRepository`接口要继承的接口是`Neo4jRepository`：
+
+（原书中同样使用了一个已经废弃的接口，`GraphRepository`）
+
+```java
+package orders.db;
+
+import org.springframework.data.neo4j.repository.Neo4jRepository;
+
+import orders.Order;
+
+public interface OrderRepository extends Neo4jRepository<Order, Long> {
+
+}
+```
+
+与其他的Spring Data项目一样，Spring Data Neo4j会为扩展Repository接口的其他接口生成Repository方法实现。
+
+现在，我们就能够使用很多通用的CRUD操作，这与`JpaRepository`和`MongoRepository`所提供的功能类似。
+
+```java
+package orders.test;
+
+import java.util.LinkedHashSet;
+import java.util.Set;
+
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+
+import orders.Item;
+import orders.Order;
+import orders.config.Neo4jConfig;
+import orders.db.OrderRepository;
+
+@ContextConfiguration(classes = Neo4jConfig.class)
+@RunWith(SpringJUnit4ClassRunner.class)
+public class OrderRepositoryTest {
+    
+    @Autowired
+    private OrderRepository repo;
+    
+    @Test
+    public void saveTest() {
+        Order order = new Order();
+        
+        order.setCustomer("Taco");
+
+        order.setType("Online");
+        
+        Set<Item> items = new LinkedHashSet<>();
+        
+        Item item = new Item();
+        item.setPrice(19.99);
+        item.setProduct("T-Rex");
+        item.setQuantity(1);
+        items.add(item);
+        
+        order.setItems(items);
+        
+        repo.save(order);
+    }
+    
+    @Test
+    public void findTest() {
+        Order order = repo.findById(20L).get();
+        System.out.println(order);
+    }
+    
+    @Test
+    public void countTest() {
+        System.out.println(repo.count());
+    }
+}
+```
+
+通过遵循命名约定来自定义查询方法这里不再赘述。
+
+当命名约定无法满足需求时，我们还可以为方法添加@Query注解，为其指定自定义的查询。我们之前已经见过`@Query`注解。在SpringData JPA中，我们使用它来为Repository方法指定JPA查询。在SpringData MongoDB中，我们使用它来指定匹配JSON的查询。但是，在使用Spring Data Neo4j的时候，我们必须指定Cypher查询，例如：
+
+```java
+@Query("match (o:Order)-[:HAS_ITEMS]->(i:Item) where i.product='T-Rex' return o")
+List<Order> findTRexOrders();
+```
+
+混合自定义功能在这里也不再赘述。
+
+### 12.3 使用Redis操作key-value数据
+
+Redis是一种特殊类型的数据库，它被称之为key-value存储。顾名思义，key-value存储保存的是键值对。实际上，key-value存储与HashMap有很大的相似性。可以不太夸张地说，它们就是持久化的HashMap。
+
+对于HashMap或者key-value存储来说，其实并没有太多的操作。我们可以将某个value存储到特定的key上，并且能够根据特定key，获取value。差不多也就是这样了。因此，Spring Data的自动Repository生成功能并没有应用到Redis上。不过，Spring Data的另外一个关键特性，也就是面向模板的数据访问，能够在使用Redis的时候，为我们提供帮助。
+
+Spring Data Redis包含了多个模板实现，用来完成Redis数据库的数据存取功能。稍后，我们就会看到如何使用它们。但是为了创建Spring Data Redis的模板，我们首先需要有一个Redis连接工厂。
+
+#### 12.3.1 连接到Redis
+
+（这里使用的spring-data-redis版本为2.0.9，并搭配Spring 5.0.8。同时，jedis的版本为2.9.0。）
+
+Redis连接工厂会生成到Redis数据库服务器的连接。Spring Data Redis为4种Redis客户端实现提供了连接工厂：
+
+- JedisConnectionFactory
+- JredisConnectionFactory（@Deprecated）
+- LettuceConnectionFactory
+- SrpConnectionFactory（@Deprecated）
+
+这里我们使用`JedisConnectionFactory`并进行配置：
+
+```
+@Bean
+public RedisConnectionFactory jedisConnectionFactory() {
+    return new JedisConnectionFactory(rsc);
+}
+```
+
+通过默认构造器创建的连接工厂会向localhost上的6379端口创建连接，并且没有密码。如果你的Redis服务器运行在其他的主机或端口上，在创建连接工厂的时候，可以设置这些属性：
+
+```java
+@Bean
+public RedisConnectionFactory jedisConnectionFactory() {
+    RedisStandaloneConfiguration rsc = new RedisStandaloneConfiguration();
+    // 设置主机名
+    rsc.setHostName("redis-server");
+    // 设置密码
+    rsc.setPassword(RedisPassword.of("myredis"));
+    // 设置端口号
+    rsc.setPort(7379);
+    return new JedisConnectionFactory(rsc);
+}
+```
+
+在当前版本，`JedisConnectionFactory`类的`setHostName()`方法已经废弃了，并推荐使用`RedisStandaloneConfiguration`类进行配置。
+
+如果要使用`LettuceConnectionFactory`的话那么只需要在最后`return`一个`LettuceConnectionFactory`实例就可以了：
+
+```java
+@Bean
+public RedisConnectionFactory lettuceConnectionFactory() {
+    RedisStandaloneConfiguration rsc = new RedisStandaloneConfiguration();
+    // 设置主机名
+    rsc.setHostName("redis-server");
+    // 设置密码
+    rsc.setPassword(RedisPassword.of("myredis"));
+    // 设置端口号
+    rsc.setPort(7379);
+    return new LettuceConnectionFactory(rsc);
+}
+```
+
+现在，我们有了Redis连接工厂，接下来就可以使用Spring Data Redis模板了。
+
+Redis连接工厂会生成到Redis的链接（以`RedisConnection`的形式）。借助`RedisConnection`，可以存储和读取数据，例如：
+
+```java
+RedisConnection conn = cf.getConnection();
+conn.stringCommands().set("greeting".getBytes(), "Hello World".getBytes());
+```
+
+与之类似，我们还可以获取之前存储的信息：
+
+```java
+byte[] greetingBytes = conn.stringCommands().get("greeting".getBytes());
+String greeting = new String(greetingBytes);
+```
+
+上述代码可以正常运行，但通常我们不会直接操作字符数组。
+
+与其他的Spring Data项目类似，Spring Data Redis以模板的形式提供了较高等级的数据访问方案。
+
+- RedisTemplate
+- StringRedisTemplate
+- 
+其中`StringRedisTemplate`继承了`RedisTemplate`。
+
+`RedisTemplate`可以极大地简化Redis数据访问，能够让我们持久化各种类型的key和value，并不局限于字节数组。在认识到key和value通常是`String`类型之后，`StringRedisTemplate`扩展了`RedisTemplate`，只关注`String`类型。
+
+例如我们已经有了`RedisConnectionFactory`，那么可以使用如下方式构建`RedisTemplate`:
+
+```java
+RedisConnectionFactory rcf = ...
+RedisTemplate<String, Product> template = new RedisTemplate<>();
+template.setConnectionFactory(rcf);
+```
+
+`RedisTemplate`使用两个类型进行了参数化。第一个是key的类型，第二个是value的类型。在这里所构建的`RedisTemplate`中，将会保存`Product`对象作为value，并将其赋予一个`String`类型的key。 
+
+如果我们的key和value都是`String`类型，那么可以考虑使用`StringRedisTemplate`。
+
+不过与`RedisTemplate`不同的是，`StringRedisTemplate`有一个接受`RedisConnectionFactory`的构造器，因此没有必要在构建后再调用`setConnectionFactory()`。
+
+```java
+StringRedisTemplate redis = new StringRedisTemplate(rcf);
+```
+
+当然我们可以将模板对象注册为bean，然后在需要的地方使用依赖注入：
+
+```java
+@SuppressWarnings("rawtypes")
+@Bean
+public RedisOperations templates(RedisConnectionFactory jcf) {
+    return new StringRedisTemplate(jcf);
+}
+```
+
+有了`RedisTemplate`（或`StringRedisTemplate`）之后，我们就可以开始保存、获取以及删除key-value条目了。`RedisTemplate`的大多数操作都是子API提供的。
+
+方法 | 子API接口 | 描述
+----- | ----- | -----
+`opsForValue()`|`ValueOperations<K, V>`|操作具有简单值的条目
+`opsForList()`|`ListOperations<K, V>`|操作具有list值的条目
+`opsForSet()`|`SetOperations<K, V>`|操作具有set值的条目
+`opsForZSet()`|`ZSetOperations<K, V>`|操作具有ZSet值（排序的set）的条目
+`opsForHash()`|`HashOperations<K, HK, HV>`|操作具有hash值的条目
+`boundValueOps(K)`|`BoundValueOperations<K,V>`|以绑定指定key的方式，操作具有简单值的条目
+`boundListOps(K)`|`BoundListOperations<K,V>`|以绑定指定key的方式，操作具有list值的条目
+`boundSetOps(K)`|`BoundSetOperations<K,V>`|以绑定指定key的方式，操作具有set值的条目
+`boundZSet(K)`|`BoundZSetOperations<K,V>`|以绑定指定key的方式，操作具有ZSet值（排序的set）的条目
+`boundHashOps(K)`|`BoundHashOperations<K,V>`|以绑定指定key的方式，操作具有hash值的条目
+
+**使用简单的值**
+
+假设我们想通过`RedisTemplate<String, Product>`保存`Product`，其中key是其`sku`属性的值。那么可以这样做：
+
+```java
+template.opsForValue().set(product.getSku(), product);
+```
+
+类似地，如果你希望获取`sku`属性为123456的产品，那么可以`get()`方法：
+
+```java
+Product product = redis.opsForValue().get("123456");
+```
+
+如果无法找到与指定key对应的value，则会返回`null`。
+
+**使用List类型的值**
+
+使用`List`类型的value与之类似，只需使用`opsForList()`方法即可：
+
+```java
+redis.opsForList().rightPush("cart", product);
+```
+
+通过这种方式，我们向列表的尾部添加了一个`Product`，列表名为cart，如果这个列表还不存在，那么会自动创建一个。
+
+`rightPush()`会在列表的尾部添加一个元素，而`leftPush()`则会在列表的头部添加一个值。
+
+类似地，可以使用`leftPop()`或`rightPop()`从列表中弹出一个元素：
+
+```java
+Product first = redis.opsForList().leftPop("cart");
+Product last = redis.opsForList().right("cart");
+```
+
+除了从列表中获取值以外，这两个方法还有一个副作用就是从列表中移除所弹出的元素。如果我们只是想获取值的话（甚至可能要在列表的中间获取），那么可以使用`range()`方法：
+
+`range()`方法不会从列表中移除任何元素，但是它会根据指定的key和索引范围，获取范围内的一个或多个值，例如：
+
+```java
+List<Product> products = redis.opsForList().range("cart", 2, 12);
+```
+
+如果范围超出了列表的边界，那么只会返回索引在范围内的元素。如果该索引范围内没有元素的话，将会返回一个空的列表。
+
+**在Set上执行操作**
+
+除了操作列表以外，我们还可以使用opsForSet()操作Set。在我们有多个Set并填充值之后，就可以对这些Set进行一些有意思的操作，如获取其交集、并集和差集：
+
+```java
+Set<Product> diff = redis.opsForSet().difference("cart1", "cart2");
+Set<Product> union = redis.opsForSet().union("cart1", "cart2");
+Set<Product> isect = redis.opsForSet().intersect("cart1", "cart2");
+```
+
+**绑定到某个key上**
+
+上表中包含了5个子API，它们能够以绑定key的方式执行操作。这些子API与其他的API是对应的，但是关注于某一个给定的key。
+
+假设我们想从一个key为cart的list的右侧弹出一个元素，然后在list的尾部新增三个元素。我们此时可以使用`boundListOps()`方法所返回的`BoundListOperations`：
+
+```java
+BoundListOperations<String, Product> cart = template.boundListOps("cart");
+Product poped = cart.rightPop();
+cart.rightPush(product1);
+cart.rightPush(product2)
+cart.rightPush(product3)
+```
+
+注意，我们只在一个地方使用了条目的key，也就是调用`boundListOps()`的时候。对返回的`BoundListOperations`执行的所有操作都会应用到这个key上。
+
+#### 12.3.3 使用key和value的序列化器
+
+当某个条目保存到Redis key-value存储的时候，key和value都会使用Redis的序列化器（serializer）进行序列化。Spring Data Redis提供了当某个条目保存到Redis key-value存储的时候，key和value都会使用Redis的序列化器（serializer）进行序列化。Spring Data Redis提供了多个这样的序列化器，包括：
+
+- GenericToStringSerializer：使用Spring转换服务进行序列化；
+- Jackson2JsonRedisSerializer：使用Jackson 2，将对象序列化为JSON；
+- JdkSerializationRedisSerializer：使用Java序列化；
+- OxmSerializer：使用Spring O/X映射的编排器和解排器（marshaler和unmarshaler）实现序列化，用于XML序列化；
+- StringRedisSerializer：序列化String类型的key和value。
+
+当然我们也可以自定义序列化器。
+
+`RedisTemplate`会使用`JdkSerializationRedisSerializer`，这意味着key和value都会通过Java进行序列化。`StringRedisTemplate`默认会使用`StringRedisSerializer`。
+
+如果我们要指定序列化器，那么可以调用`setKeySerializer()`和`setValueSerializer()`方法：
+
+```java
+@Bean
+public RedisOperations<String, Product> templates(RedisConnectionFactory jcf) {
+    RedisTemplate<String, Product> template = new RedisTemplate<>();
+    template.setConnectionFactory(jcf);
+    template.setKeySerializer(new StringRedisSerializer());
+    template.setValueSerializer(new Jackson2JsonRedisSerializer<>(Product.class));
+    return template;
+}
+```
+
+这里我们设置在序列化key时使用`StringRedisSerializer`，在序列化value时使用`Jackson2JsonRedisSerializer`。
+
+### 12.4 小结
+
+>
+关系型数据库作为数据持久化领域唯一可选方案的时代已经一去不返了。现在，我们有多种不同的数据库，每一种都代表了不同形式的数据，并提供了适应多种领域模型的功能。Spring Data能够让我们在Spring应用中使用这些数据库，并且使用一致的抽象方式访问各种数据库方案。
+>
+在本章中，我们基于前一章使用JPA时所学到的Spring Data知识，将其应用到了MongoDB文档数据库和Neo4j图数据库中。与JPA对应的功能类似，Spring Data MongoDB和Spring Data Neo4j项目都提供了基于接口定义自动生成Repository的功能。除此之外，我们还看到了如何使用Spring Data所提供的注解将领域模型映射为文档、节点和关联关系。
+>
+Spring Data还支持将数据持久化到Redis key-value存储中。Key-value存储明显要简单一些，因此没有必要支持自动化Repository和映射注解。不过，Spring Data Redis还是提供了两个不同的模板类来使用Redis key-value存储。
+>
+不管你选择使用哪种数据库，从数据库中获取数据都是消耗成本的操作。实际上，数据库查询是很多应用最大的性能瓶颈。我们已经看过了如何通过各种数据源存储和获取数据，现在看一下如何避免出现这种瓶颈。在下一章中，我们将会看到如何借助声明式缓存避免不必要的数据库查询。
+
+## 第十三章 缓存数据
+
+本章内容：
+
+- 启用声明式缓存
+- 使用Ehcache、Redis和GemFire实现缓存功能
+- 注解驱动的缓存
+
+缓存（Caching）可以存储经常会用到的信息，这样每次需要的时候，这些信息都是立即可用的。在本章中，我们将会了解到Spring的缓存抽象。尽管Spring自身并没有实现缓存解决方案，但是它对缓存功能提供了声明式的支持，能够与多种流行的缓存实现进行集成。
+
+### 13.1 启用对缓存的支持
+
+Spring对缓存的支持有两种方式：
+
+- 注解驱动的缓存
+- XML声明的缓存
+
+使用Spring的缓存抽象时，最为通用的方式就是在方法上添加`@Cacheable`和`@CacheEvict`注解。
+
+在往bean上添加缓存注解之前，必须要启用Spring对注解驱动缓存的支持。如果我们使用Java配置的话，那么可以在其中的一个配置类上添加`@EnableCaching`，这样的话就能启用注解驱动的缓存。
+
+```java
+package spittr.config;
+
+import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+@EnableCaching
+public class CachingConfig {
+
+    @Bean 
+    public CacheManager cacheManager() {
+        return new ConcurrentMapCacheManager();
+    }
+  
+}
+```
+
+通过XML配置：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:cache="http://www.springframework.org/schema/cache"
+    xsi:schemaLocation="http://www.springframework.org/schema/cache 
+    http://www.springframework.org/schema/cache/spring-cache-4.3.xsd
+        http://www.springframework.org/schema/beans 
+        http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+    <!-- 启用缓存 -->
+    <cache:annotation-driven />
+
+    <!-- 声明缓存管理器 -->
+    <bean id="cacheManager"
+        class="org.springframework.cache.concurrent.ConcurrentMapCacheManager" />
+
+</beans>
+```
+
+本质上，`@EnableCaching`和`<cache:annotation-driven />`的工作方式是相同的。它们都会创建一个切面（aspect）并触发Spring缓存注解的切点（pointcut）。根据所使用的注解以及缓存的状态，这个切面会从缓存中获取数据，将数据添加到缓存之中或者从缓存中移除某个值。
+
+在上述配置中，缓存管理器是Spring缓存抽象的核心，它能够与多个流行的缓存实现进行集成。
+
+这是使用了`ConcurrentMapCacheManager`，这个简单的缓存管理器使用`ConcurrentHashMap`作为缓存存储。它非常简单，因此对于开发、测试或基础的应用来讲，这是一个很不错的选择。但它的缓存存储是基于内存的，所以它的生命周期是与应用关联的，对于生产级别的大型企业级应用程序，这可能并不是理想的选择。
+
+#### 13.1.1 配置缓存管理器
+
+Spring提供了以下缓存管理器实现：
+
+- SimpleCacheManager
+- CompositeCacheManager
+- ConcurrentMapCacheManager
+- NoOpCacheManager
+- RedisCacheManager
+- EhCacheCacheManager
+- JCacheCacheManager
+
+在为Spring的缓存抽象选择缓存管理器时，我们有很多可选方案。具体选择哪一个要取决于想要使用的底层缓存供应商。每一个方案都可以为应用提供不同风格的缓存，其中有一些会比其他的更加适用于生产环境。尽管所做出的选择会影响到数据如何缓存，但是Spring声明缓存的方式上并没有什么差别。
+
+**使用Ehcache缓存**
+
+Spring提供集成Ehcache的缓存管理器是`EhCacheCacheManager`。
+
+（由于这里我们使用的Ehcache2，所以使用`EhCacheCacheManager`，如果使用EhCache3，那么需要使用`JCacheCacheManager `）
+
+配置如下：
+
+```java
+package spittr.config;
+
+import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.cache.ehcache.EhCacheCacheManager;
+import org.springframework.cache.ehcache.EhCacheManagerFactoryBean;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.ClassPathResource;
+
+import net.sf.ehcache.CacheManager;
+
+@Configuration
+@EnableCaching
+public class CachingConfig {
+
+    // 配置EhCacheCacheManager
+    @Bean
+    public EhCacheCacheManager cacheManager(CacheManager manager) {
+        return new EhCacheCacheManager(manager);
+    }
+
+    // 配置EhCacheManagerFactoryBean
+    @Bean
+    public EhCacheManagerFactoryBean ehcache() {
+        EhCacheManagerFactoryBean factory = new EhCacheManagerFactoryBean();
+        factory.setConfigLocation(new ClassPathResource("ehcache.xml"));
+        return factory;
+    }
+
+}
+```
+
+`cacheManager()`方法创建了一个`EhCacheCacheManager`的实例，这是通过传入`EhcacheCacheManager`实例实现的。在这里，稍微有点诡异的注入可能会让人感觉迷惑，这是因为Spring和EhCache都定义了`CacheManager`类型。
+
+我们需要使用EhCache的`CacheManager`来进行注入，所以必须也要声明一个`CacheManager` bean。为了对其进行简化，Spring提供了`EhCacheManagerFactoryBean`来生成EhCache的`CacheManager`。方法`ehcache()`会创建并返回一个`EhCacheManagerFactoryBean`实例。因为它是一个工厂bean（也就是说，它实现了Spring的`FactoryBean`接口），所以注册在Spring应用上下文中的并不是`EhCacheManagerFactoryBean`的实例，而是`CacheManager`的一个实例，因此适合注入到`EhCacheCacheManager`之中。当然我们可以手动调用工厂的`getObject()`方法来返回`CacheManager`。
+
+除了在Spring中配置的bean，还需要有针对EhCache的配置。EhCache为XML定义了自己的配置模式，我们需要在一个XML文件中配置缓存，该文件需要符合EhCache所定义的模式。在创建`EhCacheManagerFactoryBean`的过程中，需要告诉它EhCache配置文件在什么地方。在这里通过调用`setConfigLocation()`方法，传入`ClassPathResource`，用来指明EhCache XML配置文件相对于根类路径（classpath）的位置。
+
+ehcache.xml文件的内容，根据不同的应用及配置会有所差别，但至少需要声明一个最小缓存：
+
+```xml
+<ehcache>
+    <cache name="spittleCache" 
+            maxBytesLocalHeap="50m"
+            timeToLiveSecond="100">
+    </cache>
+</ehcache>
+```
+
+**使用Redis缓存**
+
+如果你仔细想一下的话，缓存的条目不过是一个键值对（key-valuepair），其中key描述了产生value的操作和参数。因此，很自然地就会想到，Redis作为key-value存储，非常适合于存储缓存。
+
+Redis可以用来为Spring缓存抽象机制存储缓存条目，Spring Data Redis提供了`RedisCacheManager`，这是`CacheManager`的一个实现。`RedisCacheManager`会与一个Redis服务器协作，并通过RedisTemplate将缓存条目存储到Redis中。
+
+配置如下：
+
+```java
+@Configuration
+@EnableCaching
+public class CacheConfig {
+
+    @Bean
+    public CacheManager cacheManager(RedisConnectionFactory factory) {
+        return RedisCacheManager.create(factory);
+    }
+    
+    @Bean
+    public RedisConnectionFactory jedisConnectionFactory() {
+        RedisStandaloneConfiguration rsc = new RedisStandaloneConfiguration();
+        // 设置主机名
+        rsc.setHostName("localhost");
+        // 设置密码
+        rsc.setPassword(RedisPassword.of("myredis"));
+        // 设置端口号
+        rsc.setPort(6379);
+        return new JedisConnectionFactory(rsc);
+    }   
+}
+```
+
+（当前版本的`RedisCacheManager`已经不再支持使用`RedisTemplate`来构造了）
+
+**配置多个缓存管理器**
+
+我们并不是只能有且仅有一个缓存管理器。如果你很难确定该使用哪个缓存管理器，或者有合法的技术理由使用超过一个缓存管理器的话，那么可以尝试使用Spring的`CompositeCacheManager`。
+
+`CompositeCacheManager`要通过一个或更多的缓存管理器来进行配置，它会迭代这些缓存管理器，以查找之前所缓存的值。
+
+```java
+@Bean
+public CacheManager manager(net.sf.ehcache.CacheManager cm,
+                            javax.cache.CacheManager jcm, 
+                            RedisConnectionFactory factory) {
+
+    CompositeCacheManager cacheManager = new CompositeCacheManager();
+    List<org.springframework.cache.CacheManager> managers = new ArrayList<>();
+    managers.add(new JCacheCacheManager(jcm));
+    managers.add(new EhCacheCacheManager(cm));
+    managers.add(RedisCacheManager.create(factory));
+    cacheManager.setCacheManagers(managers);
+    return cacheManager;
+}
+```
+
+当查找缓存条目时，`CompositeCacheManager`首先会从`JCacheCacheManager`开始检查JCache实现，然后通过`EhCacheCacheManager`检查Ehcache，最后会使用`RedisCacheManager`来检查Redis，完成缓存条目的查找。
+
+### 13.2 为方法添加注解以支持缓存
+
+如前文所述，Spring的缓存抽象在很大程度上是围绕切面构建的。在Spring中启用缓存时，会创建一个切面，它触发一个或更多的Spring的缓存注解。
+
+缓存规则：
+
+注解 | 描述
+----- | -----
+`@Cacheable` | 表明Spring在调用方法之前，首先应该在缓存中查找方法的返回值。如果这个值能够找到，就会返回缓存的值。否则的话，这个方法就会被调用，返回值会放到缓存之中
+`@CachePut` | 表明Spring应该将方法的返回值放到缓存中。在方法的调用前并不会检查缓存，方法始终都会被调用
+`@CacheEvict` | 表明Spring应该在缓存中清除一个或多个条目
+`@Caching` | 这是一个分组的注解，能够同时应用多个其他的缓存注解
+
+#### 13.2.1 填充缓存
+
+我们可以看到，`@Cacheable`和`@CachePut`注解都可以填充缓存，但是它们的工作方式略有差异。
+
+`@Cacheable`首先在缓存中查找条目，如果找到了匹配的条目，那么就不会对方法进行调用了。如果没有找到匹配的条目，方法会被调用并且返回值要放到缓存之中。而`@CachePut`并不会在缓存中检查匹配的值，目标方法总是会被调用，并将返回值添加到缓存之中。
+
+`@Cacheable`和`@CachePut`有一些属性是共有的：
+
+属性 | 类型 | 描述
+----- | ----- | -----
+`value` |`String[]`|要使用的缓存名称
+`condition` |`String`|SpEL表达式，如果得到的值是`false`的话，不会将缓存应用到方法调用上
+`key` |`String`|SpEL表达式，用来计算自定义的缓存key
+`unless` |`String`|SpEL表达式，如果得到的值是`true`的话，返回值不会放到缓存之中
+
+在最简单的情况下，在`@Cacheable`和`@CachePut`的这些属性中，只需使用value属性指定一个或多个缓存即可。例如，考虑`SpittleRepository`的`findOne()`方法。在初始保存之后，Spittle就不会再发生变化了。如果有的Spittle比较热门并且会被频繁请求，反复地在数据库中进行获取是对时间和资源的浪费。通过在`findOne()`方法上添加`@Cacheable`注解，将Spittle保存在缓存中，从而避免对数据库不必要的访问：
+
+```java
+@Cacheable("spittleCache")
+Spittle findOne(long id);
+```
+
+当`findOne()`被调用时，缓存切面会拦截调用并在缓存中查找之前以名spittleCache存储的返回值。缓存的key是传递到`findOne()`方法中的`id`参数。如果按照这个key能够找到值的话，就会返回找到的值，方法不会再被调用。如果没有找到值的话，那么就会调用这个方法，并将返回值放到缓存之中，为下一次调用`findOne()`方法做好准备。
+
+这里我们没有指定注解中的属性`key`，这意味着，方法所有的参数都会被作为key使用，即这里的方法参数`id`会作为缓存的key。
+
+>
+* Spring Expression Language (SpEL) expression for computing the key namically.
+* Default is {@code ""}, meaning all method parameters are considered as a key,
+* unless a custom {@link #keyGenerator} has been configured.
+
+同时，这里我们将注解用在了接口方法上而不是其实现类方法上，当为接口方法添加注解后，@Cacheable注解会被`SpittleRepository`的所有实现继承，这些实现类都会应用相同的缓存规则。
+
+**将值放到缓存之中**
+
+`@Cacheable`会条件性地触发对方法的调用，这取决于缓存中是不是已经有了所需要的值，对于所注解的方法，`@CachePut`采用了一种更为直接的流程。带有`@CachePut`注解的方法始终都会被调用，而且它的返回值也会放到缓存中。这提供一种很便利的机制，能够让我们在请求之前预先加载缓存。
+
+例如，当一个全新的Spittle通过`save()`方法保存后，很可能马上就会请求这条记录。所以，当`save()`方法调用后，立即将Spittle塞到缓存之中是很有意义的，这样当其他人通过`findOne()`对其进行查找时，它就已经准备就绪了。为了实现这一点，可以在`save()`方法上添加`@CachePut`注解，如下所示：
+
+```java
+@CachePut("spittleCache")
+Spittle save(Spittle spittle);
+```
+
+当`save()`方法被调用时，它首先会做所有必要的事情来保存Spittle，然后返回的Spittle会被放到spittleCache缓存中。
+
+在这里只有一个问题：缓存的key。如前文所述，默认的缓存key要基于方法的参数来确定。因为save()方法的唯一参数就是`Spittle`，所以它会用作缓存的key。将`Spittle`放在缓存中，而它的缓存key恰好是同一个`Spittle`，这是不是有一点诡异呢？
+
+显然，在这个场景中，默认的缓存key并不是我们想要的。我们需要的缓存key是新保存`Spittle`的ID，而不是`Spittle`本身。所以，在这里需要指定一个key而不是使用默认的key。
+
+**自定义缓存key**
+
+换默认的key，它是通过一个SpEL表达式计算得到的。任意的SpEL表达式都是可行的，但是更常见的场景是所定义的表达式与存储在缓存中的值有关，据此计算得到key。
+
+具体到我们这个场景，我们需要将key设置为所保存`Spittle`的ID。以参数形式传递给`save()`的`Spittle`还没有保存，因此并没有ID。我们只能通过`save()`返回的`Spittle`得到id属性。
+
+幸好，在为缓存编写SpEL表达式的时候，Spring提供了多个用来定义缓存规则的SpEL扩展：
+
+表达式 | 描述
+----- | -----
+`#root.args` | 传递给缓存方法的参数，形式为数组
+`#root.caches` | 该方法执行时所对应的缓存，形式为数组
+`#root.target` | 目标对象
+`#root.targetClass` | 目标对象的类，是`#root.target.class`的简写形式
+`#root.method` | 缓存方法
+`#root.methodName` | 缓存方法的名字，是`#root.method.name`的简写形式
+`#result` | 方法调用的返回值（不能用在`@Cacheable`注解上）
+`#Argument` | 任意的方法参数名（如#argName）或参数索引（如#a0或#p0）
+
+对于`save()`方法来说，我们需要的键是所返回`Spittle`对象的`id`属性。表达式`#result`能够得到返回的`Spittle`。借助这个对象，我们可以通过将key属性设置为`#result.id`来引用`id`属性：
+
+```java
+@CachePut(value = "spittleCache", key = "#result.id")
+Spittle save(Spittle spittle);
+```
+
+按照这种方式配置`@CachePut`，缓存不会去干涉`save()`方法的执行，但是返回的`Spittle`将会保存在缓存中，并且缓存的key与`Spittle`的`id`属性相同。
+
+**条件化缓存**
+
+通过为方法添加Spring的缓存注解，Spring就会围绕着这个方法创建一个缓存切面。但是，在有些场景下我们可能希望将缓存功能关闭。
+
+`@Cacheable`和`@CachePut`提供了两个属性用以实现条件化缓存：`unless`和`condition`，这两个属性都接受一个SpEL表达式。如果`unless`属性的SpEL表达式计算结果为`true`，那么缓存方法返回的数据就不会放到缓存中。与之类似，如果`condition`属性的SpEL表达式计算结果为`false`，那么对于这个方法缓存就会被禁用。
+
+表面上来看，`unless`和`condition`属性做的是相同的事情。但是，这里有一点细微的差别。`unless`属性只能阻止将对象放进缓存，但是在这个方法调用的时候，依然会去缓存中进行查找，如果找到了匹配的值，就会返回找到的值。与之不同，如果`condition`的表达式计算结果为`false`，那么在这个方法调用的过程中，缓存是被禁用的。就是说，不会去缓存进行查找，同时返回值也不会放进缓存中。
+
+假设要保存的`Spittle`对象的`message`属性中包含`NoCache`字样，那么我们就不对其进行缓存。为了阻止这样的`Spittle`被缓存起来，可以这样设置`unless`属性：
+
+```java
+@Cacheable(value = "spittleCache" unless = "#result.message.contains('NoCache')")
+Spittle findOne(long id);
+```
+
+为`unless`设置的SpEL表达式会检查返回的`Spittle`对象（在表达式中通过`#result`来识别）的`message`属性。如果它包含“NoCache”文本内容，那么这个表达式的计算值为`true`，这个`Spittle`对象不会放进缓存中。否则的话，表达式的计算结果为`false`，无法满足`unless`的条件，这个`Spittle`对象会被缓存。
+
+属性`unless`能够阻止将值写入到缓存中，但是有时候我们希望将缓存全部禁用。也就是说，在一定的条件下，我们既不希望将值添加到缓存中，也不希望从缓存中获取数据。
+
+假如，对于ID小于10的`Spittle`对象，我们不希望对其使用缓存。这时可以使用`condition`属性：
+
+```java
+@Cacheable(value = "spittleCache" 
+            unless = "#result.message.contains('NoCache')"
+            condition = "#id >= 10")
+Spittle findOne(long id);
+```
+
+此时，如果`findOne()`调用时，参数值小于10，那么将不会在缓存中进行查找，返回的Spittle也不会放进缓存中，就像这个方法没有添加`@Cacheable`注解一样。
+
+#### 13.2.2 移除缓存条目
+
+`@CacheEvict`并不会往缓存中添加任何东西。相反，如果带有`@CacheEvict`注解的方法被调用的话，那么会有一个或更多的条目会在缓存中移除。
+
+那么在什么场景下需要从缓存中移除内容呢？当缓存值不再合法时，我们应该确保将其从缓存中移除，这样的话，后续的缓存命中就不会返回旧的或者已经不存在的值，其中一个这样的场景就是数据被删除掉了，例如：
+
+```java
+@CacheEvict("spittleCache")
+void remove(long spittleId)
+```
+
+`@CacheEvict`的一个特点是可以应用在返回值为`void`的方法上，而`@Cacheable`和`@CachePut`需要非`void`的返回值。
+
+从这里可以看到，当`remove()`调用时，会从缓存中删除一个条目。被删除条目的key与传递进来的`spittleId`参数的值相等。
+
+`@CacheEvict`有多个属性，这些属性会影响到其行为：
+
+属性 | 类型 | 描述
+----- | ----- | -----
+`value` |`String[]`|要使用的缓存名称
+`condition` |`String`|SpEL表达式，如果得到的值是`false`的话，不会将缓存应用到方法调用上
+`key` |`String`|SpEL表达式，用来计算自定义的缓存key
+`allEntries` |`boolean`|如果为`true`的话，特定缓存的所有条目都会被移除掉
+`beforeInvocation`|`boolean`|如果为`true`的话，在方法调用之前移除条目。如果为`false`（默认值）的话，在方法成功调用之后再移除条目
+
+### 13.3 使用XML声明缓存
+
+需要使用XML声明缓存的原因有两个：
+
+- 单纯地不喜欢直接在源码上添加注解
+- 需要在没有源码的bean上应用缓存功能
+
+Spring的`cache`命名空间提供了使用XML声明缓存规则的方法，可以作为面向注解缓存的替代方案。因为缓存是一种面向切面的行为，所以`cache`命名空间会与Spring的`aop`命名空间结合起来使用，用来声明缓存所应用的切点在哪里。
+
+`cache`命名空间定义了在XML配置文件中声明缓存的配置元素：
+
+元素 | 描述
+-----|-----
+`<cache:annotation-driven>` | 启用注解驱动的缓存。等同于Java配置中的`@EnableCaching`
+`<cache:advice>` | 定义缓存通知（advice）。结合`<aop:advisor>`，将通知应用
+到切点上
+`<cache:caching>` |在缓存通知中，定义一组特定的缓存规则
+`<cache:cacheable>` |指明某个方法要进行缓存。等同于`@Cacheable`注解
+`<cache:cache-put>` |指明某个方法要填充缓存，但不会考虑缓存中是否已有匹配的值。等同于`@CachePut`注解
+`<cache:cache-evict>` |指明某个方法要从缓存中移除一个或多个条目，等同于`@CacheEvict`注解
+
+配置示例：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:aop="http://www.springframework.org/schema/aop"
+    xmlns:cache="http://www.springframework.org/schema/cache"
+    xsi:schemaLocation="http://www.springframework.org/schema/cache 
+    http://www.springframework.org/schema/cache/spring-cache-4.3.xsd
+        http://www.springframework.org/schema/beans 
+        http://www.springframework.org/schema/beans/spring-beans-4.3.xsd
+        http://www.springframework.org/schema/aop 
+        http://www.springframework.org/schema/aop/spring-aop-4.3.xsd">
+
+    <!-- 将缓存通知绑定到一个切点上 -->
+    <aop:config>
+        <aop:advisor advice-ref="cacheAdvice"
+            pointcut="execution(* spittr.db.SpittleRepository.*(..))" />
+    </aop:config>
+
+    <!-- 配置缓存 -->
+    <cache:advice id="cacheAdvice">
+        <cache:caching>
+            <cache:cacheable cache="spittleCache" method="findRecent" />
+            <cache:cacheable cache="spittleCache" method="findOne" />
+            <cache:cacheable cache="spittleCache" method="findBySpitterId" />
+            <cache:cache-put cache="spittleCache" method="save" key="#result.id" />
+            <cache:cache-evict cache="spittleCache" method="remove" />
+        </cache:caching>
+    </cache:advice>
+
+    <!-- 配置缓存管理器 -->
+    <bean id="cacheManager"
+        class="org.springframework.cache.concurrent.ConcurrentMapCacheManager" />
+</beans>
+```
+
+需要注意的是，`<cache:advice>`元素有一个`cache-manager`属性，用来指定作为缓存管理器的bean。它的默认值是cacheManager。因为我们恰巧声明了一个id为cacheManager的缓存管理器，所以这里可以不用显式地使用`cache-manager`属性。
+
+这里我们多次使用了`cache="spittleCache"`来指明要使用的缓存，为了消除这种重复，我们可以将其抽出放在`<cache:caching>`元素上：
+
+```xml
+<cache:caching cache="spittleCache">
+    <cache:cacheable method="findRecent" />
+    <cache:cacheable method="findOne" />
+    <cache:cacheable method="findBySpitterId" />
+    <cache:cache-put method="save" key="#result.id" />
+    <cache:cache-evict method="remove" />
+</cache:caching>
+```
+
+对于上述使用的XML配置中的每个`cache`命名空间下的元素，它都有与注解属性相对应的属性，这里不再赘述。
+
+### 13.4 小结
+
+>
+如果想让应用程序避免一遍遍地为同一个问题推导、计算或查询答案的话，缓存是一种很棒的方式。当以一组参数第一次调用某个方法时，返回值会被保存在缓存中，如果这个方法再次以相同的参数进行调用时，这个返回值会从缓存中查询获取。在很多场景中，从缓存查找值会比其他的方式（比如，执行数据库查询）成本更低。因此，缓存会对应用程序的性能带来正面的影响。
+>
+在本章中，我们看到了如何在Spring应用中声明缓存。首先，看到的是如何声明一个或更多的Spring缓存管理器。然后，将缓存用到了Spittr应用程序中，这是通过将@Cacheable、@CachePut和@CacheEvict添加到SpittleRepository上实现的。
+>
+我们还看到了如何借助XML将缓存规则的配置与应用程序代码分离开来。`<cache:cacheable>`、`<cache:cache-put>`和`<cache:cache-evict>`元素的作用与本章前面所使用的注解是一致的。
+>
+在这个过程中，我们讨论了缓存实际上是一种面向切面的行为。Spring将缓存实现为一个切面。在使用XML声明缓存规则时，这一点非常明显：我们必须要将缓存通知绑定到一个切点上。
+>
+Spring在将安全功能应用到方法上时，同样使用了切面。在下一章中，我们将会看到如何借助Spring Security确保bean方法的安全性。
