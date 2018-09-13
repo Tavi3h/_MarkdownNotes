@@ -13224,6 +13224,8 @@ Spring Data还支持将数据持久化到Redis key-value存储中。Key-value存
 
 ### 13.1 启用对缓存的支持
 
+*以下内容代码在工程sia4e-P3_Spring_in_the_back_end-C13_Caching_data中*。
+
 Spring对缓存的支持有两种方式：
 
 - 注解驱动的缓存
@@ -13645,3 +13647,317 @@ Spring的`cache`命名空间提供了使用XML声明缓存规则的方法，可�
 在这个过程中，我们讨论了缓存实际上是一种面向切面的行为。Spring将缓存实现为一个切面。在使用XML声明缓存规则时，这一点非常明显：我们必须要将缓存通知绑定到一个切点上。
 >
 Spring在将安全功能应用到方法上时，同样使用了切面。在下一章中，我们将会看到如何借助Spring Security确保bean方法的安全性。
+
+## 第十四章 保护方法应用
+
+本章内容：
+
+- 保护方法调用
+- 使用表达式定义安全规则
+- 创建安全表达式计算器
+
+在本章中，我们将会看到如何使用Spring Security保护bean方法。通过这种方式，就能声明安全规则，保证如果用户没有执行方法的权限，就不会执行相应的方法。
+
+### 14.1 使用注解保护方法
+
+在Spring Security中实现方法级安全性的最常见办法是使用特定的注解，将这些注解应用到需要保护的方法上。这样有几个好处，最重要的是当我们在编辑器中查看给定的方法时，能够很清楚地看到它的安全规则。
+
+Spring Security提供了三种不同的安全注解：
+
+- Spring Security自带的`@Secured`注解
+- JSR-250的`@RolesAllowed`注解
+- 表达式驱动的注解，包括`@PreAuthorize`、`@PostAuthorize`、`@PreFilter`和`@PostFilter`
+
+`@Secured`和`@RolesAllowed`方案非常类似，能够基于用户所授予的权限限制对方法的访问。当我们需要在方法上定义更灵活的安全规则时，Spring Security提供了`@PreAuthorize`和`@PostAuthorize`，而`@PreFilter`/`@PostFilter`能够过滤方法返回的以及传入方法的集合。
+
+#### 14.1.1 使用@Secured注解限制方法调用
+
+在Spring中，如果要启用基于注解的方法安全性需要在配置类中使用`@EnableGlobalMehtodSecurity`：
+
+```java
+@Configuration
+@EnableGlobalMethodSecurity(securedEnabled = true)
+public class MethodSecurityConfig extends GlobalMethodSecurityConfiguration{
+
+}
+```
+
+这里我们除了使用`@EnableGlobalMethodSecurity`注解，也继承了`GlobalMethodSecurityConfiguration`类。这个类能够为方法级别的安全性提供更精细的配置。
+
+注意到`@EnableGloablMethodSecurity`注解的`securedEnable`属性设置为`true`，这会创建一个切点，这样的话Spring Security切面就会包装带有`@Secured`注解的方法，例如：
+
+```java
+@Secured("ROLE_SPITTER")
+public void addSpittle(Spittle spittle) {
+    // ...
+}
+```
+
+`@Secured`注解会使用一个`String`数组作为参数。每个`String`值是一个权限，调用这个方法至少需要具备其中一个权限。通过传递进来的“ROLE_SPITTER”，我们告诉Spring Security只允许具有“ROLE_SPITTER”权限的认证用户才能调用`addSpittle()`方法。
+
+如果传递给`@Secured`多个权限值，则认证用户必须至少具备其中的一个才能进行方法的调用。例如，下面使用`@Secured`的方式表明用户必须具备“ROLE_SPITTER”或“ROLE_ADMIN”才能调用这个方法：
+
+```java
+@Secured({ "ROLE_SPITTER", "ROLE_ADMIN" })
+public void addSpittle(Spittle spittle) {
+    // ...
+}
+```
+
+如果方法被没有认证的用户或没有所需权限的用户调用，保护这个方法的切面将抛出异常（`AuthenticationException`或`AccessDeniedException`）。它们是非检查型异常，但这个异常最终必须被捕获和处理。如果被保护的方法是在Web请求中调用的，这个异常会被Spring Security的过滤器自动处理。否则的话我们需要编写代码来处理这个异常。
+
+`@Secured`注解的不足之处在于它是Spring特定的注解。如果更倾向于使用Java标准定义的注解，那么可以考虑使用`@RolesAllowed`注解。
+
+#### 14.1.2 在Spring Security中使用JSR-250的@RolesAllowed注解
+
+`@RolesAllowed`注解和`@Secured`注解在各个方面基本上都是一致的。唯一显著的区别在于前者是JSR-250定义的Java标准注解。当使用其它框架或API来处理注解时，使用标准的`@RolesAllowed`注解会更有意义。
+
+如果选择使用`@RolesAllowed`的话，需要将`@EnabledGlobalMethodSecurity`的`jsr250Enabled`属性设置为`true`：
+
+```java
+@EnableGlobalMethodSecurity(jsr250Enabled = true)
+```
+
+尽管我们这里只是启用了`jsr250Enabled`，但需要说明的一点是这与`securedEnabled`并不冲突。这两种注解风格可以同时启用。
+
+在将`jsr250Enabled`设置为`true`之后，将会启用一个切点，这样带有`@RolesAllowed`注解的方法都会被Spring Security的切面包装起来。因此，在方法上使用`@RolesAllowed`的方式与使用`@Secured`类似。例如，如下的`addSpittle()`方法使用了`@RolesAllowed`注解来代替`@Secured`：
+
+```java
+@RolesAllowed("ROLE_SPITTER")
+public void addSpittle(Spittle spittle) {
+    // ...
+}
+```
+
+`@Secured`和`@RolesAllowed`注解有一个共同的不足之处，它们只能根据用户有没有授予特定的权限来限制方法的调用。在判断方法是否执行方面，无法使用其它的因素。
+
+接下来我们看一下如何组合使用SpEL和Spring Security所提供的方法调用前后注解实现基于表达式的方法安全性。
+
+### 14.2 使用表达式实现方法级别的安全性
+
+尽管`@Secured`和`@RolesAllowed`注解在拒绝未认证用户方面表现不错，但这也是它们所能做到的所有事情了。有时候，安全性约束不仅仅涉及用户是否有权限。
+
+Spring Security 3.0引入了几个新注解，它们通过使用SpEL能够在方法调用上实现更有意思的安全性约束。这些注解的值能够接受一个SpEL表达式。表达式可以是任意合法的SpEL表达式，如果表达式的计算结果为`true`，那么安全规则通过，否则就会失败。安全规则通过或失败的结果会因为所使用注解的差异而有所不同。
+
+注解 | 描述
+-----|-----
+`@PreAuthorize` | 在方法调用之前，基于表达式的计算结果来限制对方法的访问
+`@PostAuthorize` | 允许方法调用，但是如果表达式计算结果为`false`，将抛出一个安全性异常
+`@PostFilter` | 允许方法调用，但必须按照表达式来过滤方法的结果
+`@PreFilter` | 允许方法调用，但必须在进入方法之前过滤输入值
+
+在使用这些注解之前，我们必须先要启用它们，这需要将`@EnableGlobalMethodSecurity`注解的`prePostEnabled`属性设置为`true`：
+
+```java
+@EnableGlobalMethodSecurity(jsr250Enabled = true, prePostEnabled = true)
+```
+
+现在，方法调用前后的注解都已经启用了，我们可以使用它们了。我们首先看一下如何使用`@PreAuthorize`和`@PostAuthorize`注解限制对方法的调用。
+
+#### 14.2.1 表达式访问规则
+
+`@PreAuthorize`和`@PostAuthorize`，它们能够基于表达式的计算结果来限制方法的访问。在定义安全限制方面，表达式带了极大的灵活性。通过使用表达式，只要我们能够想象得到，就可以定义任意允许访问或不允许访问方法的条件。
+
+二者的主要区别在于表达式执行的时机。`@PreAuthorize`的表达式会在方法调用之前执行，如果表达式的计算结果不为`true`，则会阻止方法执行。与之相反，`@PostAuthorize`表达式直到方法返回才会执行，然后决定是否抛出安全性异常。
+
+**在方法调用之前验证权限**
+
+例如，Spittr应用程序的一般用户只能写140个字以内的Spittle，而付费用户不限制字数：
+
+```java
+@PreAuthorize("(hasRole('SPITTER') and #spittle.text.length() <= 140)"
+                + "or hasRole('PREMIUM')")
+public void addSpittle(Spittle spittle) {
+    // ...
+}
+```
+
+表达式中的`#spittle`部分直接引用了方法中的同名参数。这使得Spring Security能够检查传入方法的参数，并将这些参数用于认证决策的制定。在这里，我们深入到Spitter的文本内容中，保证不超过Spittr标准用户的长度限制。如果是付费用户，那么就没有长度限制了。
+
+**在方法调用之后验证权限**
+
+在方法调用之后验证权限并不是比较常见的方式。事后验证一般需要基于安全保护方法的返回值来进行安全性决策。这种情况意味着方法必须被调用执行并且得到了返回值。
+
+除了验证的时机之外，`@PostAuthorize`与`@PreAuthorize`的工作方式差不多，只不过它会在方法执行之后，才会应用安全规则。此时，它才有机会在做出安全决策时，考虑到返回值的因素。
+
+例如，假设我们想对`getSpittleById()`方法进行保护，确保返回的Spittle对象属于当前的认证用户。我们只有得到`Spittle`对象之后，才能判断它是否属于当前用户。因此，`getSpittleById()`方法必须要先执行。在得到`Spittle`之后，如果它不属于当前用户的话，将会抛出安全性异常：
+
+```java
+@PostAuthorize("returnObject.spitter.username == principal.username")
+public Spittle getSpittleById(long id) {
+    // ...
+}
+```
+
+为了便利地访问受保护方法的返回对象，Spring Security在SpEL中提供了名为returnObject的变量。在这里，我们知道返回对象是一个`Spittle`对象，所以这个表达式可以直接访问其`spitter`属性中的`username`属性。
+
+在对比表达式双等号的另一侧，表达式到内置的`principal`对象中取出其`username`属性。`principal`是另一个Spring Security内置的特殊名称，它代表了当前认证用户的主要信息（通常是用户名）。
+
+在`Spittle`对象所包含`Spitter`中，如果`username`属性与`principal`的`username`属性相同，这个`Spittle`将返回给调用者。否则，会抛出一个`AccessDeniedException`异常，而调用者也不会得到`Spittle`对象。
+
+有一点需要注意，不像`@PreAuthorize`注解所标注的方法那样，`@PostAuthorize`注解的方法会首先执行然后被拦截。这意味着，你需要小心以保证如果验证失败的话不会有一些负面的结果。
+
+#### 14.2.2 过滤方法的输入和输出
+
+如果我们希望使用表达式来保护方法的话，那使用`@PreAuthorize`和`@PostAuthorize`是非常好的方案。但是，有时候限制方法调用太严格了。有时，需要保护的并不是对方法的调用，需要保护的是传入方法的数据和方法返回的数据。
+
+例如，我们有一个名为`getOffensiveSpittles()`的方法，这个方法会返回标记为具有攻击性的`Spittle`列表。这个方法主要会给管理员使用，以保证Spittr应用中内容的和谐。但是，普通用户也可以使用这个方法，用来查看他们所发布的`Spittle`有没有被标记为具有攻击性。这个方法的签名大致如下所示：
+
+```java
+public List<Spittle> getOffensiveSpittles() {
+    // ...
+}
+```
+
+按照这种方法的定义，`getOffensiveSpittles()`方法与具体的用户并没有关联。它只会返回攻击性`Spittle`的一个列表，并不关心它们属于哪个用户。对于管理员使用来说，这是一个很好的方法，但是对于普通用户而言它无法限制列表中的Spittle都属于当前用户。
+
+我们需要有一种方式过滤`getOffensiveSpittles()`方法返回的`Spittle`集合，将结果限制为允许当前用户看到的内容，而这就是Spring Security的`@PostFilter`所能做的事情。
+
+（当然，我们也可以重载`getOffensiveSpittles()`，实现另一个版本，让它接受一个用户ID作为参数，查询给定用户的`Spittle`）
+
+**时候对方法的返回值进行过滤**
+
+`@PostFilter`也使用一个SpEL作为参数。但是这个表达式不是用来限制方法访问的，`@PostFilter`会使用这个表达式计算该方法所返回集合的每个成员，并将计算结果为`false`的成员移除掉。
+
+例如：
+
+```java
+@PreAuthorize("hasAnyRole({'SPITTER', 'ADMIN'})")
+@PostFilter("hasRole('ADMIN') || filterObject.spitter.username == principal.username")
+public List<Spittle> getOffensiveSpittles() {
+    // ...
+}
+```
+
+在这里，`@PreAuthorize`限制只有具备`ROLE_SPITTER`或`ROLE_ADMIN`权限的用户才能访问该方法。如果用户能够通过这个检查点，那么方法将会执行，并且会返回`Spittle`所组成的一个`List`。但是，`@PostFilter`注解将会过滤这个列表，确保用户只能看到允许的`Spittle`。具体来讲，管理员能够看到所有攻击性的`Spittle`，非管理员只能看到属于自己的Spittle。
+
+**实现对方法的参数进行过滤**
+
+除了事后过滤方法的返回值，我们还可以预先过滤传入到方法中的值。这项技术不太常用，但是在有些场景下可能会很便利。
+
+例如，假设我们希望以批处理的方式删除`Spittle`组成的列表。为了完成该功能，我们可能会编写一个方法，其签名大致如下所示：
+
+```java
+public void deleteSpittles(List<Spittle> spittles) {
+    // ...
+}
+```
+
+如果我们想在它上面应用一些安全规则的话，比如`Spittle`只能由其所有者或管理员删除，那该怎么做呢？如果是这样的话，我们可以将逻辑放在`deleteSpittles()`方法中，在这里循环列表中的`Spittle`，只删除属于当前用户的那一部分对象（如果当前用户是管理员的话，则会全部删除）。
+
+这能够运行正常，但是这意味着我们需要将安全逻辑直接嵌入到方法之中。相对于删除`Spittle`来讲，安全逻辑是独立的关注点（当然，它们也有所关联）。如果列表中能够只包含实际要删除的`Spittle`，这样会更好一些，因为这能帮助`deleteSpittles()`方法中的逻辑更加简单，只关注于删除`Spittle`的任务。
+
+`@PreFilter`注解能够很好地解决这个问题。与`@PostFilter`非常类似，`@PreFilter`也使用SpEL来过滤集合，只有满足SpEL表达式的元素才会留在集合中。但是它所过滤的不是方法的返回值，`@PreFilter`过滤的是要进入方法中的集合成员：
+
+```java
+@PreAuthorize("hasAnyRole({'SPITTER', 'ADMIN'})")
+@PreFilter("hasRole('ADMIN') || targetObject.spitter.username == principal.username")
+public void deleteSpittles(List<Spittle> spittles) {
+    // ...
+}
+```
+
+与前面一样，对于没有`ROLE_SPITTER`或`ROLE_ADMIN`权限的用户，`@PreAuthorize`注解会阻止对这个方法的调用。但同时，`@PreFilter`注解能够保证传递给`deleteSpittles()`方法的列表中，只包含当前用户有权限删除的`Spittle`。这个表达式会针对集合中的每个元素进行计算，只有表达式计算结果为`true`的元素才会保留在列表中。`targetObject`是Spring Security提供的另外一个值，它代表了要进行计算的当前列表元素。
+
+Spring Security提供了注解驱动的功能，这是通过一系列注解来实现的，到此为止，我们已经对这些注解进行了介绍。相对于判断用户所授予的权限，使用表达式来定义安全限制是一种更为强大的方式。即便如此，我们也不应该让表达式过于聪明智能。我们应该避免编写非常复杂的安全表达式，或者在表达式中嵌入太多与安全无关的业务逻辑。
+
+当我们觉得安全表达式难以控制了，那么就应该看一下如何编写自定义的许可计算器（permission evaluator），以简化SpEL表达式。
+
+**定义许可计算器**
+
+我们上述使用的SpEL表达式还不算太复杂。但是，在不断地开发中，这个表达式可能会不断膨胀。在变得很长之前，表达式就会笨重、复杂并难以测试。
+
+下面我们将整个表达式替换为更加简单的版本：
+
+```java
+@PreAuthorize("hasAnyRole({'SPITTER', 'ADMIN'})")
+@PreFilter("hasPermission(targerObject, 'delete')")
+public void deleteSpittles(List<Spittle> spittles) {
+    // ...
+}
+```
+
+现在，设置给`@PreFilter`的表达式更加紧凑。它实际上只是在问一个问题“用户有权限删除目标对象吗？”。如果有的话，表达式的计算结果为`true`，`Spittle`会保存在列表中，并传递给`deleteSpittles()`方法。如果没有权限的话，它将会被移除掉。
+
+但是，`hasPermission()`是哪来的方法？它的意思是什么。更为重要的是，它如何知道用户有没有权限删除`targetObject`所对应的`Spittle`呢？
+
+`hasPermission()`方法是Spring Security为SpEL提供的扩展，它为开发者提供了一个时机，能够在执行计算的时候插入任意的逻辑。我们所需要做的就是编写并注册一个自定义的许可计算器。
+
+```java
+package spittr.security;
+
+import java.io.Serializable;
+
+import org.springframework.security.access.PermissionEvaluator;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+
+import spittr.domain.Spittle;
+
+public class SpittlePermissionEvaluator implements PermissionEvaluator {
+
+    private static final GrantedAuthority ADMIN_AUTHORITY = new SimpleGrantedAuthority("ADMIN");
+    
+    @Override
+    public boolean hasPermission(Authentication authentication, Object target, Object permission) {
+        if (target instanceof Spittle) {
+            Spittle spittle = (Spittle) target;
+            String username = spittle.getSpitter().getUsername();
+            if ("delete".equals(permission)) {
+                return isAdmin(authentication) || username.equals(authentication.getName());
+            }
+        }
+        
+        throw new UnsupportedOperationException("hasPermission not supported for object <" + target + "> and permission <" + permission + ">");
+    }
+
+    @Override
+    public boolean hasPermission(Authentication authentication, Serializable targetId, String targetType,
+            Object permission) {
+        throw new UnsupportedOperationException();
+    }
+    
+    private boolean isAdmin(Authentication authentication) {
+        return authentication.getAuthorities().contains(ADMIN_AUTHORITY);
+    }
+}
+```
+
+`SpittlePermissionEvaluator`实现了Spring Security的`PermissionEvaluator`接口，它需要实现两个不同的`hasPermission()`方法。其中的一个`hasPermission()`方法把要评估的对象作为第二个参数。第二个`hasPermission()`方法在只有目标对象的ID可以得到的时候才有用，并将ID作为`Serializable`传入第二个参数。
+
+对于第一个`hasPermission()`方法，要检查所评估的对象是否为一个`Spittle`，并判断所检查的是否为删除权限。如果是这样，它将对比`Spitter`的用户名是否与认证用户的名称相等，或者当前用户是否具有`ROLE_ADMIN`权限。
+
+编写完许可计算器，接下来需要将其注册到Spring Security中，一边在使用`@PreFilter`表达式的时候支持`hasPermission()`操作。
+
+默认情况下，Spring Security会配置为使用`DefaultMethodSecurityExpressionHandler`，它会使用一个`DenyAllPermissionEvaluator`实例。顾名思义，`DenyAllPermissionEvaluator`将会在`hasPermission()`方法中始终返回`false`，拒绝所有的方法访问。但是，我们可以为Spring Security提供另外一个`DefaultMethodSecurityExpressionHandler`，让它使用我们自定义的`SpittlePermissionEvaluator`，这需要重载`GlobalMethodSecurityConfiguration`的`createExpressionHandler`方法：
+
+```java
+@Configuration
+@EnableGlobalMethodSecurity(securedEnabled = true, prePostEnabled = true)
+public class MethodSecurityConfig extends GlobalMethodSecurityConfiguration{
+    
+    @Override
+    protected MethodSecurityExpressionHandler createExpressionHandler() {
+        DefaultMethodSecurityExpressionHandler handler = new DefaultMethodSecurityExpressionHandler();
+        handler.setPermissionEvaluator(new SpittlePermissionEvaluator());
+        return handler;
+    }
+}
+```
+
+现在，我们不管在任何地方的表达式中使用`hasPermission()`来保护方法，都会调用`SpittlePermissionEvaluator`来决定用户是否有权限调用方法。
+
+### 14.3 小结
+
+>
+方法级别的安全性是Spring Security Web级别安全性的一个重要补充，我们曾在第9章讨论过Web安全性。对于非Web应用来说，方法级别的安全性则是最前沿的防护。对于Web应用来讲，基于安全规则所声明的方法级别安全性能够保护Web请求。
+>
+在本章中，我们看到了六个可以在方法上声明安全性限制的注解。对于简单场景来说，面向权限的注解，包括Spring Security的@Secured以及基于标准的@RolesAllowed都很便利。当安全规则更为复杂的时候，组合使用@PreAuthorize、@PostAuthorize以及SpEL能够发挥更强大的威力。我们还看到通过为@PreFilter和@PostFilter提供SpEL表达式，过滤方法的输入和输出。
+>
+最后，我们还看到了让安全规则更加易于维护、测试和调试的方法，那就是自定义表达式计算器，它能够用在SpEL表达式的hasPermission()函数中。
+>
+从下一章开始，我们将会转移方向，从使用Spring开发后端应用程序转向与其他应用集成。在接下来的几章中，我们将会看到各种集成技术，包括远程服务、异步消息、REST甚至还有发送E-mail。在下一章我们将会探讨第一项集成技术，也就是使用Spring远程服务。
+
+
+
