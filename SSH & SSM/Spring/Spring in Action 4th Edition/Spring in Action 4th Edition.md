@@ -13672,6 +13672,8 @@ Spring Security提供了三种不同的安全注解：
 
 #### 14.1.1 使用@Secured注解限制方法调用
 
+*以下内容代码在工程sia4e-P3_Spring_in_the_back_end-C14_Securing_methods中*。
+
 在Spring中，如果要启用基于注解的方法安全性需要在配置类中使用`@EnableGlobalMehtodSecurity`：
 
 ```java
@@ -13959,5 +13961,405 @@ public class MethodSecurityConfig extends GlobalMethodSecurityConfiguration{
 >
 从下一章开始，我们将会转移方向，从使用Spring开发后端应用程序转向与其他应用集成。在接下来的几章中，我们将会看到各种集成技术，包括远程服务、异步消息、REST甚至还有发送E-mail。在下一章我们将会探讨第一项集成技术，也就是使用Spring远程服务。
 
+## 第十五章 使用远程服务
+
+本章内容：
+
+- 访问和发布RMI服务
+- 使用Hessian和Burlap服务
+- 使用Spring的HTTP invoker
+- 使用Spring开发Web服务
+
+作为一个Java开发者，我们有多种可以使用的远程调用技术，包括：
+
+- 远程方法调用（Remote Method Invocation，RMI）
+- Caucho的Hessian和Burlap
+- Spring基于HTTP的远程服务
+- 使用JAX-RPC和JAX-WS的Web Service
+
+不管我们选择哪种远程调用技术，Spring为使用这几种不同的技术访问和创建远程服务都提供了广泛的支持。
+
+### 15.1 Spring远程调用概览
+
+远程调用是客户端应用和服务端之间的会话。在客户端，它所需要的一些功能并不在该应用的实现范围之内，所以应用要向能提供这些功能的其他系统寻求帮助。而远程应用通过远程服务暴露这些功能。
+
+假设我们想把Spittr应用中的某些功能发布为远程服务并提供给其他应用来使用。或许除了现有的基于浏览器的用户界面，我们还想为Spittr应用提供桌面应用或移动端应用，如图所示。为了实现此想法，我们需要把`SpitterService`接口的基本功能发布为远程服务。
+
+<center>
+    ![图15.1-第三方客户端能够远程调用Spittr的服务实现与Spittr应用交互](images\图15.1-第三方客户端能够远程调用Spittr的服务实现与Spittr应用交互.PNG)
+    **第三方客户端能够远程调用Spittr的服务，从而实现与Spittr应用交互**
+</center>
+
+其他应用与Spittr之间的会话开始于客户端应用的一个远程过程调用（remote procedure call，RPC）。从表面上看，RPC类似于调用一个本地对象的一个方法。这两者都是同步操作，会阻塞调用代码的执行，直到被调用的过程执行完毕。
+
+>
+它们的差别仅仅是距离的问题，类似于人与人之间的交流。如果我们在公共场所的饮水机旁讨论周末足球比赛的结果，那我们就是在进行一个本地会话——两人之间的会话发生在同一房间内。同样，本地方法调用是指同一个应用中的两个代码块之间的执行流交换。
+>
+另一方面，如果我们拿起电话打给另一个城市的客户端，那我们之间的会话就是通过电话网络远程进行的。类似地，RPC调用就是执行流从一个应用传递给另一个应用，理论上另一个应用部署在跨网络的一台远程机器上。
+
+Spring支持多种不同的RPC模型，下表简述了每一个模型，并简要讨论了它们所适用的不同场景：
+
+RPC模型 | 适用场景
+-----|-----
+远程方法调用（RMI） | 不考虑网络限制时（例如防火墙），访问/发布基于Java的服务
+Hessian或Burlap | 考虑网络限制时，通过HTTP访问/发布基于Java的服务。Hessian是二进制协议，而Burlap是基于XML的
+HTTP invoker | 考虑网络限制，并希望使用基于XML或专有的序列化机制实现Java序列化时，访问/发布基于Spring的服务
+JAX-RPC和JAX-WS | 访问/发布平台独立的、基于SOAP的Web服务
+
+不管我们选择哪种远程调用模型，我们会发现Spring都提供了风格一致的支持。
+
+在所有的模型中，服务都作为Spring所管理的bean配置到我们的应用中。这是通过一个代理工厂bean实现的，这个bean能够把远程服务像本地对象一样装配到其他bean的属性中去。下图展示了它是如何工作的。
+
+<center>
+    ![图15.2-远程服务被代理](images\图15.2-远程服务被代理.PNG)
+    **在Spring中，远程服务被代理，所以它们能够像其他Spring bean一样被装配到客户端代码中**
+</center>
+
+客户端向代理发起调用，就像代理提供了这些服务一样。代理代表客户端与远程服务进行通信，由它负责处理连接的细节并向远程服务发起调用。
+
+更重要的是，如果调用远程服务时发生`java.rmi.RemoteException`异常，代理会处理此异常并重新抛出非检查型异常`RemoteAccessException`。远程异常通常预示着系统发生了无法优雅恢复的问题，如网络或配置问题。既然客户端通常无法从远程异常中恢复，那么重新抛出`RemoteAccessException`异常就能让客户端来决定是否处理此异常。
+
+在服务端，我们可以使用上表所列出的任意一种模型将Spring管理的bean发布为远程服务。下图展示了远程导出器（remote exporter）如何将bean方法发布为远程服务。
+
+<center>
+    ![图15.3-使用远程导出器将Spring管理的bean发布为远程服务](images\图15.3-使用远程导出器将Spring管理的bean发布为远程服务.PNG)
+    **使用远程导出器将Spring管理的bean发布为远程服务**
+</center>
+
+无论我们开发的是使用远程服务的代码，还是实现这些服务的代码，或者两者兼而有之，在Spring中，使用远程服务纯粹是一个配置问题。我们不需要编写任何Java代码就可以支持远程调用。我们的服务bean也不需要关心它们是否参与了一个RPC（当然，任何传递给远程调用的bean或从远程调用返回的bean可能需要实现`java.io.Serializable`接口）。
+
+### 15.2 使用RMI
+
+RMI最初在JDK 1.1被引入到Java平台中，它为Java开发者提供了一种强大的方法来实现Java程序间的交互。在RMI之前，对于Java开发者来说，远程调用的唯一选择就是CORBA（在当时，需要购买一种第三方产品，叫作Object Request Broker[ORB]），或者手工编写Socket程序。
+
+但是开发和访问RMI服务是非常乏味无聊的，它涉及到好几个步骤，包括程序的和手工的。Spring简化了RMI模型，它提供了一个代理工厂bean，能让我们把RMI服务像本地JavaBean那样装配到我们的Spring应用中。Spring还提供了一个远程导出器，用来简化把Spring管理的bean转换为RMI服务的工作。
+
+#### 15.2.1 导出RMI服务
+
+创建RMI服务会涉及如下几个步骤：
+
+1. 编写一个服务实现类，类中的方法必须抛出`java.rmi.RemoteException`异常
+2. 创建一个继承于`java.rmi.Remote`的服务接口
+3. 运行RMI编译器（rmic），创建客户端stub类和服务端skeleton类
+4. 启动一个RMI注册表，以便持有这些服务
+5. 在RMI注册表中注册服务
+
+除了这些必需的步骤外，我们注意到，程序还会抛出相当多的`RemoteException`和`MalformedURLException`异常。虽然这些异常通常意味着一个无法从`catch`代码块中恢复的致命错误，但是我们仍然需要编写样板式的代码来捕获并处理这些异常——即使我们不能修复它们。
+
+**Spring中配置RMI服务**
+
+幸运的是，Spring提供了更简单的方式来发布RMI服务，不用再编写那些需要抛出`RemoteException`异常的特定RMI类，只需简单地编写实现服务功能的POJO就可以了，Spring会处理剩余的其他事项。
+
+我们将要创建的RMI服务需要发布`SpitterService`接口中的方法：
+
+```java
+package spittr.service;
+
+import java.util.List;
+
+import spittr.domain.Spitter;
+import spittr.domain.Spittle;
+
+public interface SpitterService {
+    
+    List<Spittle> getRecentSpittles(int count);
+    void saveSpittle(Spittle spittle);
+    void saveSpitter(Spitter spitter);
+    Spitter getSpitter(long id);
+    Spitter getSpitter(String username);
+    void startFollowing(Spitter follower, Spitter followee);
+    List<Spittle> getSpittlesForSpitter(Spitter spitter);
+    List<Spittle> getSpittlesForSpitter(String username);
+    Spittle getSpittleById(long id);
+    void deleteSpittle(long id);
+    List<Spitter> getAllSpitters();
+}
+```
+
+如果我们使用传统的RMI来发布此服务，`SpitterService`和`SpitterServiceImpl`中的所有方法都需要抛出`java.rmi.RemoteException`。但是如果我们使用Spring的`RmiServiceExporter`把该类转变为RMI服务，那现有的实现不需要做任何改变。
+
+`RmiServiceExporter`可以把任意Spring管理的bean发布为RMI服务。如下图所示，`RmiServiceExporter`把bean包装在一个适配器类中，然后适配器类被绑定到RMI注册表中，并且代理到服务类的请求，在本例中服务类就是`SpitterServiceImpl`。
+
+<center>
+    ![图15.4-RmiServiceExporter的工作](images\图15.4-RmiServiceExporter的工作.PNG)
+    **RmiServiceExporter把POJO包装到服务适配器中，并将服务适配器绑定到RMI注册表中，从而将POJO转换为RMI服务**
+</center>
+
+使用`RmiServiceExporter`将`SpitterServiceImpl`发布为RMI服务的最简单方式是将其注册为bean：
+
+```java
+@Bean
+public RmiServiceExporter rmiExporter(SpitterService spitterService) {
+    RmiServiceExporter rmiExporter = new RmiServiceExporter();
+    rmiExporter.setService(spitterService);
+    rmiExporter.setServiceName("SpitterService");
+    rmiExporter.setServiceInterface(SpitterService.class);
+    return rmiExporter;
+}
+```
+
+这里会把`spitterService` bean设置到`service`属性中，表明`RmiServiceExporter`要把该bean发布为一个RMI服务。`serviceName`属性命名了RMI服务，`serviceInterface`属性指定了此服务所实现的接口。
+
+默认情况下，`RmiServiceExporter`会尝试绑定到本地机器1099端口上的RMI注册表。如果在这个端口没有发现RMI注册表，`RmiServiceExporter`将会启动一个注册表。如果希望绑定到不同端口或主机上的RMI注册表，那么我们可以通过`registryPort`和`registryHost`属性来指定。例如，下面的`RmiServiceExporter`会尝试绑定rmi.spitter.com主机1199端口上的RMI注册表：
+
+```java
+@Bean
+public RmiServiceExporter rmiExporter(SpitterService spitterService) {
+    RmiServiceExporter rmiExporter = new RmiServiceExporter();
+    rmiExporter.setService(spitterService);
+    rmiExporter.setServiceName("SpitterService");
+    rmiExporter.setServiceInterface(SpitterService.class);
+    rmiExporter.setRegistryHost("rmi.spitter.com");
+    rmiExporter.setRegistryPort(1199);
+    return rmiExporter;
+}
+```
+
+这就是我们使用Spring把某个bean转变为RMI服务所需要做的全部工作。现在`SpitterService`已经导出为RMI服务，我们可以为Spittr应用创建其他的用户界面或邀请第三方使用此RMI服务创建新的客户端。如果使用Spring，客户端开发者访问Spitter的RMI服务会非常容易。
+
+#### 15.2.2 装配RMI服务
+
+传统上，RMI客户端必须使用RMI API的`Naming`类从RMI注册表中查找服务，例如：
+
+```java
+try {
+    String serviceUrl = "rmi:/spitter/SpitterService";
+    SpitterService spitterService = (SpitterService) Naming.lookip(serviceUrl);
+    // ...
+} catch (RemoteException e) {
+    // ...
+} catch (NoutBoundException e) {
+    // ...
+} catch (MalFormedURLException e) {
+    // ...
+}
+```
+
+虽然这段代码可以获取Spitter的RMI服务的引用，但是它存在两个问题：
+
+- 传统的RMI查找可能会导致3种检查型异常的任意一种（`RemoteException`、`NotBoundException`和`MalformedURLException`），这些异常必须被捕获或重新抛出
+- 需要`SpitterService`的任何代码都必须自己负责获取该服务。这属于样板代码，与客户端的功能并没有直接关系。
+
+RMI查找过程中所抛出的异常通常意味着应用发生了致命的不可恢复的问题。例如，`MalformedURLException`异常意味着这个服务的地址是无效的。为了从这个异常中恢复，应用至少要重新配置，也可能需要重新编译。`try/catch`代码块并不能在发生异常时优雅地恢复，既然如此，为什么还要强制我们的代码捕获并处理这个异常呢？
+
+更糟糕的事情是这段代码直接违反了依赖注入（DI）原则。因为客户端代码需要负责查找`SpitterService`，并且这个服务是RMI服务，我们甚至没有任何机会去提供`SpitterService`对象的不同实现。理想情况下，应该可以为任意一个bean注入`SpitterService`对象，而不是让bean自己去查找服务。利用DI，使用`SpitterService`的任何客户端都不需要关心此服务来源于何处。
+
+Spring的`RmiProxyFactoryBean`是一个工厂bean，该bean可以为RMI服务创建代理。使用`RmiProxyFactoryBean`引用`SpitterService`的RMI服务是非常简单的，只需要在客户端的Spring配置中增加如下方法：
+
+```java
+@Bean
+public RmiProxyFactoryBean rmiProxy() {
+    RmiProxyFactoryBean rmiProxy = new RmiProxyFactoryBean();
+    rmiProxy.setServiceUrl("rmi://localhost/SpitterService");
+    rmiProxy.setServiceInterface(SpitterService.class);
+    return rmiProxy;
+}
+```
+
+服务的URL是通过`RmiProxyFactoryBean`的`serviceUrl`属性来设置的，在这里，服务名被设置为`SpitterService`，并且声明服务是在本地机器上的。同时，服务提供的接口由`serviceInterface`属性来指定。
 
 
+下图展示了客户端和RMI代理的交互：
+
+<center>
+    ![图15.5-客户端和RMI代理的交互](images\图15.5-客户端和RMI代理的交互.PNG)
+    **RmiProxyFactoryBean生成一个代理对象，该对象代表客户端来负责与远程的RMI服务进行通信。客户端通过服务的接口与代理进行交互，就如同远程服务就是一个本地的POJO**
+</center>
+
+注意，`RmiProxyFactoryBean`应该被配置在客户端，而`RmiServiceExporter`以及`SpitterServiceImpl`应该被配置在服务端。
+
+服务端配置：
+
+```java
+package spittr.config.server;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.remoting.rmi.RmiServiceExporter;
+
+import spittr.service.SpitterService;
+import spittr.service.impl.SpitterServiceImpl;
+
+@Configuration
+public class RmiServerConfig {
+    
+    @Bean
+    public RmiServiceExporter rmiExporter(SpitterService spitterService) {
+        RmiServiceExporter rmiExporter = new RmiServiceExporter();
+        rmiExporter.setService(spitterService);
+        rmiExporter.setServiceName("SpitterService");
+        rmiExporter.setServiceInterface(SpitterService.class);
+        return rmiExporter;
+    }
+    
+    @Bean
+    public SpitterService spitterService() {
+        return new SpitterServiceImpl();
+    }
+}
+```
+
+客户端配置：
+
+```java
+package spittr.config.client;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.remoting.rmi.RmiProxyFactoryBean;
+
+import spittr.service.SpitterService;
+
+@Configuration
+public class RmiClientConfig {
+    @Bean
+    public RmiProxyFactoryBean rmiProxy() {
+        RmiProxyFactoryBean rmiProxy = new RmiProxyFactoryBean();
+        rmiProxy.setServiceUrl("rmi://localhost:1099/SpitterService");
+        rmiProxy.setServiceInterface(SpitterService.class);
+        return rmiProxy;
+    }
+}
+```
+
+现在已经把RMI服务声明为Spring管理的bean，我们就可以把它作为依赖装配进另一个bean中，就像任意非远程的bean那样。例如，假设客户端需要使用`SpitterService`为指定的用户获取Spittle列表，我们可以使用`@Autowired`注解把服务代理装配进客户端中：
+
+```java
+@Autowired
+private SpitterService spitterService;
+```
+
+也可以像本地bean一样调用它的方法：
+
+```java
+public List<Spittle> getSpittles(String username) {
+    Spitter spitter = spitterService.getSpitter(username);
+    return spitterService.getSpittlesForSpitter(spitter);
+}
+```
+
+这样客户端代码甚至不需要知道所处理的是一个RMI服务。它只是通过注入机制接受了一个`SpitterService`对象，根本不必关心它来自何处。
+
+此外，代理捕获了这个服务所有可能抛出的`RemoteException`异常，并把它包装为运行期异常重新抛出，这样我们就可以放心地忽略这些异常。我们也可以非常容易地把远程服务bean替换为该服务的其他实现——或许是不同的远程服务，或者可能是客户端代码单元测试时的一个mock实现。
+
+RMI是一种实现远程服务交互的好办法，但是它存在某些限制。首先，RMI很难穿越防火墙，这是因为RMI使用任意端口来交互——这是防火墙通常所不允许的。在企业内部网络环境中，我们通常不需要担心这个问题。但是如果在互联网上运行，我们用RMI可能会遇到麻烦。即使RMI提供了对HTTP的通道的支持（通常防火墙都允许），但是建立这个通道也不是件容易的事。
+
+另外一件需要考虑的事情是RMI是基于Java的。这意味着客户端和服务端必须都是用Java开发的。因为RMI使用了Java的序列化机制，所以通过网络传输的对象类型必须要保证在调用两端的Java运行时中是完全相同的版本。对我们的应用而言，这可能是个问题，也可能不是问题。但是选择RMI做远程服务时，必须要牢记这一点。
+
+### 15.3 使用Hessian和Burlap发布远程服务
+
+Hessian和Burlap是Caucho Technology提供的两种基于HTTP的轻量级远程服务解决方案。借助于尽可能简单的API和通信协议，它们都致力于简化Web服务。
+
+为什么Caucho对同一个问题会有两种解决方案？Hessian和Burlap就如同一个事物的两面，但是每一个解决方案都服务于略微不同的目的。
+
+Hessian，像RMI一样，使用二进制消息进行客户端和服务端的交互。但与其他二进制远程调用技术（例如RMI）不同的是，它的二进制消息可以移植到其他非Java的语言中，包括PHP、Python、C++和C#。
+
+Burlap是一种基于XML的远程调用技术，这使得它可以自然而然地移植到任何能够解析XML的语言上。正因为它基于XML，所以相比起Hessian的二进制格式而言，Burlap可读性更强。但是和其他基于XML的远程技术（例如SOAP或XML-RPC）不同，Burlap的消息结构尽可能的简单，不需要额外的外部定义语言（例如WSDL或IDL）。
+
+很大程度上，它们是一样的。唯一的区别在于Hessian的消息是二进制的，而Burlap的消息是XML。由于Hessian的消息是二进制的，所以它在带宽上更具优势。但是如果我们更注重可读性（如出于调试的目的）或者我们的应用需要与没有Hessian实现的语言交互，那么Burlap的XML消息会是更好的选择。
+
+#### 15.3.1 使用Hessian和Burlap导出bean的功能
+
+*以下内容代码在工程sia4e-P4_Integrating_Spring-C15_Working_with_remote_services-02_HessianClient及sia4e-P4_Integrating_Spring-C15_Working_with_remote_services-02_HessianServer中*。（测试时报错，Hessian无法连接到/spitter.service，暂未解决）
+
+像之前一样，我们希望把`SpitterServiceImpl`类的功能发布为远程服务——这次是一个Hessian服务。即使没有Spring，编写一个Hessian服务也是相当容易的。我们只需要编写一个继承`com.caucho.hessian.server.HessianServlet`的类，并确保所有的服务方法是`public`的（在Hessian里，所有`public`方法被视为服务方法）。
+
+因为Hessian服务很容易实现，Spring并没有做更多简化Hessian模型的工作。但是和Spring一起使用时，Hessian服务可以在各方面利用Spring框架的优势，这是纯Hessian服务所不具备的。包括利用Spring的AOP来为Hessian服务提供系统级服务，例如声明式事务。
+
+**导出Hessian服务**
+
+在Spring中导出一个Hessian服务和在Spring中实现一个RMI服务十分类似。为了把Spitter服务发布为Hessian服务，我们需要配置另一个导出bean，只不过这次是`HessianServiceExporter`。
+
+`HessianServiceExporter`对Hessian服务所执行的功能与`RmiServiceExporter`对RMI服务所执行的功能是相同的：它把POJO的public方法发布成Hessian服务的方法。
+
+<cennter>
+    ![图15.6-HessianServiceExporter将Hessian请求转为对POJO的调用](images\图15.6-HessianServiceExporter将Hessian请求转为对POJO的调用.PNG)
+    **HessianServiceExporter是一个Spring MVC控制器，它可以接收Hessian请求，并把这些请求转换成对POJO的调用从而将POJO导出为一个Hessian服务**
+</cennter>
+
+如上图所示，`HessianServiceExporter`是一个Spring MVC控制器，它接收Hessian请求，并将这些请求转换成对被导出POJO的方法调用。在如下Spring的声明中，`HessianServiceExporter`会把`spitterService` bean导出为Hessian服务：
+
+```java
+@Bean
+public HessianServiceExporter hessianExporter(SpitterService spitterService) {
+    HessianServiceExporter exporter = new HessianServiceExporter();
+    exporter.setService(spitterService);
+    exporter.setServiceInterface(SpitterService.class);
+    return exporter;
+}
+```
+
+这里`service`属性的值被设置为实现了这个服务的bean引用。在这里，它引用的是`spitterService` bean。`serviceInterface`属性用来标识这个服务实现了`SpitterService`接口。
+
+与`RmiServiceExporter`不同的是，我们不需要设置`serviceName`属性。在RMI中，`serviceName`属性用来在RMI注册表中注册一个服务。而Hessian没有注册表，因此也就没必要为Hessian服务进行命名。
+
+**配置Hessian控制器**
+
+`RmiServiceExporter`和`HessianServiceExporter`另外一个主要区别就是，由于Hessian是基于HTTP的，所以`HessianSeriviceExporter`实现为一个Spring MVC控制器。这意味着为了使用导出的Hessian服务，我们需要执行两个额外的配置步骤：
+
+- 配置`DispatcherServlet`，并把我们的应用部署为Web应用
+- 在Spring的配置文件中配置一个URL处理器，把Hessian服务的URL分发给对应的Hessian服务bean
+
+`SpittrWebAppInitializer`：
+
+```java
+public class SpittrWebAppInitializer extends AbstractAnnotationConfigDispatcherServletInitializer {
+
+    @Override
+    protected Class<?>[] getRootConfigClasses() {
+        return new Class<?>[] { RootConfig.class };
+    }
+
+    @Override
+    protected Class<?>[] getServletConfigClasses() {
+        // 指定的配置类
+        return new Class<?>[] { WebConfig.class };
+    }
+
+    @Override
+    protected String[] getServletMappings() {
+        return new String[] { "/", "*.service" };
+    }
+
+}
+```
+
+经过上述配置后，任何以“.service”结束的URL请求都将由`DispatcherServlet`处理，它会把请求传递给匹配这个URL的控制器。例如，将“/spitter.service”请求交给`hessianSpitterService` bean所处理（它实际上仅仅是一个`SpitterServiceImpl`的代理）。
+
+那我们是如何知道这个请求会转给`hessianSpitterSevice`处理呢？我们还需要配置一个URL映射来确保DispatcherServlet把请求转给`hessianSpitterService`。使用`SimpleUrlHandlerMapping` bean可以做到这一点：
+
+```java
+@Bean
+public HandlerMapping hessianMapping() {
+    SimpleUrlHandlerMapping mapping = new SimpleUrlHandlerMapping();
+    Properties mappings = new Properties();
+    mappings.setProperty("/spitter.service", "hessianExportedSpitterService");
+    mapping.setMappings(mappings);
+    return mapping;
+}
+```
+
+经过上述配置，此时请求“/spitter.service”会交给一个名为“hessianExportedSpitterService”的bean处理，即我们配置的`HessianServiceExporter`。
+
+在客户端中我们同样要注册工厂bean：
+
+```java
+@Bean
+public HessianProxyFactoryBean spitterService(){
+    HessianProxyFactoryBean proxyFactoryBean = new HessianProxyFactoryBean();
+    proxyFactoryBean.setServiceUrl("http://localhost:8080/sia4e-P4_Integrating_Spring-C15_Working_with_remote_services-02_HessianServer/spitter.service");
+    proxyFactoryBean.setServiceInterface(SpitterService.class);
+    return proxyFactoryBean;
+}
+```
+
+**导出Burlap服务**
+
+事实上，在Spring 4中，Burlap的相关类，例如`BurlapServiceExporter`已经废弃了：
+
+>
+* @deprecated as of Spring 4.0, since Burlap hasn't evolved in years
+* and is effectively retired (in contrast to its sibling Hessian)
+
+Spring推荐我们使用Hessian，所以这里不再详述Burlap。
+
+### 15.4 使用Spring的HttpInvoker
