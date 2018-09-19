@@ -16274,7 +16274,7 @@ RabbitMQ是一个流行的开源消息代理，它实现了AMQP。SpringAMQP为R
 
 这些配置元素要与`<admin>`元素一起使用。`<admin>`元素会创建一个RabbitMQ管理组件（administrative component），它会自动创建（如果它们在RabbitMQ代理中尚未存在的话）上述这些元素所声明的队列、Exchange以及binding。
 
-例如，如果我们希望声明名为`spittle.alert.queue`的队列，只需要在Spring配置中添加如下的两个元素即可：    
+例如，如果我们希望声明名为`spittle.alerts`的队列，只需要在Spring配置中添加如下的两个元素即可：    
 
 ```xml
 <rabbit:admin connection-factory="connectionFactory"/>
@@ -16283,7 +16283,7 @@ RabbitMQ是一个流行的开源消息代理，它实现了AMQP。SpringAMQP为R
 
 注意，这里的id属性用来在Spring应用上下文中设置队列的bean ID，而name属性指定了RabbitMQ代理中队列的名称。
 
-对于简单的消息来说，我们只需做这些就足够了。这是因为默认会有一个没有名称的direct Exchange，所有的队列都会绑定到这个Exchange上，并且routing key与队列的名称相同。在这个简单的配置中，我们可以将消息发送到这个没有名称的Exchange上，并将routing key设定为`spittle.alert.queue`，这样消息就会路由到这个队列中。实际上，我们重新创建了JMS的点对点模型。
+对于简单的消息来说，我们只需做这些就足够了。这是因为默认会有一个没有名称的direct Exchange，所有的队列都会绑定到这个Exchange上，并且routing key与队列的名称相同。在这个简单的配置中，我们可以将消息发送到这个没有名称的Exchange上，并将routing key设定为`spittle.alerts`，这样消息就会路由到这个队列中。实际上，我们重新创建了JMS的点对点模型。
 
 但是，如果我们声明一个或更多的Exchange，并将其绑定到队列上。例如，如果要将消息路由到多个队列中，而不管routing key是什么，我们可以按照如下的方式配置一个fanout以及多个队列：
 
