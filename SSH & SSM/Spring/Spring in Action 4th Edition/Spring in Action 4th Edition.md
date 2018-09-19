@@ -14363,3 +14363,2124 @@ public HessianProxyFactoryBean spitterService(){
 Spring推荐我们使用Hessian，所以这里不再详述Burlap。
 
 ### 15.4 使用Spring的HttpInvoker
+
+Spring开发团队意识到RMI服务和基于HTTP的服务（例如Hessian和Burlap）之间的空白。一方面，RMI使用Java标准的对象序列化机制，但是很难穿透防火墙。另一方面，Hessian和Burlap能很好地穿透防火墙，但是使用私有的对象序列化机制。
+
+就这样，Spring的HTTP invoker应运而生了。HTTP invoker是一个新的远程调用模型，作为Spring框架的一部分，能够执行基于HTTP的远程调用（让防火墙不为难），并使用Java的序列化机制（让开发者也乐观其变）。使用基于HTTP invoker的服务和使用基于Hessian/Burlap的服务非常相似。
+
+#### 15.4.1 将bean导出为HTTP服务
+
+*以下内容代码在工程sia4e-P4_Integrating_Spring-C15_Working_with_remote_services-03_HttpInvokerClient及sia4e-P4_Integrating_Spring-C15_Working_with_remote_services-03_HttpInvokerServer中*。（与Hessian相同，连接出错，暂未解决）
+
+这里我们要使用的是`HttpInvokerServiceExporter`。
+
+为了把Spitter服务导出为一个基于HTTP invoker的服务，我们需要像下面的配置一样声明一个`HttpInvokerServiceExporter`：
+
+```java
+@Bean
+public HttpInvokerServiceExporter httpExporter(SpitterService service) {
+    HttpInvokerServiceExporter exporter = new HttpInvokerServiceExporter();
+    exporter.setService(service);
+    exporter.setServiceInterface(SpitterService.class);
+    return exporter;
+}
+```
+
+`HttpInvokerServiceExporter`的工作方式与`HessianServiceExporter`很相似。`HttpInvokerServiceExporter`也是一个SpringMVC控制器，它通过`DispatcherServlet`接收来自与客户端的请求，并将这些请求转换成对实现服务的POJO的方法调用。
+
+<center>
+    ![图15.7-HttpInvokerServiceExporter工作方式](images\图15.7-HttpInvokerServiceExporter工作方式.PNG)
+    **HttpInvokerServiceExporter工作方式与Hessian很相似，通过Spring MVC的DispatcherServlet接收请求，并将这些请求转换成对Spring bean的方法调用**
+</center>
+
+因为`HttpInvokerServiceExporter`是一个Spring MVC控制器，我们需要建立一个URL处理器，映射HTTP URL到对应的服务上，就像Hessian导出器所做的一样：
+
+```java
+@Bean
+public HandlerMapping httpMapping() {
+    SimpleUrlHandlerMapping mapping = new SimpleUrlHandlerMapping();
+    Properties mappings = new Properties();
+    mappings.setProperty("/spitter.service", "httpExporter");
+    mapping.setMappings(mappings);
+    return mapping;
+}
+```
+
+同样地，我们还需要配置`DispatcherServlet`，使其能够处理对“*.service”的请求。
+
+#### 15.4.2 通过HTTP访问服务
+
+访问基于HTTP invoker的服务很类似于我们之前使用的其他远程服务代理。实际上就是一样的。如下图所示：
+
+<center>
+    ![图15.9-HttpInvokerProxyFactoryBean工作方式](images\图15.9-HttpInvokerProxyFactoryBean工作方式.PNG)
+    **HttpInvokerProxyFactoryBean是一个代理工厂bean，用于生成一个代理，该代理使用Spring特有的基于HTTP协议进行远程通信**
+</center>
+
+为了把基于HTTP invoker的远程服务装配进我们的客户端Spring应用上下文中，我们必须将 `HttpInvokerProxyFactoryBean`配置为一个bean来代理它，如下所示：
+
+```java
+@Bean
+public HttpInvokerProxyFactoryBean spitterService() {
+    HttpInvokerProxyFactoryBean proxy = new HttpInvokerProxyFactoryBean();
+    proxy.setServiceUrl("http://localhost:8080/sia4e-P4_Integrating_Spring-C15_Working_with_remote_services-03_HttpInvokerServer/spitter.service");
+    proxy.setServiceInterface(SpitterService.class);
+    return proxy;
+}
+```
+
+Spring的HTTP invoker是作为两全其美的远程调用解决方案而出现的，把HTTP的简单性和Java内置的对象序列化机制融合在一起。这使得HTTP invoker服务成为一个引人注目的替代RMI或Hessian/Burlap的可选方案。
+
+但是，HTTP invoker也有一个重大限制：它只是一个Spring框架所提供的远程调用解决方案。这意味着客户端和服务端必须都是Spring应用。并且，至少目前而言，也隐含表明客户端和服务端必须是基于Java的。另外，因为使用了Java的序列化机制，客户端和服务端必须使用相同版本的类（与RMI类似）。
+
+### 15.5 发布和使用Web服务
+
+（关于JAX-WS的内容，这里暂略）
+
+### 15.6 小结
+
+>
+使用远程服务通常是一个乏味的苦差事，但是Spring提供了对远程服务的支持，让使用远程服务与使用普通的JavaBean一样简单。
+>
+在客户端，Spring提供了代理工厂bean，能让我们在Spring应用中配置远程服务。不管是使用RMI、Hessian、Burlap、Spring的HTTPinvoker，还是Web服务，都可以把远程服务装配进我们的应用中，好像它们就是POJO一样。Spring甚至捕获了所有的RemoteExecption异常，并在发生异常的地方重新抛出运行期异常RemoteAccessException，让我们的代码可以从处理不可恢复的异常中解放出来。
+>
+即便Spring隐藏了远程服务的很多细节，让它们表现得好像是本地JavaBean一样，但是我们应该时刻谨记它们是远程服务的事实。远程服务，本质上来讲，通常比本地服务更低效。当编写访问远程服务的代码时，我们必须考虑到这一点，限制远程调用，以规避性能瓶颈。
+>
+在本章，我们看到了Spring是如何使用几种基本的远程调用技术来发布和使用服务的。尽管这些远程调用方案在分布式应用中很有价值，但这只是涉及面向服务架构（SOA）的一鳞半爪。
+>
+我们还了解了如何将bean导出为基于SOAP的Web服务。尽管这是开发Web服务的一种简单方式，但从架构角度来看，它可能不是最佳的选择。在下一章，我们将学习构建分布式应用的另一种选择，把应用暴露为RESTful资源。
+
+## 第十六章 使用Spring MVC创建REST API
+
+本章内容：
+
+- 编写处理REST资源的控制器
+- 以XML、JSON及其他格式来表述资源
+- 使用REST资源
+
+作为开发人员，我们经常关注于构建伟大的软件来解决业务问题。数据只是软件完成工作时要处理的原材料。但是如果你问一下业务人员，数据和软件谁更重要的话，他们很可能会选择数据。数据是许多业务的生命之血。软件通常是可以替换的，但是多年积累的数据是永远不能替换的。
+
+你是不是觉得有些奇怪，既然数据如此重要，为何在开发软件的时候却经常将其视为事后才考虑的事情？以我们前面上一章所介绍的远程服务为例，这些服务是以操作和处理为中心的，而不是信息和资源。
+
+近几年来，以信息为中心的表述性状态转移（Representational StateTransfer，REST）已成为替换传统SOAP Web服务的流行方案。SOAP一般会关注行为和处理，而REST关注的是要处理的数据。
+
+从Spring 3.0版本开始，Spring为创建REST API提供了良好的支持。Spring的REST实现在Spring 3.1、3.2和如今的4.0版本中不断得到发展。
+
+Spring对REST的支持是构建在Spring MVC之上的，所以我们已经了解了许多在Spring中使用REST所需的知识。在本章中，我们将基于已了解的Spring MVC知识来开发处理RESTful资源的控制器。但在深入了解细节之前，先让我们看看使用REST到底是什么。
+
+### 16.1 了解REST
+
+我敢打赌这并不是你第一次听到或读到REST这个词。近些年来，关于REST已经有了许多讨论，在软件开发中你可能会发现有一种很流行的做法，那就是在推动REST替换SOAP Web服务的时候，会谈论到SOAP的不足。
+
+诚然，对于许多应用程序而言，使用SOAP可能会有些大材小用了，而REST提供了一个更简单的可选方案。另外，很多的现代化应用都会有移动或富JavaScript客户端，它们都会使用运行在服务器上REST API。
+
+问题在于并不是每个人都清楚REST到底是什么。结果就出现了许多误解。有很多打着REST幌子的事情其实并不符合REST真正的本意。在谈论Spring如何支持REST之前，我们需要对REST是什么达成共识。
+
+#### 16.1.1 REST的基础知识
+
+当谈论REST时，有一种常见的错误就是将其视为“基于URL的Web服务”——将REST作为另一种类型的远程过程调用（remote procedure call，RPC）机制，就像SOAP一样，只不过是通过简单的HTTP URL来触发，而不是使用SOAP大量的XML命名空间。
+
+恰好相反，REST与RPC几乎没有任何关系。RPC是面向服务的，并关注于行为和动作；而REST是面向资源的，强调描述应用程序的事物和名词。
+
+为了理解REST是什么，我们将它的首字母缩写拆分为不同的构成部分：
+
+- 表述性（Representational）：REST资源实际上可以用各种形式来进行表述，包括XML、JSON（JavaScript Object Notation）甚至HTML
+- 状态（State）：当使用REST的时候，我们更关注资源的状态而不是对资源采取的行为
+- 转移（Transfer）：REST涉及到转移资源数据，它以某种表述性形式从一个应用转移到另一个应用
+
+更简洁地讲，REST就是将资源的状态以最适合客户端或服务端的形式从服务器端转移到客户端（或者反过来）。
+
+在REST中，资源通过URL进行识别和定位。至于RESTful URL的结构并没有严格的规则，但是URL应该能够识别资源，而不是简单的发一条命令到服务器上。再次强调，关注的核心是事物，而不是行为。
+
+REST中会有行为，它们是通过HTTP方法来定义的。具体来讲，也就是`GET`、`POST`、`PUT`、`DELETE`、`PATCH`以及其他的HTTP方法构成了REST中的动作。这些HTTP方法通常会匹配为如下的CRUD动作：
+
+- Create: POST
+- Read: GET
+- Update: PUT或PATCH
+- Delete: DELETE
+
+尽管通常来讲，HTTP方法会映射为CRUD动作，但这并不是严格的限制。有时候，PUT可以用来创建新资源，POST可以用来更新资源。实际上，POST请求非幂等性（non-idempotent）的特点使其成为一个非常灵活的方法，对于无法适应其他HTTP方法语义的操作，它都能够胜任。
+
+基于对REST的这种观点，这里我们尽量避免使用诸如REST服务、REST Web服务或类似的术语，这些术语会不恰当地强调行为。相反，我们强调REST面向资源的本质，并讨论RESTful资源。
+
+#### 16.1.2 Spring是如何支持REST的
+
+Spring很早就有导出REST资源的需求。从3.0版本开始，Spring针对Spring MVC的一些增强功能对REST提供了良好的支持。当前的4.0版本中，Spring支持以下方式来创建REST资源：
+
+- 控制器可以处理所有的HTTP方法，包含四个主要的REST方法：GET、PUT、DELETE以及POST。Spring 3.2及以上版本还支持PATCH方法；
+- 借助`@PathVariable`注解，控制器能够处理参数化的URL（将变量输入作为URL的一部分）；
+- 借助Spring的视图和视图解析器，资源能够以多种方式进行表述，包括将模型数据渲染为XML、JSON、Atom以及RSS的View实现；
+- 可以使用`ContentNegotiatingViewResolver`来选择最适合客户端的表述；
+- 借助`@ResponseBody`注解和各种`HttpMethodConverter`实现，能够替换基于视图的渲染方式；
+- 类似地，`@RequestBody`注解以及`HttpMethodConverter`实现可以将传入的HTTP数据转化为传入控制器处理方法的Java对象；
+- 借助`RestTemplate`，Spring应用能够方便地使用REST资源。
+
+本章中，我们将会介绍Spring RESTful的所有特性，首先介绍如何借助Spring MVC生成资源。然后在16.4小节中，我们会转向REST的客户端，看一下如何使用这些资源。那么，就从了解RESTful SpringMVC控制器是什么样子开始吧。
+
+### 16.2 创建第一个REST端点
+
+从第5章到第7章中，我们学到了创建Web应用的知识，它们可以用在通过REST API暴露资源上。首先，我们会在名为`SpittleApiController`的新控制器中创建第一个REST端点。
+
+```java
+@RequestMapping(method = RequestMethod.GET)
+public List<Spittle> spittles(@RequestParam(value = "max", defaultValue = MAX_LONG_AS_STRING) long max,
+        @RequestParam(value = "count", defaultValue = "20") int count, Model model) {
+
+    return spittleRepository.findSpittles(max, count));
+}
+```
+
+实际上，现在我们并不能看出它服务于一个REST资源而不是Web页面。按照这个控制器的写法，并没有地方表明它是RESTful、服务于资源的控制器。
+
+当发起对“/spittles”的GET请求时，将会调用`spittles()`方法。它会查找并返回Spittle列表，而这个列表会通过注入的`SpittleRepository`获取到。列表会放到模型中，用于视图的渲染。对于基于浏览器的Web应用，这可能意味着模型数据会渲染到HTML页面中。
+
+但是，我们现在讨论的是创建REST API。在这种情况下，HTML并不是合适的数据表述形式。
+
+表述是REST中很重要的一个方面。它是关于客户端和服务器端针对某一资源是如何通信的。任何给定的资源都几乎可以用任意的形式来进行表述。如果资源的使用者愿意使用JSON，那么资源就可以用JSON格式来表述。如果使用者喜欢尖括号，那相同的资源可以用XML来进行表述。同时，如果用户在浏览器中查看资源的话，可能更愿意以HTML的方式来展现（或者PDF、Excel及其他便于人类阅读的格式）。资源没有变化——只是它的表述方式变化了。
+
+当然，如果内容要由人类用户来使用的话，那么我们可能需要支持HTML格式的资源。根据资源的特点和应用的需求，我们还可能选择使用PDF文档或Excel表格来展现资源。
+
+对于非人类用户的使用者，比如其他的应用或调用REST端点的代码，资源表述的首选应该是XML和JSON。借助Spring同时支持这两种方案非常简单，所以没有必要做一个非此即彼的选择。
+
+这里，我们至少要支持JSON，JSON使用起来和XML一样简单，并且如果客户端是JavaScript（最近一段时间以来，这种做法越来越常见）的话，JSON更是会成为优胜者，因为在JavaScript中使用JSON数据根本就不需要编排和解排（marshaling/demarshaling）。
+
+需要了解的是控制器本身通常并不关心资源如何表述。控制器以Java对象的方式来处理资源。控制器完成了它的工作之后，资源才会被转化成最适合客户端的形式。
+
+Spring提供了两种方法将资源的Java表述形式转换为发送给客户端的表述形式：
+
+- 内容协商（Content negotiation）：选择一个视图，它能够将模型渲染为呈现给客户端的表述形式；
+- 消息转换器（Message conversion）：通过一个消息转换器将控制器所返回的对象转换为呈现给客户端的表述形式。
+
+#### 16.2.1 协商资源表述
+
+*以下内容代码在工程sia4e-P4_Integrating_Spring-C16_Creating_REST_APIs_with_Spring_MVC-01_Content_Negotiation中*。
+
+在之前的学习中，当控制器的处理方法完成时，通常会返回一个逻辑视图名。如果方法不直接返回逻辑视图名（例如方法返回void）那么逻辑视图名会根据请求的URL判断得出（或通过`HttpServletRequest`进行重定向或通过`HttpServletResponse`进行请求转发）。DispatcherServlet接下来会将视图的名字传递给一个视图解析器，要求它来帮助确定应该用哪个视图来渲染请求结果。
+
+在面向人类访问的Web应用程序中，选择的视图通常来讲都会渲染为HTML。视图解析方案是个简单的一维活动。如果根据视图名匹配上了视图，那这就是我们要用的视图了。
+
+当要将视图名解析为能够产生资源表述的视图时，我们就有另外一个维度需要考虑了。视图不仅要匹配视图名，而且所选择的视图要适合客户端。如果客户端想要JSON，那么渲染HTML的视图就不行了，尽管此时视图名可能匹配。
+
+Spring的`ContentNegotiatingViewResolver`是一个特殊的视图解析器，它考虑到了客户端所需要的内容类型。按照其最简单的形式，`ContentNegotiatingViewResolver`可以按照下述形式进行配置：
+
+```java
+@Bean
+public ViewResolver cnViewResolver() {
+    return new ContentNegotiatingViewResolver();
+}
+```
+
+在这个简单的bean声明背后会涉及到很多事情。要理解`ContentNegotiatingViewResolver`是如何工作的，这涉及内容协商的两个步骤：
+
+1. 确定请求的媒体类型
+2. 找到适合请求媒体类型的最佳视图
+
+**确定请求的媒体类型**
+
+在内容协商两步骤中，第一步是确定客户端想要什么类型的内容表述。表面上看，这似乎是一个很简单的事情。难道请求的Accept头部信息不是已经很清楚地表明要发送什么样的表述给客户端吗？
+
+遗憾的是，Accept头部信息并不总是可靠的。如果客户端是Web浏览器，那并不能保证客户端需要的类型就是浏览器在Accept头部所发送的值。Web浏览器一般只接受对人类用户友好的内容类型（如text/html），所以没有办法（除了面向开发人员的浏览器插件）指定不同的内容类型。
+
+`ContentNegotiatingViewResolver`将会考虑到Accept头部信息并使用它所请求的媒体类型，但是它会首先查看URL的文件扩展名。如果URL在结尾处有文件扩展名的话，`ContentNegotiatingViewResolver`将会基于该扩展名确定所需的类型。如果扩展名是“.json”的话，那么所需的内容类型必须是“application/json”。如果扩展名是“.xml”，那么客户端请求的就是“application/xml”。当然，“.html”扩展名表明客户端所需的资源表述为HTML（text/html）。
+
+如果根据文件扩展名不能得到任何媒体类型的话，那就会考虑请求中的Accept头部信息。在这种情况下，Accept头部信息中的值就表明了客户端想要的MIME类型，没有必要再去查找了。
+
+最后，如果没有Accept头部信息，并且扩展名也无法提供帮助的话，`ContentNegotiatingViewResolver`将会使用“/”作为默认的内容类型，这就意味着客户端必须要接收服务器发送的任何形式的表述。
+
+一旦内容类型确定之后，`ContentNegotiatingViewResolver`就该将逻辑视图名解析为渲染模型的View。与Spring的其他视图解析器不同，`ContentNegotiatingViewResolver`本身不会解析视图。而是委托给其他的视图解析器，让它们来解析视图。
+
+`ContentNegotiatingViewResolver`要求其他的视图解析器将逻辑视图名解析为视图。解析得到的每个视图都会放到一个列表中。这个列表装配完成后，`ContentNegotiatingViewResolver`会循环客户端请求的所有媒体类型，在候选的视图中查找能够产生对应内容类型的视图。第一个匹配的视图会用来渲染模型。
+
+在上述的选择过程中，我们阐述了确定所请求媒体类型的默认策略。但是通过为其设置一个`ContentNegotiationManager`，我们能够改变它的行为。借助`ContentNegotiationManager`我们所能做到的事情如下所示：
+
+- 指定默认的内容类型，如果根据请求无法得到内容类型的话，将会使用默认值
+- 通过请求参数指定内容类型
+- 忽视请求的Accept头部信息
+- 将请求的扩展名映射为特定的媒体类型
+- 将JAF（Java Activation Framework）作为根据扩展名查找媒体类型的备用方案
+
+配置`ContentNegotiationManager`的方法有三种：
+
+- 直接声明一个`ContentNegotiationManager`类型的bean
+- 通过`ContentNegotiationManagerFactoryBean`间接创建
+- 重载`WebMvcConfigurerAdapter`的`configureContentNegotiation()`方法
+
+直接创建`ContentNegotiationManager`有一些复杂，除非有充分的原因，否则我们不会愿意这样做。后两种方案能够让创建`ContentNegotiationManager`更加简单。
+
+`ContentNegotiationManager`是在Spring 3.2中引入的。在Spring 3.2之前，`ContentNegotiatingViewResolver`的很多行为都是通过直接设置`ContentNegotiatingViewResolver`的属性进行配置的。从Spring 3.2开始，`ContentNegotiatingViewResolver`的大多数Setter方法都废弃了，并鼓励通过`ContentNegotiationManager`来进行配置。
+
+一般而言，如果我们使用XML配置`ContentNegotiationManager`的话，那最有用的将会是`ContentNegotiationManagerFactoryBean`。例如，我们可能希望在XML中配置`ContentNegotiationManager`使用“application/json”作为默认的内容类型：
+
+```xml
+<bean id="contentNegotiationManager" class="org.springframework.web.accept.ContentNegotiationManagerFactoryBean" p:defaultContentType="application/json" />
+```
+
+因为`ContentNegotiationManagerFactoryBean`是`FactoryBean`的实现，所以它会创建一个`ContentNegotiationManagerbean`。这个`ContentNegotiationManager`能够注入到`ContentNegotiatingViewResolver`的`contentNegotiationManager`属性中。
+
+如果使用Java配置的话，获得`ContentNegotiationManager`的最简便方法就是扩展`WebMvcConfigurerAdapter`并重载`configureContentNegotiation()`方法。在创建Spring MVC应用的时候，我们很可能已经扩展了`WebMvcConfigurerAdapter`。例如，在Spittr应用中，我们已经有了`WebMvcConfigurerAdapter`的扩展类，名为`WebConfig`，所以需要做的就是重载`configureContentNegotiation()`方法。如下就是`configureContentNegotiation()`的一个实现，它设置了默认的内容类型：
+
+```java
+@Override
+public void configureContentNegotiation(ContentNegotiationConfigurer configurer) {
+    configurer.defaultContentType(MediaType.APPLICATION_JSON);
+}
+```
+
+可以看到，`configureContentNegotiation()`方法给定了一个`ContentNegotiationConfigurer`对象。`ContentNegotiationConfigurer`中的一些方法对应于`ContentNegotiationManager`的Setter方法，这样我们就能在`ContentNegotiationManager`创建时，设置任意内容协商相关的属性。在本例中，我们调用`defaultContentType()`方法将默认的内容类型设置为“application/json”。
+
+现在，我们已经有了`ContentNegotiationManager` bean，接下来就需要将它注入到`ContentNegotiatingViewResolver`的`contentNegotiationManager`属性中：
+
+```java
+@Bean
+public ViewResolver cnViewResolver(ContentNegotiationManager manager) {
+    ContentNegotiatingViewResolver cnvr = new ContentNegotiatingViewResolver();
+    cnvr.setContentNegotiationManager(manager);
+    return cnvr;
+}
+```
+
+这个@Bean方法注入了`ContentNegotiationManager`，并使用它调用了`setContentNegotiationManager()`。这样的结果就是`ContentNegotiatingViewResolver`将会使用`ContentNegotiationManager`所定义的行为。
+
+配置`ContentNegotiationManager`有很多的细节，在这里无法对它们进行一一介绍。如下的程序清单是一个非常简单的配置样例，当我使用`ContentNegotiatingViewResolver`的时候，通常会采用这种用法：它默认会使用HTML视图，但是对特定的视图名称将会渲染为JSON输出：
+
+```java
+@Bean
+public ViewResolver cnViewResolver(ContentNegotiationManager manager) {
+    ContentNegotiatingViewResolver cnvr = new ContentNegotiatingViewResolver();
+    cnvr.setContentNegotiationManager(manager);
+    return cnvr;
+}
+
+// 默认为HTML
+@Override
+public void configureContentNegotiation(ContentNegotiationConfigurer configurer) {
+    configurer.defaultContentType(MediaType.TEXT_HTML);
+}
+
+// 以bean的形式查找视图
+@Bean
+public ViewResolver beanNameViewResolver() {
+    return new BeanNameViewResolver();
+}
+
+// 将spittles定义为JSON视图
+@Bean
+public View spittles() {
+    return new MappingJackson2JsonView();
+}
+```
+
+除了上述内容之外，还应该有一个能够处理HTML的视图解析器（比如`ThymeleafViewResolver`）。在大多数场景下，`ContentNegotiatingViewResolver`会假设客户端需要HTML。但是，如果客户端指定了它想要JSON（通过在请求路径上使用“.json”扩展名或Accept头部信息）的话，那么`ContentNegotiatingViewReslover`将会查找能够处理JSON视图的视图解析器。
+
+如果逻辑视图的名称为“spittles”，那么我们所配置的`BeanNameViewResolver`将会解析`spittles()`方法中所声明的View。这是因为bean名称匹配逻辑视图的名称。如果没有匹配的View的话，`ContentNegotiatingViewResolver`将会采用默认的行为，将其输出为HTML。
+
+**ContentNegotiatingViewResolver的优势与限制**
+
+`ContentNegotiatingViewResolver`的最大优势在于，它在Spring MVC之上构建了REST资源表述层，控制器代码无需更改。相同的一套控制器方法能够为面向人类的用户产生HTML内容，也能针对不是人类的客户端产生JSON或XML。
+
+如果面向人类用户的接口与面向非人类客户端的接口之间有很多重叠的话，那么内容协商是一种很便利的方案。在实践中，面向人类用户的视图与REST API在细节上很少能够处于相同的级别。如果面向人类用户的接口与面向非人类客户端的接口之间没有太多重叠的话，那么`ContentNegotiatingViewResolver`的优势就体现不出来了。
+
+`ContentNegotiatingViewResolver`还有一个严重的限制。作为`ViewResolver`的实现，它只能决定资源该如何渲染到客户端，并没有涉及到客户端要发送什么样的表述给控制器使用。如果客户端发送JSON或XML的话，那么`ContentNegotiatingViewResolver`就无法提供帮助了。
+
+`ContentNegotiatingViewResolver`还有一个相关的小问题，所选中的View会渲染模型给客户端，而不是资源。这里有个细微但很重要的区别。当客户端请求JSON格式的Spittle对象列表时，客户端希望得到的响应可能如下所示：
+
+```json
+[
+    {
+        "id": 42,
+        "latitude": 28.419489,
+        "longtitude": -81.581184,
+        "message": "Hello World!",
+        "time": 1400389200000
+    },
+    {
+        "id": 43,
+        "latitude": 28.419436,
+        "longtitude": -81.577225,
+        "message": "Blast off",
+        "time": 1400475600000 
+    }
+]
+```
+
+而由于模型是键值对组成的Map，那么响应可能会如下所示：
+
+```json
+{
+    "spittleList": [
+        {
+            "id": 42,
+            "latitude": 28.419489,
+            "longtitude": -81.581184,
+            "message": "Hello World!",
+            "time": 1400389200000
+        },
+        {
+            "id": 43,
+            "latitude": 28.419436,
+            "longtitude": -81.577225,
+            "message": "Blast off",
+            "time": 1400475600000 
+        }
+    ]
+}
+```
+
+尽管这不是很严重的问题，但确实可能不是客户端所预期的结果。
+
+因为有这些限制，我们通常建议不要使用`ContentNegotiatingViewResolver`。我更加倾向于使用Spring的消息转换功能来生成资源表述。接下来，我们看一下如何在控制器代码中使用Spring的消息转换器。
+
+#### 16.2.2 使用HTTP信息转换器
+
+*以下内容代码在工程sia4e-P4_Integrating_Spring-C16_Creating_REST_APIs_with_Spring_MVC-02_Message_Converters中*。
+
+消息转换（message conversion）提供了一种更为直接的方式，它能够将控制器产生的数据转换为服务于客户端的表述形式。当使用消息转换功能时，`DispatcherServlet`不再需要那么麻烦地将模型数据传送到视图中。实际上，这里根本就没有模型，也没有视图，只有控制器产生的数据，以及消息转换器（message converter）转换数据之后所产生的资源表述。
+
+Spring提供了各种各样的转换器，这些转换器满足了最常见的将对象转换为表述的需要。
+
+信息转换器 | 描述
+-----|-----
+`AtomFeedHttpMessageConverter` | Rome Feed对象和Atom feed（媒体类型application/atom+xml）之间的互相转换。如果 Rome 包在类路径下将会进行注册
+`BufferedImageHttpMessageConverter` | BufferedImages与图片二进制数据之间互相转换
+`ByteArrayHttpMessageConverter` | 读取/写入字节数组。从所有媒体类型（*/*）中读取，并以application/octetstream格式写入 
+`FormHttpMessageConverter` | 将application/x-www-form-urlencoded内容读入到MultiValueMap<String,String>中，也会将MultiValueMap<String,String>写入到application/x-www-form- urlencoded中或将MultiValueMap<String, Object>写入到multipart/form-data中 
+`Jaxb2RootElementHttpMessageConverter` | 在XML（text/xml或application/xml）和使用JAXB2注解的对象间互相读取和写入。如果 JAXB v2 库在类路径下，将进行注册
+`MappingJackson2HttpMessageConverter` | 在JSON和类型化的对象或非类型化的HashMap间互相读取和写入。如果 Jackson 2 JSON 库在类路径下，将进行注册
+`MarshallingHttpMessageConverter` | 使用注入的编排器和解排器（marshaller和unmarshaller）来读入和写入XML。支持的编排器和解排器包括Castor、JAXB2、JIBX、XMLBeans以及Xstream
+`ResourceHttpMessageConverter` | 读取或写入Resource
+`RssChannelHttpMessageConverter` | 在RSS feed和Rome Channel对象间互相读取或写入。如果 Rome 库在类路径下，将进行注册
+`SourceHttpMessageConverter` | 在XML和javax.xml.transform.Source对象间互相读取和写入。默认注册
+`StringHttpMessageConverter` | 将所有媒体类型（*/*）读取为String。将String写入为text/plain
+`XmlAwareFormHttpMessageConverter` | FormHttpMessageConverter的扩展，使用SourceHttp MessageConverter来支持基于XML的部分
+
+为了支持消息转换，我们需要对Spring MVC的编程模型进行一些小调整。
+
+**在响应体中返回资源状态**
+
+正常情况下，当处理方法返回Java对象（除`String`外或`View`的实现以外）时，这个对象会放在模型中并在视图中渲染使用。但是，如果使用了消息转换功能的话，我们需要告诉Spring跳过正常的模型/视图流程，并使用消息转换器。有不少方式都能做到这一点，但是最简单的方法是为控制器方法添加`@ResponseBody`注解。
+
+```java
+@RequestMapping(method = RequestMethod.GET, produces = "application/json")
+@ResponseBody
+public List<Spittle> spittles(@RequestParam(value = "max", defaultValue = MAX_LONG_AS_STRING) long max,
+        @RequestParam(value = "count", defaultValue = "20") int count, Model model) {
+    return spittleRepository.findSpittles(max, count);
+}
+```
+
+添加`@ResponseBode`注解，这样就能让Spring将方法返回的`List<Spittle>`转换为响应体。`@ResponseBody`注解会告知Spring，我们要将返回的对象作为资源发送给客户端，并将其转换为客户端可接受的表述形式。更具体地讲，`DispatcherServlet`将会考虑到请求中Accept头部信息，并查找能够为客户端提供所需表述形式的消息转换器。
+
+举例来讲，假设客户端的Accept头部信息表明它接受“application/json”，并且Jackson JSON库位于应用的类路径下，那么此时将会选择`MappingJackson2HttpMessageConverter`。
+
+消息转换器会将控制器返回的Spittle列表转换为JSON文档，并写入响应体。响应大致会如下所示：
+
+```json
+[
+    {
+        "id": 42,
+        "latitude": 28.419489,
+        "longtitude": -81.581184,
+        "message": "Hello World!",
+        "time": 1400389200000
+    },
+    {
+        "id": 43,
+        "latitude": 28.419436,
+        "longtitude": -81.577225,
+        "message": "Blast off",
+        "time": 1400475600000 
+    }
+]
+```
+
+**Jackson默认会使用反射**
+
+注意在默认情况下，Jackson JSON库在将返回的对象转换为JSON资源表述时，会使用反射。对于简单的表述内容来讲，这没有什么问题。但是如果我们重构了Java类型，比如添加、移除或重命名属性，那么所产生的JSON也将会发生变化（如果客户端依赖这些属性的话，那客户端有可能会出错）。
+
+但是，我们可以在Java类型上使用Jackson的映射注解，从而改变产生JSON的行为。这样我们就能更多地控制所产生的JSON，从而防止它影响到API或客户端。这个部分参见Jackson-Annotations的文档。
+
+上述`spittles()`方法的`@RequstMapping`注解中使用了`produces`属性，表明这个方法只处理预期输出为JSON的请求。也就是说，这个方法只会处理Accept头部信息包含“application/json”的请求。其他任何类型的请求，即使它的URL匹配指定的路径并且是GET请求也不会被这个方法处理。这样的请求会被其他的方法来进行处理（如果存在适当的方法的话），或者返回客户端HTTP 406（Not Acceptable）响应。
+
+**在请求体中接收资源状态**
+
+到目前为止，我们只关注了REST端点如何为客户端提供资源。但是REST并不是只读的，REST API也可以接受来自客户端的资源表述。如果要让控制器将客户端发送的JSON和XML转换为它所使用的Java对象，那是非常不方便的。在处理逻辑离开控制器的时候，Spring的消息转换器能够将对象转换为表述——它们能不能在表述传入的时候完成相同的任务呢？
+
+`@ResponseBody`能够告诉Spring在把数据发送给客户端的时候，要使用某一个消息器，与之类似，`@RequestBody`也能告诉Spring查找一个消息转换器，将来自客户端的资源表述转换为对象。例如，假设我们需要一种方式将客户端提交的新`Spittle`保存起来。我们可以按照如下的方式编写控制器方法来处理这种请求：
+
+```java
+@RequestMapping(method=RequestMethod.POST, consumes="application/json")
+@ResponseBody
+public Spittle saveSpittle(@RequestBody Spittle spittle) {
+    return spittleRepository.saveSpittle(spittle);
+}
+```
+
+如果忽略掉注解的话，那`saveSpittle()`是一个非常简单的方法。它接受一个`Spittle`对象作为参数，并使用`SpittleRepository`进行保存，最终返回`spittleRepository.save()`方法所得到的`Spittle`对象。
+
+但是，通过使用注解，他会变得更加强大。`@RequestMapping`表明它只能处理“/spittles”（在类级别的`@RequestMapping`中进行了声明）的POST请求。POST请求体中预期要包含一个`Spittle`的资源表述。因为`Spittle`参数上使用了`@RequestBody`，所以Spring将会查看请求中的Content-Type头部信息，并查找能够将请求体转换为`Spittle`的消息转换器。
+
+例如，如果客户端发送的`Spittle`数据是JSON表述形式，那么Content-Type头部信息可能就会是“application/json”。在这种情况下，`DispatcherServlet`会查找能够将JSON转换为Java对象的消息转换器。如果Jackson 2库在类路径中，那么`MappingJackson2HttpMessageConverter`将会担此重任，将JSON表述转换为`Spittle`，然后传递到`saveSpittle()`方法中。这个方法还使用了`@ResponseBody`注解，因此方法返回的`Spittle`对象将会转换为某种资源表述，发送给客户端。
+
+注意，`@RequestMapping`有一个`consumes`属性，我们将其设置为“application/json”。`consumes`属性的工作方式类似于`produces`，不过它会关注请求的Content-Type头部信息。它会告诉Spring这个方法只会处理对“/spittles”的POST请求，并且要求请求的Content-Type头部信息为“application/json”。如果无法满足这些条件的话，会由其他方法（如果存在合适的方法的话）来处理请求。
+
+**为控制器默认设置消息转换**
+
+当处理请求时，`@ResponseBody`和`@RequestBody`是启用消息转换的一种简洁和强大方式。但是，如果你所编写的控制器有多个方法，并且每个方法都需要信息转换功能的话，那么这些注解就会带来一定程度的重复性。
+
+Spring 4.0引入了`@RestController`注解，能够在这个方面给我们提供帮助。如果在控制器类上使用`@RestController`来代替`@Controller`的话，Spring将会为该控制器的所有处理方法应用消息转换功能。我们不必为每个方法都添加`@ResponseBody`了。我们所定义的`SpittleController`可能就会如下所示：
+
+```java
+@RestController
+@RequestMapping("/spittles")
+public class SpittleController {
+
+    private SpittleRepository spittleRepository;
+
+    private final String MAX_LONG_AS_STRING = Long.MAX_VALUE + "";
+
+    // 注入SpittleRepository
+    @Autowired
+    public SpittleController(SpittleRepository spittleRepository) {
+        this.spittleRepository = spittleRepository;
+    }
+
+    @RequestMapping(method = RequestMethod.GET, produces = "application/json")
+    public List<Spittle> spittles(@RequestParam(value = "max", defaultValue = MAX_LONG_AS_STRING) long max,
+            @RequestParam(value = "count", defaultValue = "20") int count, Model model) {
+        return spittleRepository.findSpittles(max, count);
+    }
+    
+    @RequestMapping(method=RequestMethod.POST, consumes="application/json")
+    public Spittle saveSpittle(@RequestBody Spittle spittle) {
+        return spittleRepository.saveSpittle(spittle);
+    }
+}
+```
+
+这两个处理器方法都没有使用`@ResponseBody`注解，因为控制器使用了`@RestController`，所以它的方法所返回的对象将会通过消息转换机制，产生客户端所需的资源表述。
+
+到目前为止，我们看到了如何使用Spring MVC编程模型将RESTful资源发布到响应体之中。但是响应除了负载以外还会有其他的内容。头部信息和状态码也能够为客户端提供响应的有用信息。接下来，我们看一下在提供资源的时候，如何填充头部信息和设置状态码。
+
+### 16.3 提供资源之外的其他内容
+
+`@ResponseBody`提供了一种很有用的方式，能够将控制器返回的Java对象转换为发送到客户端的资源表述。实际上，将资源表述发送给客户端只是整个过程的一部分。一个好的REST API不仅能够在客户端和服务器之间传递资源，它还能够给客户端提供额外的元数据，帮助客户端理解资源或者在请求中出现了什么情况。
+
+#### 16.3.1 发送错误信息到客户端
+
+例如，我们为`SpittleController`添加一个新的处理器方法，它会提供单个`Spittle`对象：
+
+```java
+@RequestMapping(value = "/{id}", method = RequestMethod.GET)
+@ResponseBody
+public Spittle spittleById(@PathVariable long id) {
+    return spittleRepository.findOne(id);
+}
+```
+
+在这里，通过id参数传入了一个ID，然后根据它调用Repository的`findOne()`方法，查找`Spittle`对象。处理器方法会返回`findOne()`方法得到的`Spittle`对象，消息转换器会负责产生客户端所需的资源表述。
+
+但是，当通过ID无法找到`Spittle`对象时，`findOne()`方法返回null时会发生什么呢？
+
+结果就是`spittleById()`方法会返回`null`，响应体为空，不会返回任何有用的数据给客户端。同时，响应中默认的HTTP状态码是200（OK），表示所有的事情运行正常。
+
+但是，所有的事情都是不对的。客户端要求`Spittle`对象，但是它什么都没有得到。它既没有收到`Spittle`对象也没有收到任何消息表明出现了错误。服务器实际上是在说：“这是一个没用的响应，但是能够告诉你一切都正常！”
+
+在这种场景下，至少状态码不应该是200，而应该404，告诉客户端，它们所要求的内容没有找到。如果响应体中能够包含错误信息而不是空的话就更好了。
+
+Spring提供了多种方式来处理这样的场景：
+
+- 使用`@ResponseStatus`注解可以指定状态码；
+- 控制器方法可以返回`ResponseEntity`对象，该对象能够包含更多响应相关的元数据；
+- 异常处理器能够应对错误场景，这样处理器方法就能关注于正常的状况
+
+在这个方面，Spring提供了很多的灵活性，其实也不存在唯一正确的方式。
+
+**使用ResponseEntity对象**
+
+作为`@ResponseBody`的替代方案，控制器方法可以返回一个`ResponseEntity`对象。`ResponseEntity`中可以包含响应相关的元数据（如头部信息和状态码）以及要转换成资源表述的对象。
+
+因为`ResponseEntity`允许我们指定响应的状态码，所以当无法找到`Spittle`的时候，我们可以返回HTTP 404错误。如下是新版本的`spittleById()`，它会返回`ResponseEntity`：
+
+```java
+@RequestMapping(value = "/{id}", method = RequestMethod.GET)
+@ResponseBody
+public ResponseEntity<Spittle> spittleById(@PathVariable long id) {
+    Spittle spittle = spittleRepository.findOne(id);
+    HttpStatus status = spittle != null ? HttpStatus.OK : HttpStatus.NOT_FOUND;
+    return new ResponseEntity<Spittle>(spittle, status);
+}
+```
+
+像前面一样，路径中得到的ID用来从Repository中检索`Spittle`。如果找到的话，状态码设置为`HttpStatus.OK`（这是之前的默认值），但是如果Repository返回`null`的话，状态码设置为`HttpStatus.NOT_FOUND`，这会转换为HTTP 404。最后，会创建一个新的`ResponseEntity`，它会把`Spittle`和状态码传送给客户端。
+
+注意这个`spittleById()`方法没有使用`@ResponseBody`注解。除了包含响应头信息、状态码以及负载以外，`ResponseEntity`还包含了`@ResponseBody`的语义，因此负载部分将会渲染到响应体中，就像之前在方法上使用`@ResponseBody`注解一样。如果返回`ResponseEntity`的话，那就没有必要在方法上使用`@ResponseBody`注解了。
+
+我们在正确的方向上走出了第一步，如果所要求的Spittle无法找到的话，客户端能够得到一个合适的状态码。但是在本例中，响应体依然为空。我们可能会希望在响应体中包含一些错误信息。
+
+首先，定义一个包含错误信息的`Error`对象
+
+```java
+public class Error {
+    
+    private int code;
+    private String message;
+
+    public Error(int code, String message) {
+        super();
+        this.code = code;
+        this.message = message;
+    }
+
+    public int getCode() {
+        return code;
+    }
+
+    public String getMessage() {
+        return message;
+    }
+
+    @Override
+    public String toString() {
+        return "Error [code=" + code + ", message=" + message + "]";
+    }
+}
+```
+
+然后修改`spittleById()`，让它返回`Error`对象：
+
+```java
+@RequestMapping(value = "/{id}", method = RequestMethod.GET)
+public ResponseEntity<?> spittleById(@PathVariable long id) {
+    Spittle spittle = spittleRepository.findOne(id);
+    if (spittle == null) {
+        Error error = new Error(404, "Spittle [" + id + "] not found");
+        return new ResponseEntity<Error>(error, HttpStatus.NOT_FOUND);
+    } else {
+        return new ResponseEntity<Spittle>(spittle, HttpStatus.OK);
+    }
+}
+```
+
+现在，这个方法的行为已经符合我们的预期了。如果找到`Spittle`的话，就会把返回的对象以及200（OK）的状态码封装到`ResponseEntity`中。另一方面，如果`findOne()`返回null的话，将会创建一个`Error`对象，并将其与404（Not Found）状态码一起封装到`ResponseEntity`中，然后返回。
+
+首先，这比我们开始的时候更为复杂。涉及到了更多的逻辑，包括条件语句。另外，方法返回`ResponseEntity<?>`感觉有些问题。`ResponseEntity`所使用的泛型为它的解析或出现错误留下了太多的空间。
+
+**处理错误**
+
+`spittleById()`方法中的if代码块是处理错误的，但这是控制器中错误处理器（error handler）所擅长的领域。错误处理器能够处理导致问题的场景，这样常规的处理器方法就能只关心正常的逻辑处理路径了。
+
+我们重构一下代码来使用错误处理器。首先，定义能够对应`SpittleNotFoundException`的错误处理器：
+
+```java
+@ExceptionHandler(SpittleNotFoundException.class)
+public ResponseEntity<Error> spittleNotFound(SpittleNotFoundException e) {
+    long spittleId = e.getSpittleId();
+    Error error = new Error(404, "Spittle [" + spittleId + "] not found");
+    return new ResponseEntity<Error>(error, HttpStatus.NOT_FOUND);
+}
+```
+
+`@ExceptionHandler`注解能够用到控制器方法中，用来处理特定的异常。这里，它表明如果在控制器的任意处理方法中抛出`SpittleNotFoundException`异常，就会调用`spittleNotFound()`方法来处理异常。
+
+`SpittleNotFoundException`：
+
+```java
+public class SpittleNotFoundException extends RuntimeException {
+
+    private static final long serialVersionUID = 2618420166836567451L;
+
+    private long spittleId;
+
+    public SpittleNotFoundException(long spittleId) {
+        this.spittleId = spittleId;
+    }
+
+    public long getSpittleId() {
+        return spittleId;
+    }
+}
+```
+
+现在，我们可以移除掉`spittleById()`方法中大多数的错误处理代码：
+
+```java
+@RequestMapping(value = "/{id}", method = RequestMethod.GET)
+public ResponseEntity<?> spittleById(@PathVariable long id) {
+    Spittle spittle = spittleRepository.findOne(id);
+    if (spittle == null) {
+        throw new SpittleNotFoundException(id);
+    } else {
+        return new ResponseEntity<Spittle>(spittle, HttpStatus.OK);
+    }
+}
+```
+
+这个版本的`spittleById()`方法确实干净了很多。除了对返回值进行`null`检查，它完全关注于成功的场景，也就是能够找到请求的`Spittle`。同时，在返回类型中，我们能移除掉奇怪的泛型了。
+
+不过，我们能够让代码更加干净一些。现在我们已经知道`spittleById()`将返回`Spittle`并且HTTP状态码始终会是200，那么也就不再需要使用`ResponseEntity`：
+
+```java
+@RequestMapping(value = "/{id}", method = RequestMethod.GET)
+@ResponseBody
+public Spittle spittleById(@PathVariable long id) {
+    Spittle spittle = spittleRepository.findOne(id);
+    if (spittle == null) {
+        throw new SpittleNotFoundException(id);
+    } else {
+        return spittle;
+    }
+}
+```
+
+同样地，对于错误处理方法始终返回`Error`，并且状态吗为404，那么我们也可以做类似清理：
+
+```java
+@ExceptionHandler(SpittleNotFoundException.class)
+@ResponseStatus(HttpStatus.NOT_FOUND)
+@ResponseBody
+public Error spittleNotFound(SpittleNotFoundException e) {
+    long spittleId = e.getSpittleId();
+    return new Error(404, "Spittle [" + spittleId + "] not found");
+}
+```
+
+在一定程度上，我们已经圆满达到了想要的效果。为了设置响应状态码，我们首先使用`ResponseEntity`，但是稍后我们借助异常处理器以及`@ResponseStatus`，避免使用`ResponseEntity`，从而让代码更加整洁。
+
+似乎，我们不再需要使用`ResponseEntity`了。但是，有一种场景`ResponseEntity`能够很好地完成，但是其他的注解或异常处理器却做不到。现在，我们看一下如何在响应中设置头部信息。
+
+#### 16.3.2 在响应中设置头部信息
+
+在`saveSpittle()`方法中，我们在处理POST请求的过程中创建了一个新的`Spittle`资源。但是，按照目前的写法，我们无法准确地与客户端交流。
+
+在`saveSpittle()`处理完请求之后，服务器在响应体中包含了`Spittle`的表述以及HTTP状态码200（OK），将其返回给客户端。这里没有什么大问题，但是还不是完全准确。
+
+我们创建了新的内容，HTTP状态码也将这种情况告诉给了客户端。不过，HTTP 201不仅能够表明请求成功完成，而且还能描述创建了新资源。如果我们希望完整准确地与客户端交流，那么响应是不是应该为201（Created），而不仅仅是200（OK）呢？
+
+根据上一节的写法，这个问题解决起来很容易，我们需要做的就是为这个方法添加`@ResponseStatus`注解，如下所示：
+
+```java
+@RequestMapping(method = RequestMethod.POST, consumes = "application/json")
+@ResponseStatus(HttpStatus.CREATED)
+@ResponseBody
+public Spittle saveSpittle(@RequestBody Spittle spittle) {
+    return spittleRepository.saveSpittle(spittle);
+}
+```
+
+这应该能够完成我们的任务，现在状态码能够精确反应发生了什么情况。它告诉客户端我们新创建了资源。问题已经得以解决！
+
+但这只是问题的一部分。客户端知道新创建了资源，你觉得客户端会不会感兴趣新创建的资源在哪里呢？毕竟，这是一个新创建的资源，会有一个新的URL与之关联。难道客户端只能猜测新创建资源的URL是什么吗？我们能不能以某种方式将其告诉客户端？
+
+当创建新资源的时候，将资源的URL放在响应的Location头部信息中，并返回给客户端是一种很好的方式。因此，我们需要有一种方式来填充响应头部信息，此时我们的老朋友`ResponseEntity`就能提供帮助了。
+
+如下所示：
+
+```java
+@RequestMapping(method = RequestMethod.POST, consumes = "application/json")
+public ResponseEntity<Spittle> saveSpittle(@RequestBody Spittle spittle) {
+    
+    Spittle savedSpittle = spittleRepository.saveSpittle(spittle);
+    
+    HttpHeaders headers = new HttpHeaders();
+    
+    URI locationUri = URI.create("http://localhost:8080/spittr/spittles" + savedSpittle.getId());
+    headers.setLocation(locationUri);
+    
+    return new ResponseEntity<Spittle>(savedSpittle, headers, HttpStatus.CREATED);        
+    
+}
+```
+
+在这个新的版本中，我们创建了一个`HttpHeaders`实例，用来存放希望在响应中包含的头部信息值。`HttpHeaders`是`MultiValueMap<String, String>`的特殊实现，它有一些便利的Setter方法（如`setLocation()`），用来设置常见的HTTP头部信息。在得到新创建`Spittle`资源的URL之后，接下来使用这个头部信息来创建`ResponseEntity`。
+
+这里需要注意的是，我们使用硬编码的方式来构建Location头部信息。URL中“localhost”以及“8080”这两个部分尤其需要注意，因为如果我们将应用部署到其他地方，而不是在本地运行的话，它们就不适用了。
+
+事实上，我们没有必要手动构建URL，Spring提供了`UriComponentsBuilder`，可以给我们一些帮助。它是一个构建类，通过逐步指定URL中的各种组成部分（如host、端口、路径以及查询），我们能够使用它来构建`UriComponents`实例。借助`UriComponentsBuilder`所构建的`UriComponents`对象，我们就能获得适合设置给Location头部信息的URI。
+
+为了使用`UriComponentsBuilder`，我们需要做的就是在处理器方法中将其作为一个参数，
+
+```java
+@RequestMapping(method = RequestMethod.POST, consumes = "application/json")
+public ResponseEntity<Spittle> saveSpittle(@RequestBody Spittle spittle, UriComponentsBuilder uriBuilder) {
+    
+    Spittle savedSpittle = spittleRepository.saveSpittle(spittle);
+    
+    HttpHeaders headers = new HttpHeaders();
+    
+    URI locationUri = uriBuilder.path("/spittles")
+                                .path(String.valueOf(savedSpittle.getId()))
+                                .build()
+                                .toUri();
+    
+    headers.setLocation(locationUri);
+    
+    return new ResponseEntity<Spittle>(savedSpittle, headers, HttpStatus.CREATED);        
+    
+}
+```
+
+在处理器方法所得到的`UriComponentsBuilder`中，会预先配置已知的信息如host、端口以及Servlet内容。它会从处理器方法所对应的请求中获取这些基础信息。基于这些信息，代码会通过设置路径的方式构建`UriComponents`其余的部分。
+
+这里路径的构建分为两步。第一步调用`path()`方法，将其设置为“/spittles/”，也就是这个控制器所能处理的基础路径。然后，在第二次调用`path()`的时候，使用了已保存`Spittle`的ID。我们可以推断出来，每次调用`path()`都会基于上次调用的结果。
+
+在路径设置完成之后，调用`build()`方法来构建`UriComponents`对象，根据这个对象调用`toUri()`就能得到新创建`Spittle`的URI。
+
+在REST API中暴露资源只代表了会话的一端。如果发布的API没有人关心和使用的话，那也没有什么价值。通常来讲，移动或JavaScript应用会是REST API的客户端，但是Spring应用也完全可以使用这些资源。我们换个方向，看一下如何编写Spring代码实现RESTful交互的客户端。
+
+### 16.4 编写REST客户端
+
+作为客户端，编写与REST资源交互的代码可能会比较乏味，并且所编写的代码都是样板式的。例如，假设我们需要借助Facebook的Graph API，编写方法来获取某人的Facebook基本信息。不过，获取基本信息的代码会有点复杂：
+
+```java
+public Profile fetchFacebookProfile(String id) {
+    try {
+        HttpClient client = HttpClient.createDefault();
+        HttpGet request = new HttpGet("http://graph.facebook.com/" + id);
+        request.setHeader("Accept", "application/json");
+        HttpResponse response = client.execute(request);
+        HttpEntity entity = response.getEntity();
+        ObjectMapper mapper = new ObjectMapper();
+        return mapper.readValue(entity.getContent(), Profile.class);
+    } catch (IOException e) {
+        throw new RuntimeException(e);
+    }
+}
+```
+
+可以看到，在使用REST资源的时候涉及很多代码，这里使用了Commons HTTP Client发起请求并使用Jackson JSONprocessor解析响应。
+
+仔细观察上述方法，我们会发现实际上只有少量代码与获取Facebook个人信息直接相关。如果我们要编写另一个方法来使用其他的REST资源，很可能会有很多代码是与`fetchFacebookProfile()`相同的。
+
+另外，还有一些地方可能会抛出的`IOException`异常。因为`IOException`是检查型异常，所以要么捕获它，要么抛出它。在这里，我们选择捕获它并在它的位置重新抛出一个非检查型异常`RuntimeException`。
+
+鉴于在资源使用上有如此之多的样板代码，我们可能会觉得最好的方式是封装通用代码并参数化可变的部分。这正是Spring的`RestTemplate`所做的事情。就像`JdbcTemplate`处理了JDBC数据访问时的丑陋部分，`RestTemplate`让我们在使用RESTful资源时免于编写那些乏味的代码。
+
+#### 16.4.1 了解RestTemplate的操作
+
+`RestTemplate`定义了许多与REST资源交互的方法，其中大多数都对应于HTTP的方法。除了TRACE以外，`RestTemplate`涵盖了所有的HTTP动作。除此之外，`execute()`和`exchange()`提供了较低层次的通用方法来使用任意的HTTP方法。
+
+`RestTemplate`定义了11个独立的操作，而每一个都有重载：
+
+方法 | 描述
+-----|-----
+`delete()` | 在特定的URL上对资源执行HTTP DELETE操作
+`exchange()` | 在URL上执行特定的HTTP方法，返回包含对象的`ResponseEntity`，这个对象是从响应体中映射得到的
+`execute()` | 在URL上执行特定的HTTP方法，返回一个从响应体映射得到的对象
+`getForEntity()` | 发送一个HTTP GET请求，返回的`ResponseEntity`包含了响应体所映射成的对象
+`getForObject()` | 发送一个HTTP GET请求，返回的请求体将映射为一个对象
+`headForHeaders()` | 发送HTTP HEAD请求，返回包含特定资源URL的HTTP头
+`optionsForAllow()` | 发送HTTP OPTIONS请求，返回对特定URL的Allow头信息
+`postForEntity()` | POST数据到一个URL，返回包含一个对象的`ResponseEntity`，这个对象是从响应体中映射得到的
+`postForLocation()` | POST数据到一个URL，返回新创建资源的URL
+`postForObject()` | POST数据到一个URL，返回根据响应体匹配形成的对象
+`put()` | PUT资源到特定的URL
+
+我们通过对四个主要HTTP方法的支持（也就是GET、PUT、DELETE和POST）来研究RestTemplate的操作。我们从GET方法的`getForObject()`和`getForEntity()`开始。
+
+#### 16.4.2 GET资源
+
+上表中列出了两种执行GET请求的方法：
+
+- getForObject()
+- getForEntity()
+
+其中，每个方法又有三种重载形式：
+
+- getForObject()
+    + <T> T getForObject(String url, Class<T> responseType, Object... uriVariables)
+    + <T> T getForObject(String url, Class<T> responseType, Map<String, ?> uriVariables)
+    + <T> T getForObject(URI url, Class<T> responseType)
+- getForEntity()
+    + <T> ResponseEntity<T> getForEntity(String url, Class<T> responseType, Object... uriVariables)
+    + <T> ResponseEntity<T> getForEntity(String url, Class<T> responseType, Map<String, ?> uriVariables)
+    + <T> ResponseEntity<T> getForEntity(URI url, Class<T> responseType)
+
+除了返回类型，`getForEntity()`方法就是`getForObject()`方法的镜像。实际上，它们的工作方式大同小异。它们都执行根据URL检索资源的GET请求。它们都将资源根据`responseType`参数匹配为一定的类型。唯一的区别在于`getForObject()`只返回所请求类型的对象，而`getForEntity()`方法会返回请求的对象以及响应相关的额外信息。
+
+#### 16.4.3　检索资源
+
+`getForObject()`方法是检索资源的合适选择。我们请求一个资源并按照所选择的Java类型接收该资源。作为`getForObject()`能够做什么的一个简单示例，让我们看一下`fetchFacebookProfile()`的另一个实现：
+
+```java
+public Profile fetchFacebookProfile(String id) {
+    RestTemplate rest = new RestTemplate();
+    return rest.getForObject("http://graph.facebook.com/{spitter}", Profile.class, id);
+}
+```
+
+`fetchFacebookProfile()`首先构建了一个`RestTemplate`的实例（另一种可行的方式是注入实例）。接下来，它调用了`getForObject()`来得到Facebook个人信息。为了做到这一点，它要求结果是`Profile`对象。在接收到`Profile`对象后，该方法将其返回给调用者。
+
+注意，在这个新版本的`fetchFacebookProfile()`中，我们没有使用字符串连接来构建URL，而是利用了`RestTemplate`可以接受参数化URL这一功能。URL中的“{id}”占位符最终将会用方法的id参数来填充。`getForObject()`方法的最后一个参数是大小可变的参数列表，每个参数都会按出现顺序插入到指定URL的占位符中。
+
+另外一种替代方案是将id参数放到`Map`中，并以id作为key，然后将这个`Map`作为最后一个参数传递给`getForObject()`：
+
+```java
+public Profile fetchFacebookProfile(String id) {
+    Map<String, String> urlVariables = new HashMap<>();
+    urlVariables.put("id", id);
+    RestTemplate rest = new RestTemplate();
+    return rest.getForObject("http://graph.facebook.com/{id}", Profile.class, urlVariables);
+}
+```
+
+这里没有任何形式的JSON解析和对象映射。在表面之下，`getForObject()`为我们将响应体转换为对象。它实现这些需要依赖HTTP消息转换器，与带有`@ResponseBody`注解的Spring MVC处理方法所使用的一样。
+
+这个方法也没有任何异常处理。这不是因为`getForObject()`不能抛出异常，而是因为它抛出的异常都是非检查型的。如果在`getForObject()`中有错误，将抛出非检查型`RestClientException`异常（或者它的一些子类）。如果愿意的话，你可以捕获它，但编译器不会强制你捕获它。
+
+#### 16.4.4 抽取响应的元数据
+
+作为`getForObject()`的一个替代方案，`RestTemplate`还提供了`getForEntity()`。`getForEntity()`方法与`getForObject()`方法的工作很相似。`getForObject()`只返回资源（通过HTTP信息转换器将其转换为Java对象），`getForEntity()`会在`ResponseEntity`中返回相同的对象，而且`ResponseEntity`还带有关于响应的额外信息，如HTTP状态码和响应头。
+
+我们可能想使用`ResponseEntity`所做的事就是获取响应头的一个值。例如，假设除了获取资源，还想要知道资源的最后修改时间。假设服务端在LastModified头部信息中提供了这个信息，我们可以这样像这样使用`getHeaders()`方法：
+
+```java
+Date lastModified = new Date(response.getHeaders().getLastModified());
+```
+
+`getHeaders()`方法返回一个`HttpHeaders`对象，该对象提供了多个便利的方法来查询响应头，包括`getLastModified()`，它将返回从1970年1月1日开始的毫秒数。
+
+`HttpHeaders`还包含如下的方法来获取头信息：
+
+- public List<MediaType> getAccept() { ... }
+- public List<Charset> getAcceptCharset() { ... }
+- public Set<HttpMethod> getAllow() { ... }
+- public String getCacheControl() { ... }
+- public List<String> getConnection() { ... }
+- public long getContentLength() { ... }
+- public MediaType getContentType() { ... }
+- public long getDate() { ... }
+- public String getETag() { ... }
+- public long getExpires() { ... }
+- public long getIfNotModifiedSince() { ... }
+- public List<String> getIfNoneMatch() { ... }
+- public long getLastModified() { ... }
+- public URI getLocation() { ... }
+- public String getOrigin() { ... }
+- public String getPragma() { ... }
+- public String getUpgrade() { ... }
+
+为了实现更通用的HTTP头信息访问，`HttpHeaders`提供了`get()`方法和`getFirst()`方法。两个方法都接受`String`参数来标识所需要的头信息。`get()`将会返回一个`String`值的列表，其中的每个值都是赋给该头部信息的，而`getFirst()`方法只会返回第一个头信息的值。
+
+如果对响应的HTTP状态码感兴趣，那么可以调用`getStatusCode()`方法：
+
+```java
+public Spittle fetchSpittle(long id) {
+    RestTemplate rest = new RestTemplate();
+    ResponseEntity<Spittle> response = rest.getForEntity("http://localhost:8080/spittr/spittles/{id}", Spittle.class, id);
+    if (response.getStatusCode() == HttpStatus.NOT_MODIFIED) {
+        throw new NotModifiedException();
+    }
+    return response.getBody();
+}
+```
+
+在这里，如果服务器响应304状态，这意味着服务器端的内容自从上一次请求之后再也没有修改。在这种情况下，将会抛出自定义的`NotModifiedException`异常来表明客户端应该检查它的缓存来获取`Spittle`。
+
+#### 16.4.5 PUT资源
+
+为了对数据进行PUT操作，`RestTemplate`提供了三个简单的`put()`方法。就像其他的`RestTemplate`方法一样，`put()`方法有三种形式：
+
+- void put(String url, Object request, Object... uriVariables)
+- void put(String url, Object request, Map<String, ?> uriVariables)
+- void put(URI url, Object request)
+
+按照它最简单的形式，`put()`接受一个`java.net.URI`，用来标识（及定位）要将资源发送到服务器上，另外还接受一个对象，这代表了资源的Java表述。例如，使用`put()`方法来更新服务器上的Spittle资源：
+
+```java
+public void updateSpittle(Spittle spittle) throws SpitterException {
+    RestTemplate rest = new RestTemplate();
+    String url = "http://localhost:8080/spittr/spittles/" + spittle.getId();
+    rest.put(URI.create(url), spittle);
+}
+```
+
+在这里，尽管方法签名很简单，但是使用`java.net.URI`作为参数的影响很明显。为了创建所更新`Spittle`对象的URL，我们要进行字符串拼接。
+
+使用基于String的其他`put()`方法能够为我们减少创建URI的不便。这些方法可以将URI指定为模板并对可变部分插入值。以下是使用基于String的`put()`方法重写的`updateSpittle()`：
+
+```java
+public void updateSpittle(Spittle spittle) throws SpitterException {
+    RestTemplate rest = new RestTemplate();
+    rest.put("http://localhost:8080/spittr/spittles/{id}", spittle, spittle.getId());
+}
+```
+
+现在的URI使用简单的`String`模板来进行表示。当`RestTemplate`发送PUT请求时，URI模板将“{id}”部分用`spittle.getId()`方法的返回值来进行替换。就像`getForObject()`和`getForEntity()`一样，这个版本的put()方法最后一个参数是大小可变的参数列表，每一个值会出现按照顺序赋值给占位符变量。
+
+当然，还可以使用Map传递参数：
+
+```java
+public void updateSpittle(Spittle spittle) throws SpitterException {
+    RestTemplate rest = new RestTemplate();
+    Map<String, String> params = new HashMap<>();
+    params.put("id", spittle.getId());
+    rest.put("http://localhost:8080/spittr/spittles/{id}", spittle, params);
+}
+```
+
+当使用Map来传递模板参数时，Map条目的每个key值与URI模板中占位符变量的名字相同。
+
+在所有版本的`put()`中，第二个参数都是表示资源的Java对象，它将按照指定的URI发送到服务器端。在本示例中，它是一个`Spittle`对象。`RestTemplate`将使用个HTTP消息转换器将Spittle对象转换为一种表述形式，并在请求体中将其发送到服务器端。
+
+对象将被转换成什么样的内容类型很大程度上取决于传递给put()方法的类型。如果给定一个String值，那么将会使用`StringHttpMessageConverter`：这个值直接被写到请求体中，内容类型设置为“text/plain”。如果给定一个`MultiValueMap<String,String>`，那么这个Map中的值将会被`FormHttpMessageConverter`以“application/x-wwwform-urlencoded”的格式写到请求体中。
+
+由于这里我们传递的是Spittle对象，所以需要一个能够处理任意对象的信息转换器。如果在类路径下包含Jackson 2库，那么`MappingJackson2HttpMessageConverter`将以application/json格式将`Spittle`写到请求中。
+
+#### 16.4.63 DELETE资源
+
+当你不需要在服务端保留某个资源时，那么可能需要调用`RestTemplate`的`delete()`方法。就像PUT方法那样，`delete()`方法有三个版本，它们的签名如下：
+
+- delete(String url, Object... uriVariables)
+- delete(String url, Map<String, ?> uriVariables)
+- delete(URI url)
+
+`delete()`方法是所有`RestTemplate`方法中最简单的。你唯一要提供的就是要删除资源的URI。例如，为了删除指定ID的`Spittle`，你可以这样调用`delete()`：
+
+```java
+public void deleteSpittle(long id) {
+    RestTemplate rest = new RestTemplate();
+    rest.delete(URI.create("http://localhost:8080/spittr/spittles/" + id));
+}
+```
+
+或
+
+```java
+public void deleteSpittle(long id) {
+    RestTemplate rest = new RestTemplate();
+    rest.delete("http://localhost:8080/spittr/spittles/{id}" + id);
+}
+```
+
+#### 16.4.7 POST资源数据
+
+`RestTemplate`有三个不同类型的方法来发送POST请求。当再乘上每个方法的三个不同变种，那就是有九个方法来POST数据到服务器端。
+
+这些方法中有两个的名字看起来比较类似。`postForObject()`和`postForEntity()`对POST请求的处理方式与发送GET请求的`getForObject()`和`getForEntity()`方法是类似的。另一个方法是`getForLocation()`，它是POST请求所特有的。
+
+#### 16.4.8 在POST请求中获取响应对象
+
+假设你正在使用`RestTemplate`来POST一个新的`Spitter`对象到Spittr应用程序的REST API。因为这是一个全新的`Spitter`，服务端并（还）不知道它。因此，它还不是真正的REST资源，也没有URL。另外，在服务端创建之前，客户端也不知道`Spitter`的ID。
+
+POST资源到服务端的一种方式是使用`RestTemplate`的`postForObject()`方法：
+
+- <T> T postForObject(String url, Object request, Class<T> responseType, Object... uriVariables)
+- <T> T postForObject(String url, Object request, Class<T> responseType, Map<String, ?> uriVariables)
+- <T> T postForObject(URI url, Object request, Class<T> responseType)
+
+在所有情况下，第一个参数都是资源要POST到的URL，第二个参数是要发送的对象，而第三个参数是预期返回的Java类型。在将URL作为`String`类型的两个版本中，第四个参数指定了URL变量（要么是可变参数列表，要么是一个`Map`）。
+
+当POST新的`Spitter`资源到Spitter REST API时，它们应该发送到`http://localhost:8080/spittr/spitters`。这里会有一个应对POST请求的处理方法来保存对象。因为这个URL不需要URL参数，所以我们可以使用任何版本的`postForObject()`。但为了保持尽可能简单，我们可以这样调用：
+
+```java
+public Spitter postSpitterForObject(Spitter spitter) {
+    RestTemplate rest = new RestTemplate();
+    return rest.postForObject("http://localhost:8080/spittr/spitters", spitter, Spitter.class);
+}
+```
+
+`postSpitterForObject()`方法给定了一个新创建的`Spitter`对象，并使用`postForObject()`将其发送到服务器端。在响应中，它接收到一个`Spitter`对象并将其返回给调用者。
+
+就像`getForEntity()`方法一样，我们可能想得到请求带回来的一些元数据。在这种情况下，`postForEntity()`是更合适的方法。`postForEntity()`方法有着与`postForObject()`几乎相同的一组签名：
+
+- <T> ResponseEntity<T> postForEntity(String url, Object request, Class<T> responseType, Object... uriVariables)
+- <T> ResponseEntity<T> postForEntity(String url, Object request, Class<T> responseType, Map<String, ?> uriVariables)
+- <T> ResponseEntity<T> postForEntity(URI url, Object request, Class<T> responseType)
+
+假设除了要获取返回的`Spitter`资源，还要查看响应中Location头信息的值。在这种情况下，可以这样调用`postForEntity()`：
+
+```java
+RestTemplate rest = new RestTemplate();
+ResponseEntity<Spitter> response = rest.postForEntity("http://localhost:8080/spittr-api/spitters",spitter, Spitter.class);
+Spitter spitter = response.getBody();
+URI url = response.getHeaders().getLocation();
+```
+
+与`getForEntity()`方法一样，`postForEntity()`返回一个`ResponseEntity<T>`对象。你可以调用这个对象的`getBody()`方法以获取资源对象（在本示例中是`Spitter`）。`getHeaders()`会给你一个`HttpHeaders`，通过它可以访问响应中返回的各种HTTP头信息。这里，我们调用`getLocation()`来得到`java.net.URI`形式的`Location`头信息。
+
+#### 16.4.9 在POST请求后获取资源位置
+
+上一例中如果我们并不需要将资源发送回来（毕竟，将其发送到服务器端是第一位的）。而真正需要的是Location头信息的值，那么使用`RestTemplate`的`postForLocation()`方法会更简单。
+
+类似于其他的POST方法，`postForLocation()`会在POST请求的请求体中发送一个资源到服务器端。但是，响应不再是相同的资源对象，`postForLocation()`的响应是新创建资源的位置。它有如下三个方法签名：
+
+- URI postForLocation(String url, Object request, Object... uriVariables)
+- URI postForLocation(String url, Object request, Map<String, ?> uriVariables)
+- URI postForLocation(URI url, Object request)
+
+例如，POST一个`Spitter`，返回包含资源的URL：
+
+```java
+public String postSpitter(Spitter spitter) {
+    RestTemplate rest = new RestTemplate();
+    return rest.postForLocation("http://localhost:8080/spittr/spitters", spitter).toString();
+}
+```
+
+在这里，我们以`String`的形式将目标URL传递进来，还有要POST的`Spitter`对象（在本示例中没有URL参数）。在创建资源后，如果服务端在响应的Location头信息中返回新资源的URL，接下来`postForLocation()`会以`String`的格式返回该URL。
+
+#### 16.4.10 交换资源
+
+到目前为止，我们已经看到`RestTemplate`的各种方法来GRT、PUT、DELETE以及POST资源。在它们之中，我们看到两个特殊的方法：`getForEntity()`和`postForEntity()`，这两个方法将结果资源包含在一个`ResponseEntity`对象中，通过这个对象我们可以得到响应头和状态码。
+
+能够从响应中读取头信息是很有用的。但是如果我们想在发送给服务端的请求中设置头信息的话，怎么办呢？这就是`RestTemplate`的`exchange()`的用武之地。
+
+像`RestTemplate`的其他方法一样，`exchange()`也重载为三个签名格式。一个使用`java.net.URI`来标识目标URL，而其他两个以`String`的形式传入URL并带有URL变量。如下所示：
+
+- <T> ResponseEntity<T> exchange(String url, HttpMethod method,          HttpEntity<?> requestEntity, Class<T> responseType, Object... uriVariables)
+- <T> ResponseEntity<T> exchange(String url, HttpMethod method,            HttpEntity<?> requestEntity, Class<T> responseType, Map<String, ?> uriVariables)
+- <T> ResponseEntity<T> exchange(URI url, HttpMethod method, HttpEntity<?> requestEntity, Class<T> responseType)
+
+`exchange()`方法使用`HttpMethod`参数来表明要使用的HTTP动作。根据这个参数的值，`exchange()`能够执行与其他`RestTemplate`方法一样的工作。
+
+例如，从服务端获取Spitter资源也可以使用`exchange()`来完成：
+
+```java
+ResponseEntity<Spitter> response = rest.exchange("http://localhost:8080/spittr/spitters/{id}", HttpMethod.GET, null, Spitter.class, spitterId);
+Spitter spitter = response.getBody();
+```
+
+通过传入`HttpMethod.GET`作为HTTP动作，我们会要求`exchange()`发送一个GET请求。第三个参数是用于在请求中发送资源的，但因为这是一个GET请求，它可以是`null`。下一个参数表明我们希望将响应转换为`Spitter`对象。最后一个参数用于替换URL模板中“{id}”占位符的值。
+
+不同于`getForEntity()`和`getForObject()`，`exchange()`方法允许在请求中设置头部信息。
+
+如果不知名头部信息，`exchange()`对Spitter的GET请求会带有如下的头部信息：
+
+```text
+GET /Spitter/spitters/habuma HTTP/1.1
+Accept: application/xml, text/xml, application/*+xml, application/json
+Content-Length: 0
+User-Agent: Java/1.6.0_20
+Host: localhost:8080
+Connection: keep-alive
+```
+
+让我们看一下Accept头信息。Accept头信息表明它能够接受多种不同的XML内容类型以及application/json。这样服务器端在决定采用哪种格式返回资源时，就有很大的可选空间。假设我们希望服务端以JSON格式发送资源。在这种情况下，我们需要将“application/json”设置为Accept头信息的唯一值。
+
+设置请求头信息是很简单的，只需构造发送给`exchange()`方法的`HttpEntity`对象即可，`HttpEntity`中包含承载头信息的`MultiValueMap`：
+
+```java
+MultiValueMap<String, String> headers = new LinkedMultiValueMap<>();
+headers.add("Accept", "application/json");
+HttpEntity<Object> requestEntity = new HttpEntity<>(headers);
+```
+
+在这里，我们创建了一个`LinkedMultiValueMap`并添加值为“application/json”的Accept头信息。接下来，我们构建了一个`HttpEntity`（使用`Object`泛型类型），将`MultiValueMap`作为构造参数传入。如果这是一个PUT或POST请求，我们需要为`HttpEntity`设置在请求体中发送的对象——对于GET请求来说，这是没有必要的。
+
+现在，将`HttpEntity`传入`exchange()`方法：
+
+```java
+ResponseEntity<Spitter> response = rest.exchange("http://localhost:8080/spittr/spitters/{id}", HttpMethod.GET, requestEntity, Spitter.class, spitterId);
+Spitter spitter = response.getBody();
+```
+
+表面上看，结果是一样的。我们得到了请求的`Spitter`对象。但在表面之下，请求将会带有如下的头信息发送：
+
+```text
+GET /Spitter/spitters/habuma HTTP/1.1
+Accept: application/json
+Content-Length: 0
+User-Agent: Java/1.6.0_20
+Host: localhost:8080
+Connection: keep-alive
+```
+
+假设服务器端能够将`Spitter`序列化为JSON，响应体将会以JSON格式来进行表述。
+
+### 16.5 小结
+
+>
+RESTful架构使用Web标准来集成应用程序，使得交互变得简单自然。系统中的资源采用URL进行标识，使用HTTP方法进行管理并且会以一种或多种适合客户端的方式来进行表述。
+>
+在本章中，我们看到了如何编写响应RESTful资源管理请求的SpringMVC控制器。借助参数化的URL模式并将控制器处理方法与特定的HTTP方法关联，控制器能够响应对资源的GET、POST、PUT以及DELETE请求。
+>
+为了响应这些请求，Spring能够将资源背后的数据以最适合客户端的形式展现。对于基于视图的响应，ContentNegotiatingViewResolver能够在多个视图解析器产生的视图中选择出最适合客户端期望内容类型的那一个。或者，控制器的处理方法可以借助@ResponseBody注解完全绕过视图解析，并使用信息转换器将返回值转换为客户端的响应。
+>
+REST API为客户端暴露了应用的功能，它们暴露功能的方式恐怕最原始的API设计者做梦都想不到。REST API的客户端通常是移动应用或运行在Web浏览器中的JavaScript。但是，Spring应用也可以借助RestTemplate来使用这些API。
+>
+REST只是应用间通信的方法之一，在下一章中，我们将会学习如何在Spring应用中借助消息实现异步通信。
+
+## 第十七章 Spring 消息
+
+本章内容：
+
+- 异步消息简介
+- 基于JMS的消息功能
+- 使用Spring的AMQP发送消息
+- 消息驱动的POJO
+
+在前面的一些章中，你看到了如何使用RMI、Hessian、Burlap、HTTPinvoker和Web服务在应用程序之间进行通信。所有这些通信机制都是同步的，客户端应用程序直接与远程服务相交互，并且一直等到远程过程完成后才继续执行。
+
+同步通信有它自己的适用场景。不过，对于开发者而言，这种通信方式并不是应用程序之间进行交互的唯一方式。异步消息是一个应用程序向另一个应用程序间接发送消息的一种方式，这种方式无需等待对方的响应。相对于同步消息，异步消息具有多个优势，关于这一点你很快就会看到。
+
+借助Spring，我们有多个实现异步消息的可选方案。在本章中，我们将会看到如何在Spring中使用Java消息服务（Java Message Service，JMS）和高级消息队列协议（Advanced Message Queuing Protocol，AMQP）发送和接收消息。除了基本的消息发送和接收之外，我们还会看到Spring对消息驱动POJO的支持，它是一种与EJB的消息驱动Bean（message-driven bean，MDB）类似的消息接收方式。
+
+### 17.1 异步消息简介
+
+与前面几章中介绍的远程调用机制以及REST接口类似，异步消息也是用于应用程序之间通信的。但是，在系统之间传递信息的方式上，它与其他机制有所不同。
+
+像RMI和Hessian/Burlap这样的远程调用机制是同步的。如下图所示，当客户端调用远程方法时，客户端必须等到远程方法完成后，才能继续执行。即使远程方法不向客户端返回任何信息，客户端也要被阻塞直到服务完成。
+
+<center>
+    ![图17.1-同步通信](images\图17.1-同步通信.PNG)
+    **如果通信是同步的，客户端必须等待服务完成**
+</center>
+
+消息则是异步发送的，如下图所示，客户端不需要等待服务处理消息，甚至不需要等待消息投递完成。客户端发送消息，然后继续执行，这是因为客户端假定服务最终可以收到并处理这条消息。
+
+<center>
+    ![图17.2-异步通信](images\图17.2-异步通信.PNG)
+    **异步通信是一种不需要等待的通信形式**
+</center>
+
+相对于同步通信，异步通信具有多项优势。
+
+#### 17.1.1 发送消息
+
+大多数人都使用过邮政服务。每天会有数百万信件、明信片和包裹交到邮递员手上，我们相信自己邮寄的东西会被送到目的地。世界实在是太大了，我们无法自己去运送这些东西，因此我们依赖邮政系统为我们运送。我们在信封上写明地址，贴张邮票，接着把它们投到信箱里，而不需要考虑信件如何到达目的地。
+
+与此类似，间接性也是异步消息的关键所在。当一个应用向另一个应用发送消息时，两个应用之间没有直接的联系。相反的是，发送方的应用程序会将消息交给一个服务，由服务确保将消息投递给接收方应用程序。
+
+在异步消息中有两个主要的概念：
+
+- 消息代理：message broker
+- 目的地：destination
+
+当一个应用发送消息时，会将消息交给一个消息代理。消息代理实际上类似于邮局。消息代理可以确保消息被投递到指定的目的地，同时解放发送者，使其能够继续进行其他的业务。
+
+当我们通过邮局邮递信件时，最重要的是要写上地址，这样邮局就可以知道这封信应该被投递到哪里。与此类似，每条异步消息都带有一个目的地，目的地就好像一个邮箱，可以将消息放入这个邮箱，直到有人将它们取走。
+
+但是，并不像信件地址那样必须标识特定的收件人或街道地址，消息中的目的地相对来说并不那么具体。目的地只关注消息应该从哪里获得——而不关心是由谁取走消息的。这种情况下，目的地就如同信件的地址为“本地居民”。
+
+尽管不同的消息系统会提供不同的消息路由模式，但是有两种通用的目的地：队列（queue）和主题（topic）。每种类型都与特定的消息模型相关联，分别是点对点模型（队列）和发布/订阅模型（主题）。
+
+**点对点消息模型**
+
+在点对点模型中，每一条消息都有一个发送者和一个接收者，如下图所示。当消息代理得到消息时，它将消息放入一个队列中。当接收者请求队列中的下一条消息时，消息会从队列中取出，并投递给接收者。因为消息投递后会从队列中删除，这样就可以保证消息只能投递给一个接收者。
+
+<center>
+    ![图17.3-点对点消息模型](images\图17.3-点对点消息模型.PNG)
+    **消息队列对消息发送者和消息接收者进行了解耦。虽然队列可以有多个接收者，但是每一条消息只能被一个接收者取走**
+</center>
+
+尽管消息队列中的每一条消息只被投递给一个接收者，但是并不意味着只能使用一个接收者从队列中获取消息。事实上，通常可以使用几个接收者来处理队列中的消息。不过，每个接收者都会处理自己所接收到的消息。
+
+这与在银行排队等候类似。在等待时，我们可能注意到很多银行柜员都可以帮助我们处理金融业务。在柜员帮助客户完成业务后，她就空闲了，此时，她会要求排队等候的下一个人前来办理业务。如果我们排在队伍的最前边时，我们就会被叫到，然后由其中的一个空闲柜员来帮助我们处理业务，而其他的柜员则会帮助其他的银行客户。
+
+从另一个角度看，我们在银行排队时，并不知道哪一个柜员会帮助我们办理业务。我们可以计算队伍中有多少人，与柜员的数目进行比较，注意哪一个柜员业务办理速度最快，然后猜测会由哪一个柜员办理我们的业务。但是，一般情况下我们都会猜错，最终会由另一个柜员来办理。
+
+同样，在点对点的消息中，如果有多个接收者监听队列，我们也无法知道某条特定的消息会由哪一个接收者处理。这种不确定性实际上有很多好处，因为我们只需要简单地为队列添加新的监听器就能提高应用的消息处理能力。
+
+**发布-订阅模型**
+
+在发布—订阅消息模型中，消息会发送给一个主题。与队列类似，多个接收者都可以监听一个主题。但是，与队列不同的是，消息不再是只投递给一个接收者，而是主题的所有订阅者都会接收到此消息的副本，如下图所示：
+
+<center>
+    ![图17.4-发布-订阅模型](images\图17.4-发布-订阅模型.PNG)
+    **与队列类似，主题可以将消息发送者与消息接收者进行解耦。与队列不同的是，主题消息可以发送给多个主题订阅者**
+</center>
+
+正如它的名字所暗示的，发布—订阅消息模型与杂志发行商和杂志订阅者很相似。杂志（消息）出版后，发送给邮局，然后所有的订阅者都会收到杂志的副本。
+
+杂志的类比就到此为至，因为对于异步消息来讲，发布者并不知道谁订阅了它的消息。发布者只知道它的消息要发送到一个特定的主题——而不知道有谁在监听这个主题。也就是说，发布者并不知道消息是如何被处理的。
+
+下面让我们异步消息与同步RPC的对比。
+
+#### 17.1.2 评估异步消息的优点
+
+虽然同步通信比较容易理解，建立起来也很简单，但是采用同步通信机制访问远程服务的客户端存在几个限制，最主要的是：
+
+- 同步通信意味着等待。当客户端调用远程服务的方法时，它必须等待远程方法结束后才能继续执行。如果客户端与远程服务频繁通信，或者远程服务响应很慢，就会对客户端应用的性能带来负面影响。
+- 客户端通过服务接口与远程服务相耦合。如果服务的接口发生变化，此服务的所有客户端都需要做相应的改变。
+- 客户端与远程服务的位置耦合。客户端必须配置服务的网络位置，这样它才知道如何与远程服务进行交互。如果网络拓扑进行调整，客户端也需要重新配置新的网络位置。
+- 客户端与服务的可用性相耦合。如果远程服务不可用，客户端实际上也无法正常运行。
+- 
+虽然同步通信仍然有它的适用场景，但是在决定应用程序更适合哪种通信机制时，我们必须考量以上的这些缺点。如果这些限制正是你所担心的，那你可能很想知道异步通信是如何解决这些问题的。
+
+**无需等待**
+
+当使用JMS发送消息时，客户端不必等待消息被处理，甚至是被投递。客户端只需要将消息发送给消息代理，就可以确信消息会被投递给相应的目的地。
+
+因为不需要等待，所以客户端可以继续执行其他任务。这种方式可以有效地节省时间，所以客户端的性能能够极大的提高。
+
+**面向消息解耦**
+
+与面向方法调用的RPC通信不同，发送异步消息是以数据为中心的。这意味着客户端并没有与特定的方法签名绑定。任何可以处理数据的队列或主题订阅者都可以处理由客户端发送的消息，而客户端不必了解远程服务的任何规范。
+
+**位置独立**
+
+同步RPC服务通常需要网络地址来定位。这意味着客户端无法灵活地适应网络拓扑的改变。如果服务的IP地址改变了，或者服务被配置为监听其他端口，客户端必须进行相应的调整，否则无法访问服务。
+
+与之相反，消息客户端不必知道谁会处理它们的消息，或者服务的位置在哪里。客户端只需要了解需要通过哪个队列或主题来发送消息。因此，只要服务能够从队列或主题中获取消息即可，消息客户端根本不需要关注服务来自哪里。
+
+在点对点模型中，可以利用这种位置的独立性来创建服务的集群。如果客户端不知道服务的位置，并且服务的唯一要求就是可以访问消息代理，那么我们就可以配置多个服务从同一个队列中接收消息。如果服务过载，处理能力不足，我们只需要添加一些新的服务实例来监听相同的队列就可以了。
+
+在发布-订阅模型中，位置独立性会产生另一种有趣的效应。多个服务可以订阅同一个主题，接收相同消息的副本。但是每一个服务对消息的处理逻辑却可能有所不同。例如，假设我们有一组服务可以共同处理描述新员工信息的消息。一个服务可能会在工资系统中增加该员工，另一个服务则会将新员工增加到HR门户中，同时还有一个服务为新员工分配可访问系统的权限。每一个服务都基于相同的数据（都是从同一个主题接收的），但各自进行独立的处理。
+
+**确保投递**
+
+为了使客户端可以与同步服务通信，服务必须监听指定的IP地址和端口。如果服务崩溃了，或者由于某种原因无法使用了，客户端将不能继续处理。
+
+但是，当发送异步消息时，客户端完全可以相信消息会被投递。即使在消息发送时，服务无法使用，消息也会被存储起来，直到服务重新可以使用为止。
+
+### 17.2 使用JMS发送消息
+
+Java消息服务（Java Message Service ，JMS）是一个Java标准，定义了使用消息代理的通用API。在JMS出现之前，每个消息代理都有私有的API，这就使得不同代理之间的消息代码很难通用。但是借助JMS，所有遵从规范的实现都使用通用的接口，这就类似于JDBC为数据库操作提供了通用的接口一样。
+
+Spring通过基于模板的抽象为JMS功能提供了支持，这个模板也就是`JmsTemplate`。使用`JmsTemplate`，能够非常容易地在消息生产方发送队列和主题消息，在消费消息的那一方，也能够非常容易地接收这些消息。Spring还提供了消息驱动POJO的理念：这是一个简单的Java对象，它能够以异步的方式响应队列或主题上到达的消息。
+
+我们将会讨论Spring对JMS的支持，包括`JmsTemplate`和消息驱动POJO。但是在发送和接收消息之前，我们首先需要一个消息代理，它能够在消息的生产者和消费者之间传递消息。
+
+#### 17.2.1 在Spring中搭建消息代理
+
+ActiveMQ是一个伟大的开源消息代理产品，也是使用JMS进行异步消息传递的最佳选择。
+
+**创建连接工厂**
+
+在本章中，我们将了解如何采用不同的方式在Spring中使用JMS发送和接收消息。在所有的示例中，我们都需要借助JMS连接工厂通过消息代理发送消息。因为选择了ActiveMQ作为我们的消息代理，所以我们必须配置JMS连接工厂，让它知道如何连接到ActiveMQ。ActiveMQConnectionFactory是ActiveMQ自带的连接工厂，在Spring中可以使用如下方式进行配置：
+
+```xml
+<bean id="connectionFactory" class="org.apache.activemq.spring.ActiveMQConnectionFactory" />
+```
+
+默认情况下，`ActiveMQConnectionFactory`会假设ActiveMQ代理监听localhost的61616端口。对于开发环境来说，这没有什么问题，但是在生产环境下，ActiveMQ可能会在不同的主机和/端口上。如果是这样的话，我们可以使用`brokerURL`属性来指定代理的URL：
+
+```xml
+<bean id="connectionFactory" class="org.apache.activemq.spring.ActiveMQConnectionFactory"
+p:brokerURL="tcp://localhost:61616" />
+```
+
+配置连接工厂还有另外一种方式，既然我们知道正在与ActiveMQ打交道，那我们就可以使用ActiveMQ自己的Spring配置命名空间来声明连接工厂（适用于ActiveMQ 4.1之后的所有版本）。首先，我们必须确保在Spring的配置文件中声明了`amq`命名空间：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:jms="http://www.springframework.org/schema/jms"
+    xmlns:amq="http://activemq.apache.org/schema/core"
+    xsi:schemaLocation="http://activemq.apache.org/schema/core
+        http://activemq.apache.org/schema/core/activemq-core.xsd
+        http://www.springframework.org/schema/jms
+        http://www.springframework.org/schema/jms/spring-jms.xsd
+        http://www.springframework.org/schema/beans
+        http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+</beans>
+```
+
+然后使用`<amq:connectionFactory>`元素声明连接工厂：
+
+```xml
+<amq:connectionFactory id="connectionFactory" brokerURL="tcp://localhost:61616" />
+```
+
+注意，`<amq:connectionFactory>`元素很明显是为ActiveMQ所准备的。如果我们使用不同的消息代理实现，它们不一定会提供Spring配置命名空间。如果没有提供的话，那我们就需要使用`<bean>`来装配连接工厂。
+
+在本章的后续内容中，我们会多次使用`connectionFactory` bean，但是现在，我们只需要通过配置brokerURL属性来告知连接工厂消息代理的位置就足够了。在本例中，`brokerURL`属性中的URL指定连接工厂要连接到本地机器的61616端口（这个端口是ActiveMQ监听的默认端口）上的ActiveMQ。
+
+**声明ActiveMQ消息目的地**
+
+除了连接工厂外，我们还需要消息传递的目的地。目的地可以是一个队列，也可以是一个主题，这取决于应用的需求。
+
+不论使用的是队列还是主题，我们都必须使用特定的消息代理实现类在Spring中配置目的地bean。下面的`<bean>`声明定义了一个ActiveMQ队列：
+
+```xml
+<bean id="queue" class="org.apache.activemq.command.ActiveMQQueue" c:_0="spitter.queue"/>
+```
+
+或者声明一个ActiveMQ主题：
+
+```xml
+<bean id="topic" class="org.apache.activemq.command.ActiveMQTopic" c:_0="spitter.topic" />
+```
+
+与连接工厂相似的是，ActiveMQ命名空间提供了另一种方式来声明队列和主题。对于队列，我们可以使用`<amq:quence>`元素来声明：
+
+```xml
+<amq:queue id="spitteQueue" physicalName="spitter.alert.queue" />
+```
+
+如果是主题，那么可以使用`<amq:topic>`元素来声明：
+
+```xml
+<amq:topic id="spittleTopic" physicalName="spittle.alert.topic" />
+```
+
+不管是哪种类型，都是借助`physicalName`属性指定消息通道的名称。
+
+到此为止，我们已经看到了如何声明使用JMS所需的组件。现在我们已经准备好发送和接收消息了。为此，我们将使用Spring的`JmsTemplate`——Spring 对JMS支持的核心部分。但是首先，让我们先看看如果没有`JmsTemplate`，JMS是怎样使用的，以此了解`JmsTemplate`到底提供了些什么。
+
+#### 17.2.2 使用Spring的JMS模板
+
+正如我们所看到的，JMS为Java开发者提供了与消息代理进行交互来发送和接收消息的标准API，而且几乎每个消息代理实现都支持JMS，因此我们不必因为使用不同的消息代理而学习私有的消息API。
+
+虽然JMS为所有的消息代理提供了统一的接口，但是这种接口用起来并不是很方便。使用JMS发送和接收消息并不像拿一张邮票并贴在信封上那么简单。
+
+**处理失控的JMS代码**
+
+传统的JMS使用与传统的JDBC代码类似的编程模型：
+
+```java
+ConnectionFactory cf = new ActiveMQConnectionFactory("tcp//localhost:61616");
+Connection conn = null;
+Session session = null;
+try {
+    conn = cf.createConnection();
+    session = conn.createSession(false, Session.AUTO_ACKNOWLEDGE);
+    Destination destination = new ActiveMQQueue("spitter.queue");
+    MessageProducer producer = session.createProducer(destination);
+    TextMessage message = session.createTextMessage();
+    message.setText("Hello world!");
+    producer.send(message);
+} catch (JMSException e) {
+    // ...
+} finally {
+    try {
+        if (session != null) {
+            session.close();
+        }
+        if (conn != null) {
+            conn.close();
+        }
+    } catch (JMSException ex) {
+        // ...
+    }
+}
+```
+
+这是一段失控的代码！！就像JDBC示例一样，差不多使用了20行代码，只是为了发送一条“Hello world!”消息。实际上，其中只有几行代码是用来发送消息的，剩下的代码仅仅是为了发送消息而进行的设置。
+
+同样地，接收端的代码也很复杂：
+
+```java
+ConnectionFactory cf = new ActiveMQConnectionFactory("tcp://localhost:61616");
+Connection conn = null;
+Session session = null;
+try {
+    conn = cf.createConnection();
+    conn.start();
+    session = conn.createSession(false, Session.AUTO_ACKNOWLEDGE);
+    Destination destination = new ActiveMQQueue("spitter.queue");
+    MessageConsumer consumer = session.createConsumer(destination);
+    Message message = consumer.receive();
+    TextMessage = consumer.receiver();
+    System.out.println("GOT A Message: " + textMessage.getText());
+} catch (JMSException e) {
+    // ...
+} finally {
+    try {
+        if (session != null) {
+            session.close();
+        }
+        if (conn != null) {
+            conn.close();
+        }
+    } catch (JMSException ex) {
+        // ...
+    }
+}
+```
+
+因为这些样板式代码，我们每次使用JMS时都要不断地做很多重复工作。更糟糕的是，你会发现我们在重复编写其他开发者的JMS代码。
+
+现在，让我来介绍一下Spring的`JmsTemplate`如何对JMS的样板式代码实现相同的功能。
+
+**使用JMS模板**
+
+针对如何消除冗长和重复的JMS代码，Spring给出的解决方案是`JmsTemplate`。`JmsTemplate`可以创建连接、获得会话以及发送和接收消息。这使得我们可以专注于构建要发送的消息或者处理接收到的消息。
+
+另外，`JmsTemplate`可以处理所有抛出的笨拙的`JMSException`异常。如果在使用`JmsTemplate`时抛出`JMSException`异常，`JmsTemplate`将捕获该异常，然后抛出一个非检查型异常，该异常是Spring自带的`JmsException`异常的子类。
+
+下表列出了标准`JMSException`异常与Spring的非检查型异常之间的映射关系：
+
+Spring（org.spirngframework.jms） | 标准的JMS（javax.jms）
+----- | -----
+`DestinationResolutionException` | Spring特有的——当Spring无法解析目的地名称时抛出
+`IllegalStateException` | `IllegalStateException`
+`InvalidClientIDException` | `InvalidClientIDException`
+`InvalidDestinationException` | `InvalidDestinationException`
+`InvalidSelectorException` | `InvalidSelectorException`
+`JmsSecurityException` | `JmsSecurityException`
+`InvalidSelectorException` | `InvalidSelectorException`
+`ListenerExecutionFailedException` | Spring特有的——当监听器方法执行失败时抛出
+`MessageConversionException` | Spring特有的——当消息转换失败时抛出
+`MessageEOFException` | `MessageEOFException`
+`MessageFormatException` | `MessageFormatException`
+`MessageNotReadableException` | `MessageNotReadableException`
+`MessageNotWriteableException` | `MessageNotWriteableException`
+`ResourceAllocationException` | `ResourceAllocationException`
+`SynchedLocalTransactionFailedException` | Spring特有的——当同步的本地事务不能完成时抛出
+`TransactionInprogressException` | `TransactionInprogressException`
+`TransactionRolledBackException` | `TransactionRolledBackException`
+`UncategorizedJmsException` | Spring特有的——当没有其他异常适用时抛出
+
+对于JMS API来说，`JMSException`的确提供了丰富且具有描述性的子类集合，让我们更清楚地知道发生了什么错误。不过，所有的`JMSException`异常的子类都是检查型异常，因此必须要捕获。`JmsTemplate`为我们捕获这些异常，并重新抛出对应非检查型`JMSException`异常的子类。
+
+为了使用`JmsTemplate`，我们需要在配置文件中将它声明为一个bean：
+
+```xml
+<bean id="jmsTemplate" class="org.springframework.jms.core.JmsTemplate">
+    <constructor-arg ref="connectionFactory" />
+</bean>
+```
+
+因为`JmsTemplate`需要知道如何连接到消息代理，所以我们必须为`connectionFactory`属性设置实现了JMS的`ConnectionFactory`接口的bean引用。
+
+**发送消息**
+
+在我们想建立的Spittr应用程序中，其中有一个特性就是当创建Spittle的时候提醒其他用户（或许是通过E-mail）。我们可以在增加Spittle的地方直接实现该特性。但是搞清楚发送提醒给谁以及实际发送这些提醒可能需要一段时间，这会影响到应用的性能。当增加一个新的Spittle时，我们希望应用是敏捷的，能够快速做出响应。
+
+与其在增加Spittle时浪费时间发送这些信息，不如对该项工作进行排队，在响应返回给用户之后再处理它。与直接发送消息给其他用户所花费的时间相比，发送消息给队列或主题所花费的时间是微不足道的。
+
+为了在`Spittle`创建的时候异步发送spittle提醒，让我们为Spittr应用引入`AlertService`：
+
+```java
+package spittr.alerts;
+
+import spittr.domain.Spittle;
+
+public interface AlertService {
+    void sendSpittleAlert(Spittle spittle);
+}
+```
+
+`AlertService`是一个接口，只定义了一个操作：`sendSpittleAlert()`。
+
+如下所示，`AlertServiceImpl`实现了`AlertService`接口，它使用`JmsOperation`（`JmsTemplate`所实现的接口）将`Spittle`对象发送给消息队列，而队列会在稍后得到处理：
+
+```java
+package spittr.alerts;
+
+import javax.jms.JMSException;
+import javax.jms.Message;
+import javax.jms.Session;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jms.core.JmsOperations;
+import org.springframework.jms.core.MessageCreator;
+
+import spittr.domain.Spittle;
+
+public class AlertServiceImpl implements AlertService {
+
+    // 注入JMS模板
+    @Autowired
+    private JmsOperations jmsTemplate;
+
+    @Override
+    public void sendSpittleAlert(Spittle spittle) {
+        // 发送消息，指定目的地
+        jmsTemplate.send("spittle.alert.queue", new MessageCreator() {
+            
+            @Override
+            public Message createMessage(Session session) throws JMSException {
+                // 创建消息
+                return session.createObjectMessage(spittle);
+            }
+        });
+    }
+}
+```
+
+`JmsOperations`的`send()`方法的第一个参数是JMS目的地名称，标识消息将发送给谁。当调用`send()`方法时，`JmsTemplate`将负责获得JMS连接、会话并代表发送者发送消息，如下图所示：
+
+<center>
+    ![图17.5-JmsTemplate代表发送者来负责处理发送消息的复杂过程](images\图17.5-JmsTemplate代表发送者来负责处理发送消息的复杂过程.PNG)
+    **JmsTemplate代表发送者来负责处理发送消息的复杂过程**
+</center>
+
+这里使用一个匿名内部类来构造消息，通过`createMessage()`方法，我们通过`session`创建了一个对象消息：传入一个`Spittle`对象，返回一个对象消息。
+
+注意，`sendSpittleAlert()`方法专注于组装和发送消息。在这里没有连接或会话管理的代码，`JmsTemplate`帮我们处理了所有的相关事项，而且我们也不需要捕获`JMSException`异常。`JmsTemplate`将捕获抛出的所有`JMSException`异常，然后重新抛出某一种非检查型异常。
+
+**设置目的地**
+
+在上述代码中，我们明确指定了一个目的地，在`send()`方法中将消息发向此目的地。当我们希望通过程序选择一个目的地时，这种形式的`send()`方法很适用。但是在`AlertServiceImpl`案例中，我们总是将`Spittle`消息发给相同的目的地，所以这种形式的`send()`方法并不能带来明显的好处。
+
+与其每次发送消息都指定一个目的地，我们可以为`JmsTemplate`装配一个默认的目的地：
+
+```xml
+<bean id="jmsTemplate" class="org.springframework.jms.core.JmsTemplate">
+    <constructor-arg ref="connectionFactory" />
+    <property name="defaultDestinationName" value="spittle.alert.queue" />
+</bean>
+```
+
+在这里，将目的地的名称设置为`spittle.alert.queue`，但它只是一个名称：它并没有说明你所处理的目的地是什么类型。如果已经存在该名称的队列或主题的话，就会使用已有的。如果尚未存在的话，将会创建一个新的目的地（通常会是队列）。但是，如果你想指定要创建的目的地类型的话，那么你可以将之前创建的队列或主题的目的地bean装配进来：
+
+```xml
+<bean id="spittleQueue" class="org.apache.activemq.command.ActiveMQQueue">
+    <constructor-arg value="spittle.alert.queue" />
+</bean>
+<bean id="jmsTemplate" class="org.springframework.jms.core.JmsTemplate">
+    <constructor-arg ref="connectionFactory" />
+    <property name="defaultDestination" ref="spittleQueue" />
+</bean>
+```
+
+现在，在调用`send()`方法时，我们可以去除第一个参数了：
+
+```java
+@Override
+public void sendSpittleAlert(Spittle spittle) {
+    // 发送消息
+    jmsTemplate.send(new MessageCreator() {
+        
+        @Override
+        public Message createMessage(Session session) throws JMSException {
+            // 创建消息
+            return session.createObjectMessage(spittle);
+        }
+    });
+}
+```
+
+这种形式的`send()`方法只需要传入一个`MessageCreator`。因为希望消息发送给默认目的地，所以我们没有必要再指定特定的目的地。
+
+在调用`send()`方法时，我们不必再显式指定目的地能够让任务得以简化。但是如果我们使用消息转换器的话，发送消息会更加简单。
+
+**在发送消息时，对消息进行转换**
+
+除了send()方法，`JmsTemplate`还提供了`convertAndSend()`方法。与`send()`方法不同，`convertAndSend()`方法并不需要`MessageCreator`作为参数。这是因为`convertAndSend()`会使用内置的消息转换器（message converter）为我们创建消息：
+
+当我们使用`convertAndSend()`时，`sendSpittleAlert()`可以减少到方法体中只包含一行代码：
+
+```java
+@Override
+public void sendSpittleAlert(Spittle spittle) {
+    jmsTemplate.convertAndSend(spittle);
+}
+```
+
+这里，`Spittle`会在发送之前转换为`Message`，这个步骤在`JmsTemplate`内部进行处理，它使用一个`MessageConverter`的实现类将对象转换为`Message`。
+
+`MessageConverter`是Spring定义的接口，只有两个需要实现的方法：
+
+```java
+public interface MessageConverter {
+
+    Message toMessage(Object object, Session session) throws JMSException, MessageConversionException;
+
+    Object fromMessage(Message message) throws JMSException, MessageConversionException;
+}
+```
+
+尽管这个接口实现起来很简单，但我们通常并没有必要创建自定义的实现。Spring已经提供了多个实现（所有的消息转换器都位于`org.springframework.jms.support.converter`包中中）：
+
+- MappingJackson2MessageConverter：使用Jackson 2 JSON库实现消息与JSON格式之间的相互转换
+- MarshallingMessageConverter：使用JAXB库实现消息与XML格式之间的相互转换
+- SimpleMessageConverter：实现`String`与`TextMessage`之间的相互转换，字节数组与`BytesMessage`之间的相互转换，`Map`与`MapMessage`之间的相互转换以及`Serializable`对象与`ObjectMessage`之间的相互转换
+- MessagingMessageConverter
+
+默认情况下，`JmsTemplate`在`convertAndSend()`方法中会使用`SimpleMessageConverter`。但是通过将消息转换器声明为bean并将其注入到`JmsTemplate`的`messageConverter`属性中，我们可以重写这种行为。例如，如果我们想使用JSON消息的话，那么可以声明一个`MappingJackson2MessageConverter` bean：
+
+```xml
+<bean id="jmsTemplate" class="org.springframework.jms.core.JmsTemplate">
+    <constructor-arg ref="connectionFactory" />
+    <property name="defaultDestination" ref="spittleQueue" />
+    <property name="messageConverter" ref="messageConverter" />
+</bean>
+
+<bean id="messageConverter"
+    class="org.springframework.jms.support.converter.MappingJackson2MessageConverter" />
+```
+
+各个消息转换器可能会有额外的配置，进而实现转换过程的细粒度控制。例如，`MappingJacksonMessageConverter`能够让我们配置转码以及自定义`ObjectMapper`。
+
+**接收消息**
+
+现在我们已经了解了如何使用`JmsTemplate`发送消息。但如果我们是接收端，那要怎么办呢？`JmsTemplate`是不是也可以接收消息呢？
+
+事实上，使用`JmsTemplate`接收消息甚至更简单，我们只需要调用`JmsTemplate`的`receive()`方法即可。
+
+```java
+@Override
+public Spittle receiveSpittleAlert() {
+    ObjectMessage receivedMessage = (ObjectMessage) jmsTemplate.receive();
+    try {
+        return (Spittle) receivedMessage.getObject();
+    } catch (JMSException e) {
+        throw JmsUtils.convertJmsAccessException(e);
+    }
+}
+```
+
+当调用`JmsTemplate`的`receive()`方法时，`JmsTemplate`会尝试从消息代理中获取一个消息。如果没有可用的消息，`receive()`方法会一直等待，直到获得消息为止。
+
+<center>
+    ![图17.6-调用receive()方法接收消息](images\图17.6-调用receive()方法接收消息.PNG)
+    **使用JmsTemplate从主题或队列中接收消息的时候，只需要简单地调用receive()方法。JmsTemplate会处理其他的事情**
+</center>
+
+因为我们知道Spittle消息是作为一个对象消息来发送的，所以它可以在到达后转型为`ObjectMessage`。然后，我们调用`getObject()`方法把`ObjectMessage`转换为`Spittle`对象并返回此对象。
+
+但是这里存在一个问题，我们不得不对可能抛出的`JMSException`进行处理。正如我已经提到的，`JmsTemplate`可以很好地处理抛出的`JmsException`检查型异常，然后把异常转换为Spring非检查型异常`JmsException`并重新抛出。但是它只对调用`JmsTemplate`的方法时才适用。`JmsTemplate`无法处理调用`ObjectMessage`的`getObject()`方法时所抛出的`JMSException`异常。
+
+因此，我们要么捕获`JMSException`异常，要么声明本方法抛出`JMSException`异常。为了遵循Spring规避检查型异常的设计理念，我们不建议本方法抛出`JMSException`异常，所以我们选择捕获该异常。在`catch`代码块中，我们使用Spring中`JmsUtils`的`convertJmsAccessException()`方法把检查型异常`JMSException`转换为非检查型异常`JmsException`。这其实是在其他场景中由`JmsTemplate`为我们做的事情。
+
+在`receiveSpittleAlert()`方法中，我们可以改善的一点就是使用消息转换器。在`convertAndSend()`中，我们已经看到了如何将对象转换为`Message`。不过，它们还可以用在接收端，也就是使用`JmsTemplate`的`receiveAndConvert()`：
+
+```java
+@Override
+public Spittle receiveSpittleAlert() {
+    return (Spittle) jmsTemplate.receiveAndConvert();
+}
+```
+
+现在，没有必要将`Message`转换为`ObjectMessage`，也没有必要通过调用`getObject()`来获取`Spittle`，更无需担心检查型的`JMSException`异常。这个新的`receiveSpittleAlert()`简洁了许多。但是，依然还有一个很小且不容易察觉的问题。
+
+使用`JmsTemplate`接收消息的最大缺点在于`receive()`和`receiveAndConvert()`方法都是同步的。这意味着接收者必须耐心等待消息的到来，因此这些方法会一直被阻塞，直到有可用消息（或者直到超时）。同步接收异步发送的消息，是不是感觉很怪异？
+
+这个问题需要使用消息驱动POJO来解决。让我们看看如何使用能够响应消息的组件异步接收消息，而不是一直等待消息的到来。
+
+#### 17.2.3 创建消息驱动的POJO
+
+当我们调用`receive()`方法时，`JmsTemplate`会查看队列或主题中是否有消息，直到收到消息或者等待超时才会返回。这期间，应用无法处理任何事情，只能等待是否有消息。如果应用能够继续进行其他业务处理，当消息到达时再去通知它，不是更好吗？
+
+EJB2规范的一个重要内容是引入了消息驱动bean（message-drivenbean，MDB）。MDB是可以异步处理消息的EJB。换句话说，MDB将JMS目的地中的消息作为事件，并对这些事件进行响应。而与之相反的是，同步消息接收者在消息可用前会一直处于阻塞状态。
+
+MDB是EJB中的一个亮点。即使那些狂热的EJB反对者也认为MDB可以优雅地处理消息。EJB 2 MDB的唯一缺点是它们必须要实现`java.ejb.MessageDrivenBean`。此外，它们还必须实现一些EJB生命周期的回调方法。简而言之，EJB 2 MDB 不是纯的POJO。
+
+在EJB 3规范中，MDB进一步简化了，使其更像POJO。我们不再需要实现`MessageDrivenBean`接口，而是实现更通用的`javax.jms.MessageListener`接口，并使用`@MessageDriven`注解标注MDB。
+
+Spring提供了它自己的消息驱动bean来满足异步接收消息的需求，这种形式与EJB 3的MDB很相似。
+
+**创建消息监听器**
+
+如果使用EJB的消息驱动模型来创建Spittle的提醒处理器，我们需要使用`@MessageDriven`注解进行标注，并实现`MessageListener`接口。那么，Spittle的提醒处理器最终可能是这样的：
+
+```java
+@MessageDriven(mappedName="jms/spittle.alert.queue")
+public class SpittleAlertHandler implements MessageListener {
+    @Resource
+    private MessageDrivenContext context;
+
+    public void onMessage(Message message) {
+        // ...
+    }
+}
+```
+
+EJB 3规范所要求的MDB也算不上太麻烦。但是事实上，`SpittleAlertHandler`的EJB 3实现太依赖于EJB的消息驱动API，并不是我们所希望的POJO。理想情况下，我们希望提醒处理器能够处理消息，但是不用编码，就好像它知道应该做什么。
+
+Spring提供了以POJO的方式处理消息的能力，这些消息来自于JMS的队列或主题中。例如，基于POJO实现`SpittleAlertHandler`就足以做到这一点：
+
+```java
+public class SpittleAlertHandler {
+    public void handleSpittleAlert(Spittle spittle) {
+        // ...
+    }
+}
+```
+
+我们稍后会编写`handleSpittleAlert()`方法的具体内容，但现在可以看到，这个方法没有任何JMS的痕迹，从任何一个角度观察，它都是一个纯粹的POJO。
+
+**配置消息监听器**
+
+为POJO赋予消息接收能力的诀窍是在Spring中把它配置为消息监听器。Spring的jms命名空间为我们提供了所需要的一切。首先，让我们先把处理器声明为bean：
+
+```xml
+<bean id="spittleHandler" class="spittr.alerts.SpittleAlertHandler" />
+```
+
+然后，为了将其转变为消息驱动的POJO，我们需要把这个bean声明为消息监听器：
+
+```xml
+<jms:listener-container connection-factory="connectionFactory">
+    <jms:listener destination="spitter.alert.queue" ref="spittleHandler"
+        method="handleSpittleAlert" />
+</jms:listener-container>
+```
+
+在这里，我们在消息监听器容器中包含了一个消息监听器。消息监听器容器（message listener container）是一个特殊的bean，它可以监控JMS目的地并等待消息到达。一旦有消息到达，它取出消息，然后把消息传给任意一个对此消息感兴趣的消息监听器。下图展示了这个交互过程：
+
+<center>
+    ![图17.7-消息监听器容器监听队列和主题](images\图17.7-消息监听器容器监听队列和主题.PNG)
+    **消息监听器容器监听队列和主题。当消息到达时，消息将转给消息监听器（例如消息驱动的POJO）**
+</center>
+
+为了在Spring中配置消息监听器容器和消息监听器，我们使用了Spring jms命名空间中的两个元素。`<jms:listener-container>`中包含了`<jms:listener>`元素。这里的`connection-factory`属性配置了对`connectionFactory`的引用，容器中的每个`<jms:listener>`都使用这个连接工厂进行消息监听。在本示例中，`connection-factory`属性可以移除，因为该属性的默认值就是`connectionFactory`。
+
+对于`<jms:listener>`元素，它用于标识一个bean和一个可以处理消息的方法。为了处理`Spittle`提醒消息，`ref`元素引用了`spittleHandler` bean。当消息到达`spitter.alert.queue`队列（通过`destination`属性配置）时，`spittleHandler` bean的`handleSpittleAlert()`方法（通过`method`属性指定的）会被触发。
+
+值得一提的是，如果`ref`属性所标示的bean实现了`MessageListener`，那就没有必要再指定`method`属性了，默认就会调用`onMessage()`方法。
+
+#### 17.2.4 使用基于消息的RPC
+
+在第15章中，我们展示了Spring把bean的方法暴露为远程服务以及从客户端向这些服务发起调用的几种方式。在本章，我们学习了如何通过队列和主题在应用程序之间发送消息。现在我们将了解一下如何使用JMS作为传输通道来进行远程调用。
+
+为了支持基于消息的RPC，Spring提供了`JmsInvokerServiceExporter`，它可以把bean导出为基于消息的服务；为客户端提供了`JmsInvokerProxyFactoryBean`来使用这些服务。
+
+**导出基于JMS的服务**
+
+`JmsInvokerServiceExporter`很类似于其他的服务导出器。考虑如下的`AlertServiceImpl`：
+
+```java
+@Component("alertService")
+public class AlertServiceImpl implements AlertService {
+
+    @Autowired
+    private JavaMailSender mailSender;
+
+    @Value("foo@bar.com")
+    private String alertEmailAddress;
+    
+    public void sendSpittleAlert(Spittle spittle) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        String spitterName = spittle.getSpitter().getFullName();
+        message.setFrom("noreply@spitter.com");
+        message.setSubject("New Spittle from " + spitterName);
+        message.setText(spitterName + " says: " + spittle.getText());
+        mailSender.send(message);
+    }
+}
+```
+
+我们现在不要过于关注`sendSpittleAlert()`方法的细节。现在，我们需要关注的重点在于`AlertServiceImpl`是一个简单的POJO，没有任何迹象标示它要用来处理JMS消息。
+
+正如我们所看到的，`AlertServiceImpl`使用了`@Component`注解来标注，所以它会被Spring自动发现并注册为Spring应用上下文中ID为`alertService`的bean。在配置`JmsInvokerServiceExporter`时，我们将引用这个bean：
+
+```xml
+<bean id="alertServiceExporter" class="org.springframework.jms.remoting.JmsInvokerServiceExporter">
+    <property name="service" ref="alertService" />
+    <property name="serviceInterface" value="spittr.alerts.AlertService"/>
+</bean>
+```
+
+这个bean的属性描述了导出的服务应该是什么样子的。`service`属性设置为`alertService` bean的引用，它是远程服务的实现。同时，`serviceInterface`属性设置为远程服务对外提供接口的全限定类名。
+
+导出器的属性并没有描述服务如何基于JMS通信的细节。。但好消息是JmsInvokerServiceExporter可以充当JMS监听器。因此，我们使用`<jms:listenercontainer>`元素配置它：
+
+```xml
+<jms:listener-container connection-factory="connectionFactory">
+    <jms:listener destination="spitter.alert.queue" ref="alertServiceExporter"/>
+</jms:listener-container>
+```
+
+**使用基于JMS的服务**
+
+这时候，基于JMS的提醒服务已经准备好了，等待队列中名字为`spitter.alert.queue`的RPC消息到达。在客户端，`JmsInvokerProxyFactoryBean`用来访问服务。
+
+`JmsInvokerProxyFactoryBean`隐藏了访问远程服务的细节，并提供一个易用的接口，通过该接口客户端与远程服务进行交互。与代理RMI服务或HTTP服务的最大区别在于，`JmsInvokerProxyFactoryBean`代理了通过`JmsInvokerServiceExporter`所导出的JMS服务。
+
+为了使用提醒服务，我们需要如下配置：
+
+```xml
+<bean id="alertService" class="org.springframework.jms.remoting.JmsInvokerProxyFactoryBean">
+    <property name="connectionFactory" ref="connectionFactory" />
+    <property name="queueName" value="spittle.alert.queue" />
+    <property name="serviceInterface" value="spittr.alerts.AlertService" />
+</bean>
+```
+
+多年来，JMS一直是Java应用中主流的消息解决方案。但是对于Java和Spring开发者来说，JMS并不是唯一的消息可选方案。在过去的几年中，高级消息队列协议（Advanced Message Queuing Protocol ，AMQP）得到了广泛的关注。因此，Spring也为通过AMQP发送消息提供了支持，这就是我们下面要讲解的内容。
+
+### 17.3.1 AMQP简介
+
+简单回忆一下JMS的消息模型，可能会有助于理解AMQP的消息模型。在JMS中，有三个主要的参与者：消息的生产者、消息的消费者以及在生产者和消费者之间传递消息的通道（队列或主题）。
+
+在JMS中，通道有助于解耦消息的生产者和消费者，但是这两者依然会与通道相耦合。生产者会将消息发布到一个特定的队列或主题上，消费者从特定的队列或主题上接收这些消息。通道具有双重责任，也就是传递数据以及确定这些消息该发送到什么地方，队列的话会使用点对点算法发送，主题的话就使用发布-订阅的方式。
+
+与之不同的是，AMQP的生产者并不会直接将消息发布到队列中。AMQP在消息的生产者以及传递消息的队列之间引入了一种间接的机制：Exchange。这种关系如下图所示：
+
+<center>
+    ![图17.8-Exchange实现了消息的生产者与消息队列之间解耦](images\图17.8-Exchange实现了消息的生产者与消息队列之间解耦.PNG)
+    **在AMQP中，通过引入处理信息路由的Exchange，消息的生产者 与消息队列之间实现了解耦**
+</center>
+
+可以看到，消息的生产者将信息发布到一个Exchange。Exchange会绑定到一个或多个队列上，它负责将信息路由到队列上。信息的消费者会从队列中提取数据并进行处理。
+
+上图没有展现出来的一点是Exchange不是简单地将消息传递到队列中，并不仅仅是一种穿透（pass-through）机制。AMQP定义了四种不同类型的Exchange，每一种都有不同的路由算法，这些算法决定了是否要将信息放到队列中。根据Exchange的算法不同，它可能会使用消息的routing key和/或参数，并将其与Exchange和队列之间binding的routing key和参数进行对比。（routing key可以大致理解为Email的收件人地址，指定了预期的接收者。）如果对比结果满足相应的算法，那么消息将会路由到队列上。否则的话，将不会路由到队列上。
+
+四种标准的AMQP Exchange如下所示：
+
+- Direct：如果消息的routing key与binding的routing key直接匹配的话，消息将会路由到该队列上；
+- Topic：如果消息的routing key与binding的routing key符合通配符匹配的话，消息将会路由到该队列上；
+- Headers：如果消息参数表中的头信息和值都与bingding参数表中相匹配，消息将会路由到该队列上；
+- Fanout：不管消息的routing key和参数表的头信息/值是什么，消息将会路由到所有队列上。
+
+借助这四种类型的Exchange，很容易就能想到我们可以定义任意数量的路由模式，而不再仅限于点对点和发布-订阅的方式。
+
+当发送和接收消息的时候，所涉及的路由算法对于如何编写消息的生产者和消费者并没有什么影响。简单来讲，生产者将信息发送给Exchange并带有一个routing key，消费者从队列中获取消息。
+
+现在，我们结束对AMQP的抽象讨论，开始着手编写借助SpringAMQP发送和接收消息的代码。首先我们将看到的是一些通用的配置，它们同时适用于生产者和消费者。
+
+#### 17.3.2 配置Spring支持AMQP消息
+
+当我们第一次使用Spring JMS抽象的时候，首先配置了一个连接工厂。与之类似，使用Spring AMQP前也要配置一个连接工厂。只不过，所要配置的不是JMS的连接工厂，而是需要配置AMQP的连接工厂。更具体来讲，需要配置RabbitMQ连接工厂。
+
+**什么是RabbitMQ**
+
+RabbitMQ是一个流行的开源消息代理，它实现了AMQP。SpringAMQP为RabbitMQ提供了支持，包括RabbitMQ连接工厂、模板以及Spring配置命名空间。
+
+在使用它发送和接收消息之前，我们必须预先安装RabbitMQ。
+
+配置RabbitMQ连接工厂最简单的方式就是使用Spring AMQP所提供的rabbit配置命名空间。为了使用这项功能，需要确保在Spring配置文件中已经声明了该模式：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:rabbit="http://www.springframework.org/schema/rabbit"
+    xsi:schemaLocation="http://www.springframework.org/schema/beans 
+    http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/rabbit 
+        http://www.springframework.org/schema/rabbit/spring-rabbit.xsd">
+
+
+</beans>
+```
+
+`rabbit`命名空间包含了多个在Spring中配置RabbitMQ的元素。按照其最简单的形式，我们可以在配置RabbitMQ连接工厂的时候没有任何属性：
+
+```xml
+<rabbit:connection-factory />
+```
+
+这的确能够运行起来，但是所导致的结果就是连接工厂bean没有可用的bean ID，这样的话就难将连接工厂装配到需要它的bean中。因此，我们可能希望通过`id`属性为其设置一个bean ID：
+
+```xml
+<rabbit:connection-factory id="connectionFactory" />
+```
+
+默认情况下，连接工厂会假设RabbitMQ服务器监听localhost的5672端口，并且用户名和密码均为guest。对于开发来讲，这是合理的默认值，但是对于生产环境，我们可能希望修改这些默认值。如下`<connection-factory>`的设置重写了默认的做法：
+
+```xml
+<rabbit:connection-factory id="connectionFactory" 
+    host="${rabbitmq.host}"
+    port="${rabbitmq.port}" 
+    username="${rabbitmq.username}" 
+    password="${rabbitmq.password}" />
+```
+
+我们使用占位符来指定值，这样配置项可以在Spring配置文件之外进行管理（很可能位于属性文件中）。
+
+除了连接工厂以外，我们还要考虑使用其他的几个配置元素。接下来，看一下如何创建队列、Exchange以及binding。
+
+**声明队列、Exchange以及binding**
+
+在JMS中，队列和主题的路由行为都是通过规范建立的，AMQP与之不同，它的路由更加丰富和灵活，依赖于如何定义队列和Exchange以及如何将它们绑定在一起。声明队列、Exchange和binding的一种方式是使用RabbitMQ Channel接口的各种方法。但是直接使用RabbitMQ的Channel接口非常麻烦。
+
+幸好，`rabbit`命名空间包含了多个元素，帮助我们声明队列、Exchange以及将它们结合在一起的binding：
+
+元素 | 作用
+-----|-----
+`<queue>` | 创建一个队列
+`<fanout-exchange>` | 创建一个fanout类型的Exchange
+`<header-exchange>` | 创建一个header类型的Exchange
+`<topic-exchange>` | 创建一个topic类型的Exchange
+`<direct-exchange>` | 创建一个direct类型的Exchange
+`<bindings><binding/></bindings>` | 元素定义一个或多个元素的集合。元素创建Exchange和队列之间的binding
+
+这些配置元素要与`<admin>`元素一起使用。`<admin>`元素会创建一个RabbitMQ管理组件（administrative component），它会自动创建（如果它们在RabbitMQ代理中尚未存在的话）上述这些元素所声明的队列、Exchange以及binding。
+
+例如，如果我们希望声明名为`spittle.alert.queue`的队列，只需要在Spring配置中添加如下的两个元素即可：    
+
+```xml
+<rabbit:admin connection-factory="connectionFactory"/>
+<rabbit:queue id="spittleAlertQueue" name="spittle.alerts" />
+```
+
+注意，这里的id属性用来在Spring应用上下文中设置队列的bean ID，而name属性指定了RabbitMQ代理中队列的名称。
+
+对于简单的消息来说，我们只需做这些就足够了。这是因为默认会有一个没有名称的direct Exchange，所有的队列都会绑定到这个Exchange上，并且routing key与队列的名称相同。在这个简单的配置中，我们可以将消息发送到这个没有名称的Exchange上，并将routing key设定为`spittle.alert.queue`，这样消息就会路由到这个队列中。实际上，我们重新创建了JMS的点对点模型。
+
+但是，如果我们声明一个或更多的Exchange，并将其绑定到队列上。例如，如果要将消息路由到多个队列中，而不管routing key是什么，我们可以按照如下的方式配置一个fanout以及多个队列：
+
+```xml
+<rabbit:admin connection-factory="connectionFactory"/>
+
+<rabbit:queue name="spittle.alerts.queue.1" />
+<rabbit:queue name="spittle.alerts.queue.2" />
+<rabbit:queue name="spittle.alerts.queue.3" />
+
+<rabbit:fanout-exchange name="spittle.fanout">
+    <rabbit:bindings>
+        <rabbit:binding queue="spittle.alerts.queue.1"/>
+        <rabbit:binding queue="spittle.alerts.queue.2"/>
+        <rabbit:binding queue="spittle.alerts.queue.3"/>
+    </rabbit:bindings>
+</rabbit:fanout-exchange>
+```
+
+借助上表中的元素，会有无数种在RabbitMQ配置路由的方式。
+
+#### 17.3.3 使用RabbitTemplate发送消息
+
+顾名思义，RabbitMQ连接工厂的作用是创建到RabbitMQ的连接。如果你希望通过RabbitMQ发送消息，那么你可以将`connectionFactory` bean注入到`AlertServiceImpl`类中，并使用它来创建`Connection`，使用这个`Connection`来创建`Channel`，然后使用这个`Channel`发布消息到Exchange上。
+
+但是，如果这样做的话，你要做许多的工作并且会涉及到很多样板式代码。Spring所讨厌的一件事情就是样板式代码。我们已经看到Spring提供模板来消除样板式代码的多个例子——包括本章前面所介绍的`JmsTemplate`，它消除了JMS的样板式代码。因此，SpringAMQP提供`RabbitTemplate`来消除RabbitMQ发送和接收消息相关的样板式代码就一点也不让人感觉奇怪了。
+
+配置`RabbitTemplate`的最简单方式是使用rabbit命名空间的`template`元素：
+
+```xml
+<rabbit:template id="rabbitTemplate" connection-factory="connectionFactory" />
+```
+
+现在，要发送消息的话，我们只需要将模板bean注入到`AlertServiceImpl`中，并使用它来发送`Spittle`：
+
+```java
+public class AlertServiceImpl implements AlertService {
+
+    @Autowired
+    private RabbitOperations template;
+    
+    @Override
+    public void sendSpittleAlert(Spittle spittle) {
+        template.convertAndSend("spittle.alert.exchange", "spittle.alerts", spittle);
+    }
+    
+}
+```
+
+可以看到，现在`sendSpittleAlert()`调用`RabbitOperations`（`RabbitTemplate`实现的接口）的`convertAndSend()`方法，其中`RabbitOperations`是被注入进来的。它传入了三个参数：Exchange的名称、routing key以及要发送的对象。注意，这里并没有指定消息该路由到何处、要发送给哪个队列以及期望哪个消费者来获取消息。
+
+`RabbitOperations`有多个重载版本的`convertAndSend()`方法，这些方法可以简化它的使用。例如，使用某个重载版本的`convertAndSend()`方法，我们可以在调用`convertAndSend()`的时候，不设置Exchange的名称：
+
+```java
+template.convertAndSend("spittle.alerts", spittle);
+```
+
+我们甚至可以同时省略Exchange名称和routing key：
+
+```java
+template.convertAndSend(spittle);
+```
+
+如果在参数列表中省略Exchange名称，或者同时省略Exchange名称和routing key的话，RabbitTemplate将会使用默认的Exchange名称和routing key。按照我们之前的配置，默认的Exchange名称为空（或者说是默认没有名称的那一个Exchange），默认的routing key也为空。但是，我们可以在`<template>`元素上借助exchange和routing key属性配置不同的默认值：
+
+```xml
+<rabbit:template id="rabbitTemplate" 
+                 connection-factory="connectionFactory" 
+                 exchange="spittle.alert.exchange"
+                 routing-key="spittle.alerts" />
+```
+
+但是，不管设置的默认值是什么，我们都可以在调用`convertAndSend()`方法的时候，以参数的形式显式指定它们，从而覆盖掉默认值。
+
+`RabbitTemplate`还有其他的方法来发送消息，你可能会对此感兴趣。例如，我们可以使用较低等级的`send()`方法来发送`org.springframework.amqp.core.Message`对象，如下所示：
+
+```java
+Message message = new Message("Hello World".getBytes(), new MessageProperties());
+template.send("hello.exchange", "hello.routing", message);
+```
+
+与`convertAndSend()`方法类似，`send()`方法也有重载形式，它们不需要提供Exchange名称和/或routing key。
+
+使用`send()`方法的技巧在于构造要发送的`Message`对象。在这个“Hello World”样例中，我们通过给定字符串的字节数组来构建`Message`实例。对于`String`值来说，这足够了，但是如果消息的负载是复杂对象的话，那它就会复杂得多。
+
+鉴于这种情况，我们有了`convertAndSend()`方法，它会自动将对象转换为`Message`。它需要一个消息转换器的帮助来完成该任务，默认的消息转换器是`SimpleMessageConverter`，它适用于`String`、`Serializable`实例以及字节数组。Spring AMQP还提供了其他几个有用的消息转换器，其中包括使用JSON和XML数据的消息转换器。
+
+现在，我们已经发送了消息，接下来我们转向回话的另外一端，看一下如何获取消息。
+
+#### 17.3.4 接收AMQP消息
+
+我们可以回忆一下，JMS提供了两种从队列中获取信息的方式：使用`JmsTemplate`的同步方式以及使用消息驱动POJO的异步方式。Spring AMQP提供了类似的方式来获取通过AMQP发送的消息。因为我们已经有了`RabbitTemplate`，所以首先看一下如何使用它同步地从队列中获取消息。
+
+**使用RabbitTemplate接收消息**
+
+`RabbitTemplate`提供了多个接收信息的方法。最简单就是`receive()`方法，它位于消息的消费者端，对应于`RabbitTemplate`的`send()`方法。借助`receive()`方法，我们可以从队列中获取一个`Message`对象：
+
+```java
+Message message = template.recieve("spittle.alerts");
+```
+
+或者，如果愿意的话，你还可以配置获取消息的默认队列，这是通过在配置模板的时候，设置`queue`属性实现的：
+
+```xml
+<rabbit:template id="rabbitTemplate" 
+                 connection-factory="connectionFactory" 
+                 exchange="spittle.alert.exchange"
+                 routing-key="spittle.alerts" 
+                 queue="spittle.alerts" />
+```
+
+这样的话，我们在调用`receive()`方法的时候，不需要设置任何参数就能从默认队列中获取消息了：
+
+```java
+Message message = template.recieve();
+```
+
+在获取到`Message`对象之后，我们可能需要将它body属性中的字节数组转换为想要的对象。就像在发送的时候将领域对象转换为`Message`一样，将接收到的`Message`转换为领域对象同样非常繁琐。因此，我们可以考虑使用`RabbitTemplate`的`receiveAndConvert()`方法作为替代方案：
+
+```java
+Spittle spittle = (Spittle) template.receiveAndConvert("spittle.alerts");
+```
+
+我们还可以省略调用参数中的队列名称，这样它就会使用模板的默认队列名称：
+
+```java
+Spittle spittle = (Spittle) template.receiveAndConvert();
+```
+
+`receiveAndConvert()`方法会使用与`sendAndConvert()`方法相同的消息转换器，将`Message`对象转换为原始的类型。
+
+调用`receive()`和`receiveAndConvert()`方法都会立即返回，如果队列中没有等待的消息时，将会得到`null`。这就需要我们来管理轮询（polling）以及必要的线程，实现队列的监控。
+
+我们并非必须同步轮询并等待消息到达，Spring AMQP还提供了消息驱动POJO的支持，这不禁使我们回忆起Spring JMS中的相同特性。让我们看一下如何通过消息驱动AMQP POJO的方式来接收消息。
+
+**定义消息驱动的AMQP POJO**
+
+如果你想在消息驱动POJO中异步地消费使用`Spittle`对象，首先要解决的问题就是这个POJO本身。如下的`SpittleAlertHandler`扮演了这个角色：
+
+```java
+package spittr.alerts;
+
+import spittr.domain.Spittle;
+
+public class SpittleAlertHandler {
+
+    public void handleSpittleAlert(Spittle spittle) {
+        // ...
+    }
+}
+```
+
+这个类与借助JMS消费`Spittle`时所用到`SpittleAlertHandler`完全一致。我们之所以能够重用相同的POJO是因为这个类丝毫没有依赖于JMS或AMQP，并且不管通过什么机制传递过来Spittle对象，它都能够进行处理。
+
+首先，我们在Spirng应用上下文中将其声明为一个bean：
+
+```xml
+<bean id="spittleListener" class="spittr.alerts.SpittleAlertHandler" />
+```
+
+同样，在使用基于JMS的MDP时，我们已经做过相同的事情，没有什么丝毫的差异。
+
+最后，我们需要声明一个监听器容器和监听器，当消息到达的时候，能够调用SpittleAlertHandler。在基于JMS的MDP中，我们做过相同的事情，但是基于AMQP的MDP在配置上有一个细微的差别：
+
+```xml
+<rabbit:listener-container connection-factory="connectionFactory">
+    <rabbit:listener ref="spittleListener" method="handleSpittleAlert"
+        queue-names="spittle.alerts" />
+</rabbit:listener-container>
+```
+
+我们不再通过`destination`属性（JMS中的做法）来监听队列或主题，这里我们通过`queue-names`属性来指定要监听的队列。但是，除此之外，基于AMQP的MDP与基于JMS的MDP都非常类似。
+
+`queue-names`属性的名称使用了复数形式。在这里我们只设定了一个要监听的队列，但是允许设置多个队列的名称，用逗号分割即可。
+
+另外一种指定要监听队列的方法是引用`<queue>`元素所声明的队列bean。我们可以通过`queues`属性来进行设置：
+
+```xml
+<rabbit:listener-container connection-factory="connectionFactory">
+    <rabbit:listener ref="spittleListener" method="handleSpittleAlert"
+        queues="spittleAlertQueue" />
+</rabbit:listener-container>
+```
+
+同样，这里可以接受逗号分割的queue ID列表。当然，这需要我们在声明队列的时候，为其指定ID。例如，如下是重新定义的提醒队列，这次指定了ID：
+
+```xml
+<queue id="spittleAlertQueue" name="spittle.alerts" />
+```
+
+### 17.4 小结
+
+>
+异步消息通信与同步RPC相比有几个优点。间接通信带来了应用之间的松散耦合，因此减轻了其中任意一个应用崩溃所带来的影响。此外，因为消息转发给了收件人，因此发送者不必等待响应。在很多情况下，这会提高应用的性能。
+>
+虽然JMS为所有的Java应用程序提供了异步通信的标准API，但是它使用起来很繁琐。Spring消除了JMS样板式代码和异常捕获代码，让异步消息通信更易于使用。
+>
+在本章中，我们了解了Spring通过消息代理和JMS建立应用程序之间异步通信的几种方式。Spring的JMS模板消除了传统的JMS编程模型所必需的样板式代码，而基于Spring的消息驱动bean可以通过声明bean的方法允许方法响应来自于队列或主题中的消息。我们同样了解了如何通过Spring的JMS invoker为Spring bean提供基于消息的RPC。
+>
+在本章中，我们已经看到了如何在应用程序之间使用异步通信。在下一章中，我们将会延续这一话题，了解如何借助WebSocket在基于浏览器的客户端和服务器之间实现异步通信。
