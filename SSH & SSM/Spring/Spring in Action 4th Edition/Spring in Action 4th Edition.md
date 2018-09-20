@@ -15625,6 +15625,8 @@ REST只是应用间通信的方法之一，在下一章中，我们将会学习�
 
 ### 17.2 使用JMS发送消息
 
+*以下内容代码在工程sia4e-P4_Integrating_Spring-C17_Messaging_in_Spring-01_jms中*。
+
 Java消息服务（Java Message Service ，JMS）是一个Java标准，定义了使用消息代理的通用API。在JMS出现之前，每个消息代理都有私有的API，这就使得不同代理之间的消息代码很难通用。但是借助JMS，所有遵从规范的实现都使用通用的接口，这就类似于JDBC为数据库操作提供了通用的接口一样。
 
 Spring通过基于模板的抽象为JMS功能提供了支持，这个模板也就是`JmsTemplate`。使用`JmsTemplate`，能够非常容易地在消息生产方发送队列和主题消息，在消费消息的那一方，也能够非常容易地接收这些消息。Spring还提供了消息驱动POJO的理念：这是一个简单的Java对象，它能够以异步的方式响应队列或主题上到达的消息。
@@ -16207,6 +16209,8 @@ public class AlertServiceImpl implements AlertService {
 
 #### 17.3.2 配置Spring支持AMQP消息
 
+*以下内容代码在工程sia4e-P4_Integrating_Spring-C17_Messaging_in_Spring-02_amqp中*。
+
 当我们第一次使用Spring JMS抽象的时候，首先配置了一个连接工厂。与之类似，使用Spring AMQP前也要配置一个连接工厂。只不过，所要配置的不是JMS的连接工厂，而是需要配置AMQP的连接工厂。更具体来讲，需要配置RabbitMQ连接工厂。
 
 **什么是RabbitMQ**
@@ -16484,3 +16488,168 @@ public class SpittleAlertHandler {
 在本章中，我们了解了Spring通过消息代理和JMS建立应用程序之间异步通信的几种方式。Spring的JMS模板消除了传统的JMS编程模型所必需的样板式代码，而基于Spring的消息驱动bean可以通过声明bean的方法允许方法响应来自于队列或主题中的消息。我们同样了解了如何通过Spring的JMS invoker为Spring bean提供基于消息的RPC。
 >
 在本章中，我们已经看到了如何在应用程序之间使用异步通信。在下一章中，我们将会延续这一话题，了解如何借助WebSocket在基于浏览器的客户端和服务器之间实现异步通信。
+
+## 第十八章 使用WebSocket和STOMP实现消息功能
+
+本章内容：
+
+- 在浏览器和服务器之间发送消息
+- 在Spring MVC控制器中处理消息
+- 为目标用户发送消息
+
+在上一章中，我们看到了如何使用JMS和AMQP在应用程序之间发送消息。异步消息是应用程序之间通用的交流方式。但是，如果某一应用是运行在Web浏览器中，那我们就需要一些稍微不同的技巧了。
+
+WebSocket协议提供了通过一个套接字实现全双工通信的功能。除了其他的功能之外，它能够实现Web浏览器和服务器之间的异步通信。全双工意味着服务器可以发送消息给浏览器，浏览器也可以发送消息给服务器。
+
+Spring 4为WebSocket通信提供了支持，包括：
+
+- 发送和接收消息的低层级API
+- 发送和接收消息的高层级API
+- 用来发送信息的模板
+- 支持SockJS，用来解决浏览器端、服务器以及代理不支持WebSocket的问题
+
+在本章中，我们将会学习借助Spring的WebSocket功能实现服务器端和基于浏览器的应用之间实现异步通信。
+
+### 18.1 使用Spring的低层级WebSocket API
+
+按照其最简单的形式，WebSocket只是两个应用之间通信的通道。位于WebSocket一端的应用发送消息，另外一端处理消息。因为它是全双工的，所以每一端都可以发送和处理消息。
+
+<center>
+    ![图18.1-WebSocket是两个应用之间全双工的通信通道](images\图18.1-WebSocket是两个应用之间全双工的通信通道.PNG)
+    **WebSocket是两个应用之间全双工的通信通道**
+</center>
+
+WebSocket通信可以应用于任何类型的应用中，但是WebSocket最常见的应用场景是实现服务器和基于浏览器的应用之间的通信。浏览器中的JavaScript客户端开启一个到服务器的连接，服务器通过这个连接发送更新给浏览器。相比历史上轮询服务端以查找更新的方案，这种技术更加高效和自然。
+
+为了阐述Spring低层级的WebSocket API，让我们编写一个简单的WebSocket样例，基于JavaScript的客户端与服务器玩一个无休止的“Marco Polo”游戏。服务器端的应用会处理文本消息（“Marco!”），然后在相同的连接上往回发送文本消息（“Polo!”）。为了在Spring使用较低层级的API来处理消息，我们必须编写一个实现`WebSocketHandler`的类：
+
+```java
+public interface WebSocketHandler {
+    void afterConnectionEstablished(WebSocketSession session) throws Exception;
+    void handleMessage(WebSocketSession session, WebSocketMessage<?> message) throws Exception;
+    void afterConnectionClosed(WebSocketSession session, CloseStatus closeStatus) throws Exception;
+    boolean supportsPartialMessage();
+}
+```
+
+可以看到，`WebSocketHandler`需要我们实现五个方法。相比直接实现`WebSocketHandler`，更为简单的方法是扩展`AbstractWebSocketHandler`，这是`WebSocketHandler`的一个抽象实现。例如，这个`MarcoHandler`，它是`AbstractWebSocketHandler`的一个子类，会在服务器端处理消息：
+
+```java
+public class MarcoHandler extends AbstractWebSocketHandler {
+
+    private static final Logger logger = LoggerFactory.getLogger(MarcoHandler.class);
+
+    @Override
+    protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
+        logger.info("Received message: " + message.getPayload());
+        TimeUnit.SECONDS.sleep(2);
+        session.sendMessage(new TextMessage("Polo!"));
+    }
+}
+```
+
+尽管`AbstractWebSocketHandler`是一个抽象类，但是它并不要求我们必须重载任何特定的方法。相反，它让我们来决定该重写哪一个方法。除了重写`WebSocketHandler`中所定义的五个方法以外，我们还可以重载`AbstractWebSocketHandler`中所定义的三个方法：
+
+- void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception 
+- void handleBinaryMessage(WebSocketSession session, BinaryMessage message) throws Exception 
+- void handlePongMessage(WebSocketSession session, PongMessage message) throws Exception 
+
+这三个方法是`handleMessage()`方法的具体化，每个方法对应于某一种特定类型的消息。
+
+因为`MarcoHandler`将会处理文本类型的“Marco!”消息，因此我们应该重写`handleTextMessage()`方法。当有文本消息抵达的时候，日志会记录消息内容，在两秒钟的模拟延迟之后，在同一个连接上返回另外一条文本消息。
+
+`MarcoHandler`所没有重写的方法都由`AbstractWebSocketHandler`以空操作的方式（no-op）进行了实现。这意味着`MarcoHandler`也能处理二进制和pong消息，只是对这些消息不进行任何操作而已。
+
+另一种方案，我们可以扩展`TextWebSocketHandler`，不再扩展`AbstractWebSocketHandler`：
+
+`TextWebSocketHandler`是`AbstractWebSocketHandler`的子类，它会拒绝处理二进制消息。它重写了`handleBinaryMessage()`方法，如果收到二进制消息的时候，将会关闭WebSocket连接：
+
+```java
+public class TextWebSocketHandler extends AbstractWebSocketHandler {
+
+    @Override
+    protected void handleBinaryMessage(WebSocketSession session, BinaryMessage message) {
+        try {
+            session.close(CloseStatus.NOT_ACCEPTABLE.withReason("Binary messages not supported"));
+        }
+        catch (IOException ex) {
+            // ignore
+        }
+    }
+
+}
+```
+
+与之类似，`BinaryWebSocketHandler`也是`AbstractWebSocketHandler`的子类，它重写了`handleTextMessage()`方法，如果接收到文本消息的话，将会关闭连接：
+
+```java
+public class BinaryWebSocketHandler extends AbstractWebSocketHandler {
+
+    @Override
+    protected void handleTextMessage(WebSocketSession session, TextMessage message) {
+        try {
+            session.close(CloseStatus.NOT_ACCEPTABLE.withReason("Text messages not supported"));
+        }
+        catch (IOException ex) {
+            // ignore
+        }
+    }
+
+}
+```
+
+尽管你会关心如何处理文本消息或二进制消息，或者二者兼而有之，但是你可能还会对建立和关闭连接感兴趣。在本例中，我们可以重写`afterConnectionEstablished()`和`afterConnectionClosed()`：
+
+```java
+@Override
+public void afterConnectionEstablished(WebSocketSession session) throws Exception {
+    logger.info("Connection established");
+}
+
+@Override
+public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
+    logger.info("Connection closed. status: " + status);
+}
+```
+
+我们通过`afterConnectionEstablished()`和`afterConnectionClosed()`方法记录了连接信息。当新连接建立的时候，会调用`afterConnectionEstablished()`方法，类似地，当连接关闭时，会调用`afterConnectionClosed()`方法。在本例中，连接事件仅仅记录了日志，但是如果我们想在连接的生命周期上建立或销毁资源时，这些方法会很有用。
+
+注意，这些方法都是以“after”开头。这意味着，这些事件只能在事件发生后才产生响应，因此并不能改变结果。
+
+现在，已经有了消息处理器类，我们必须要对其进行配置，这样Spring才能将消息转发给它。在Spring的Java配置中，这需要在一个配置类上使用`@EnableWebSocket`，并实现`WebSocketConfigurer`接口：
+
+```java
+package marcopolo;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.socket.config.annotation.EnableWebSocket;
+import org.springframework.web.socket.config.annotation.WebSocketConfigurer;
+import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry;
+
+@Configuration
+@EnableWebSocket
+public class WebSocketConfig implements WebSocketConfigurer {
+
+    // 将MarcoHandler映射到“/marco”
+    @Override
+    public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
+        registry.addHandler(marcoHandler(), "/marco");
+    }
+
+    // 声明MarcoHandler bean
+    @Bean
+    public MarcoHandler marcoHandler() {
+        return new MarcoHandler();
+    }
+
+}
+```
+
+`registerWebSocketHandlers()`方法是注册消息处理器的关键。通过重载该方法，我们得到了一个`WebSocketHandlerRegistry`对象，通过该对象可以调用`addHandler()`来注册信息处理器。在本例中，我们注册了`MarcoHandler`（以bean的方式进行声明）并将其与“/marco”路径相关联。
+
+如果使用XML配置，可以使用`websocket`命名空间：
+
+```xml
+
+```
