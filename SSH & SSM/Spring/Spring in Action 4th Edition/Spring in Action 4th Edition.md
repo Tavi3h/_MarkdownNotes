@@ -16512,6 +16512,8 @@ Spring 4为WebSocket通信提供了支持，包括：
 
 ### 18.1 使用Spring的低层级WebSocket API
 
+*以下内容代码在工程sia4e-P4_Integrating_Spring-C18_Messaging_with_WebSocket_And_STOMP-01_websocket中*。
+
 按照其最简单的形式，WebSocket只是两个应用之间通信的通道。位于WebSocket一端的应用发送消息，另外一端处理消息。因为它是全双工的，所以每一端都可以发送和处理消息。
 
 <center>
@@ -16537,11 +16539,11 @@ public interface WebSocketHandler {
 ```java
 public class MarcoHandler extends AbstractWebSocketHandler {
 
-    private static final Logger logger = LoggerFactory.getLogger(MarcoHandler.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(MarcoHandler.class);
 
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
-        logger.info("Received message: " + message.getPayload());
+        LOGGER.info("Received message: " + message.getPayload());
         TimeUnit.SECONDS.sleep(2);
         session.sendMessage(new TextMessage("Polo!"));
     }
@@ -16603,12 +16605,12 @@ public class BinaryWebSocketHandler extends AbstractWebSocketHandler {
 ```java
 @Override
 public void afterConnectionEstablished(WebSocketSession session) throws Exception {
-    logger.info("Connection established");
+    LOGGER.info("Connection established");
 }
 
 @Override
 public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
-    logger.info("Connection closed. status: " + status);
+    LOGGER.info("Connection closed. status: " + status);
 }
 ```
 
@@ -16651,5 +16653,1094 @@ public class WebSocketConfig implements WebSocketConfigurer {
 如果使用XML配置，可以使用`websocket`命名空间：
 
 ```xml
+<websocket:handlers>
+    <websocket:mapping handler="marcoHandler" path="/marco" />
+</websocket:handlers>
 
+<bean id="marcoHandler" class="marcopolo.MarcoHandler" />
 ```
+
+现在我们将注意力转向客户端，它会发送文本“Marco！”消息到服务器，并监听来自服务器的文本消息：
+
+```js
+var url = "ws://" + window.location.host + "/websocket/marco";
+
+// 打开WebSocket
+var sock = new WebSocket(url);
+
+// 处理连接开启事件
+sock.onopen = function() {
+    console.log("Opening");
+    sayMarco();
+};
+
+// 处理信息
+sock.onmessage = function(e) {
+    console.log("Received message: " + e.data);
+    setTimeout(function() {
+        sayMarco()
+    }, 2000);
+}
+
+// 处理连接关闭事件
+sock.onclose = function() {
+    console.log("Closing");
+};
+
+// 发送消息
+function sayMarco() {
+    console.log("Sending Marco!");
+    sock.send("Marco!");
+}
+```
+
+上述代码所做的第一件事情就是创建WebSocket实例。对于支持WebSocket的浏览器来说，这个类型是原生的。通过创建WebSocket实例，实际上打开了到给定URL的WebSocket。在本例中，URL使用了“ws://”前缀，表明这是一个基本的WebSocket连接。如果是安全WebSocket的话，协议的前缀将会是“wss://”。
+
+WebSocket创建完毕之后，接下来的代码建立了WebSocket的事件处理功能。注意，WebSocket的`onopen`、`onmessage`和`onclose`事件对应于`MarcoHandler`的`afterConnectionEstablished()`、`handleTextMessage()`和`afterConnectionClosed()`方法。在`onopen`事件中，设置了一个函数，它会调用`sayMarco()`方法，在该WebSocket上发送“Marco!”消息。通过发送“Marco!”，这个无休止的Marco Polo游戏就开始了，因为服务器端的`MarcoHandler`作为响应会将“Polo!”发送回来，当客户端收到来自服务器的消息后，`onmessage`事件会发送另外一个“Marco!”给服务器。
+
+这个过程会一直持续下去，直到调用`sock.close()`关闭连接。在服务端也可以关闭连接，或者浏览器转向其他的页面，都会关闭连接。如果发生以上任意的场景，只要连接关闭，都会触发`onclose`事件。
+
+到此为止，我们已经编写完使用Spring低层级WebSocket API的所有代码，包括接收和发送消息的处理器类，以及在浏览器端完成相同功能的JavaScript客户端。如果我们构建这些代码并将其部署到Servlet容器中，那它有可能能够正常运行。
+
+为什么是可能？这是因为我们不能保证它可以正常运行。实际上，它很有可能运行不起来。即便把所有的事情都做对了。
+
+接下来让我们看一下都有什么事情会阻止WebSocket正常运行，并采取一些措施提高成功的几率。
+
+### 18.2 应对不支持WebSocket的场景
+
+WebSocket是一个相对比较新的规范。虽然它早在2011年底就实现了规范化，但即便如此，在Web浏览器和应用服务器上依然没有得到一致的支持。Firefox和Chrome早就已经完整支持WebSocket了，但是其他的一些浏览器刚刚开始支持WebSocket。
+
+令人遗憾的是，很多的上网者并没有认识到或理解新Web浏览器的特性，因此升级很慢。另外，有的公司规定使用特定版本的浏览器，这样它们的员工很难（或不可能）使用更新的浏览器。鉴于这些情况，如果你的应用程序使用WebSocket的话，用户可能会无法使用。
+
+服务器端对WebSocket的支持也好不到哪里去。GlassFish在几年前就开始支持一定形式的WebSocket，但是很多其他的应用服务器在最近的版本中刚刚开始支持WebSocket。
+
+即便浏览器和应用服务器的版本都符合要求，两端都支持WebSocket，在这两者之间还有可能出现问题。防火墙代理通常会限制所有除HTTP以外的流量。它们有可能不支持或者（还）没有配置允许进行WebSocket通信。
+
+在当前的WebSocket领域，我也许描述了一个很阴暗的前景。但是，不要因为这一些不支持，你就停止使用WebSocket的功能。当它能够正常使用的时候，WebSocket是一项非常棒的技术，但是如果它无法得到支持的话，我们所需要的仅仅是一种备用方案（fallback plan）。
+
+幸好，提到WebSocket的备用方案，这恰是SockJS所擅长的。SockJS是WebSocket技术的一种模拟，在表面上，它尽可能对应WebSocket API，但是在底层它非常智能，如果WebSocket技术不可用的话，就会选择另外的通信方式。SockJS会优先选用WebSocket，但是如果WebSocket不可用的话，它将会从如下的方案中挑选最优的可行方案：
+
+- XHR流
+- XDR流
+- iFrame事件源
+- iFrame HTML文件
+- XHR轮询
+- XDR轮询
+- iFrame XHR轮询
+- JSONP轮询
+
+好消息是在使用SockJS之前，我们并没有必要全部了解这些方案。SockJS让我们能够使用统一的编程模型，就好像在各个层面都完整支持WebSocket一样，SockJS在底层会提供备用方案。
+
+例如，为了在服务端启用SockJS通信，我们在Spring配置中可以很简单地要求添加该功能。
+
+```java
+@Override
+public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
+    registry.addHandler(marcoHandler(), "/marco").withSockJS();
+}
+```
+
+此时，`addHandler()`方法会返回`WebSocketHandlerRegistration`，通过简单地调用其`withSockJS()`方法就能声明我们想要使用SockJS功能，如果WebSocket不可用的话，SockJS的备用方案就会发挥作用。
+
+如果你使用XML来配置Spring的话，启用SockJS只需在配置中添加`<websocket:sockjs>`元素即可：
+
+```xml
+<websocket:handlers>
+    <websocket:mapping handler="marcoHandler" path="/marco" />
+    <websocket:sockjs />
+</websocket:handlers>
+```
+
+要在客户端使用SockJS，需要确保加载了SockJS客户端库。具体的做法在很大程度上依赖于使用JavaScript模块加载器还是简单地使用`<script>`标签加载JavaScript库。加载SockJS客户端的最简单方法是使用`<script>`标签从CDN中进行加载：
+
+```html
+<script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+```
+
+使用WebJars解析Web资源
+
+我们使用WebJars来解析JavaScript库，使其作为项目构建的一部分，就像其他的依赖一样。为了支持该功能，我们需要在Spring MVC中配置一个资源处理器，它负责解析路径以“/webjars/**”开头的请求，这也是WebJars的标准路径：
+
+```java
+@Override
+public void addResourceHandlers(ResourceHandlerRegistry registry) {
+    registry.addResourceHandler("/webjars/**")
+            .addResourceLocations("classpath:/META-INF/resources/webjars/");
+}
+```
+
+在资源处理器准备就绪后，我们可以在Web页面中使用如下的`<script>`标签加载SockJS库：
+
+```html
+<script th:src="@{/webjars/sockjs-client/1.1.5/dist/sockjs.js}"></script>
+```
+
+这里使用了Thymeleaf（需要配置），并使用“@{}”表达式来为JavaScript文件计算完整的相对于上下文的URL路径。
+
+页面代码如下：
+
+```html
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="UTF-8">
+<title>Home</title>
+<script th:src="@{/webjars/sockjs-client/1.1.5/dist/sockjs.js}"></script>
+<script th:src="@{/webjars/jquery/3.3.1/dist/jquery.js}"></script>
+</head>
+<body>
+    <button id="stop">Stop</button>
+    <script th:inline="javascript">
+      var sock = new SockJS([[@{/marco}]]);
+       
+      sock.onopen = function() {
+          console.log('Opening');
+          sayMarco();
+      }
+      
+      sock.onmessage = function(e) {
+          console.log('Received message: ', e.data);
+          $('#output').append('Received "' + e.data + '"<br/>');
+          setTimeout(function(){
+              sayMarco()
+          }, 2000);
+      }
+      
+      sock.onclose = function() {
+          console.log('Closing');
+      }
+      
+      function sayMarco() {
+          console.log('Sending Marco!');
+          $('#output').append('Sending "Marco!"<br/>');
+          sock.send("Marco!");
+      }
+      
+      $('#stop').click(function() {
+          sock.close()
+      });
+    </script>
+    
+    <div id="output"></div>
+</body>
+</html>
+```
+
+`var sock = new SockJS([[@{/marco}]])`会创建到“http://localhost:8080/project_name/marco” 的链接。这里最核心的变化是创建SockJS实例来代替WebSocket。因为SockJS尽可能地模拟了WebSocket，所以其他代码并不需要变化。相同的`onopen`、`onmessage`和`onclose`事件处理函数用来响应对应的事件，相同的`send()`方法用来发送“Marco!”到服务器端。
+
+我们并没有改变很多的代码，但是客户端-服务器之间通信的运行方式却有了很大的变化。我们可以完全相信客户端和服务器之间能够进行类似于WebSocket这样的通信，即便浏览器、服务器或位于中间的代理不支持WebSocket，我们也无需再担心了。
+
+WebSocket提供了浏览器-服务器之间的通信方式，当运行环境不支持WebSocket的时候，SockJS提供了备用方案。但是不管哪种场景，对于实际应用来说，这种通信形式都显得层级过低。让我们看一下如何在WebSocket之上使用STOMP（Simple Text Oriented Messaging Protocol），为浏览器-服务器之间的通信增加恰当的消息语义。
+
+### 18.3 使用STOMP消息
+
+*以下内容代码在工程sia4e-P4_Integrating_Spring-C18_Messaging_with_WebSocket_And_STOMP-02_stomp中*。
+
+如果我们要编写一个Web应用程序，在讨论需求之前，我们可能对于要采用的基础技术和框架就有了很好的想法。即便是简单的“HelloWorld”Web应用，可能也会考虑使用Spring MVC控制器来处理请求，并为响应使用JSP或Thymeleaf模板。至少，我们也应当会创建一个静态的HTML页面，并让Web服务器处理来自Web浏览器的相应请求。我们应该不会关心浏览器具体如何请求页面以及页面如何传递给浏览器这样的事情。
+
+现在，我们假设HTTP协议并不存在，只能使用TCP套接字来编写Web应用。这是个疯狂的想法，当然，我们也许能够完成这一壮举，但是这需要自行设计客户端和服务器端都认可的协议，从而实现有效的通信。简单来说，这不是一件容易的事情。
+
+不过，幸好我们有HTTP，它解决了Web浏览器发起请求以及Web服务器响应请求的细节。这样的话，大多数的开发人员并不需要编写低层级TCP套接字通信相关的代码。
+
+直接使用WebSocket（或SockJS）就很类似于使用TCP套接字来编写Web应用。因为没有高层级的线路协议（wire protocol），因此就需要我们定义应用之间所发送消息的语义，还需要确保连接的两端都能遵循这些语义。
+
+不过，好消息是我们并非必须要使用原生的WebSocket连接。就像HTTP在TCP套接字之上添加了请求-响应模型层一样，STOMP在WebSocket之上提供了一个基于帧的线路格式（frame-based wireformat）层，用来定义消息的语义。
+
+乍看上去，STOMP的消息格式非常类似于HTTP请求的结构。与HTTP请求和响应类似，STOMP帧由命令、一个或多个头信息以及负载所组成。例如，如下就是发送数据的一个STOMP帧：
+
+```text
+SEND
+destination:/ap/marco
+{"message":"Marco!"}
+```
+
+在这个简单的样例中，STOMP命令是send，表明会发送一些内容。紧接着是两个头信息：一个用来表示消息要发送到哪里的目的地，另外一个则包含了负载的大小。然后，紧接着是一个空行，STOMP帧的最后是负载内容，在本例中，是一个JSON消息。
+
+STOMP帧中最有意思的恐怕就是destination头信息了。它表明STOMP是一个消息协议，类似于JMS或AMQP。消息会发布到某个目的地，这个目的地实际上可能真的有消息代理（message broker）作为支撑。另一方面，消息处理器（message handler）也可以监听这些目的地，接收所发送过来的消息。
+
+在WebSocket通信中，基于浏览器的JavaScript应用可能会发送消息到一个目的地，这个目的地由服务器端的组件来进行处理。其实，反过来是一样的，服务器端的组件也可以发布消息，由JavaScript客户端的目的地来接收。
+
+Spring为STOMP消息提供了基于Spring MVC的编程模型。稍后将会看到，在Spring MVC控制器中处理STOMP消息与处理HTTP请求并没有太大的差别。但首先，我们需要配置Spring启用基于STOMP的消息。
+
+#### 18.3.1 启用STOMP消息功能
+
+稍后，我们将会看到如何在Spring MVC中为控制器方法添加`@MessageMapping`注解，使其处理STOMP消息，它与带有`@RequestMapping`注解的方法处理HTTP请求的方式非常类似。但是与`@RequestMapping`不同的是，`@MessageMapping`的功能无法通过`@EnableWebMvc`启用。Spring的Web消息功能基于消息代理（message broker）构建，因此除了告诉Spring我们想要处理消息以外，还有其他的内容需要配置。我们必须要配置一个消息代理和其他的一些消息目的地。
+
+下面的代码展示了如何通过Java配置启用基于代理的Web消息功能：
+
+```java
+package marcopolo;
+
+import org.springframework.context.annotation.Configuration;
+import org.springframework.messaging.simp.config.MessageBrokerRegistry;
+import org.springframework.web.socket.config.annotation.AbstractWebSocketMessageBrokerConfigurer;
+import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
+import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
+
+@Configuration
+@EnableWebSocketMessageBroker // 启用STOMP消息
+public class WebSocketStompConfig extends AbstractWebSocketMessageBrokerConfigurer {
+
+    @Override
+    public void registerStompEndpoints(StompEndpointRegistry registry) {
+        // 为“/marcopolo”路径启用SockJS功能
+        registry.addEndpoint("/marcopolo").withSockJS();
+    }
+    
+    @Override
+    public void configureMessageBroker(MessageBrokerRegistry registry) {
+        registry.enableSimpleBroker("/queue", "/topic");
+        registry.setApplicationDestinationPrefixes("/app");
+    }
+
+}
+```
+
+`WebSocketStompConfig`使用了`@EnableWebSocketMessageBroker`注解，这表明这个配置类不仅配置了WebSocket，还配置了基于代理的STOMP消息。它重写了`registerStompEndpoints()`方法，将“/marcopolo”注册为STOMP端点。这个路径与之前发送和接收消息的目的地路径有所不同。这是一个端点，客户端在订阅或发布消息到目的地路径前，要连接该端点。
+
+同时，从重写`configureMessageBroker()`方法配置了一个简单的消息代理。这个方法是可选的，如果不进行重写，那么将会自动配置一个简单的内存消息代理。由于这里进行了重写，所以消息代理将会处理前缀为“/topic”和“/queue”的消息。除此之外，发往应用程序的消息将会带有“/app”前缀。
+
+下图展示了配置中的消息流：
+
+<center>
+    ![图18.2-STOMP配置中的消息流](images\图18.2-STOMP配置中的消息流.PNG)
+    **Spring简单的STOMP代理是基于内存的，它模拟了STOMP代理的多项功能**
+</center>
+
+当消息到达时，目的地的前缀将会决定消息该如何处理。在上图中，应用程序的目的地以“/app”作为前缀，而代理的目的地以“/topic”和“/queue”作为前缀。以应用程序为目的地的消息将会直接路由到带有`@MessageMapping`注解的控制器方法中。而发送到代理上的消息，其中也包括`@MessageMapping`注解方法的返回值所形成的消息，将会路由到代理上，并最终发送到订阅这些目的地的客户端。
+
+**启用STOMP代理中继**
+
+对于初学来讲，简单的代理是很不错的，但是它也有一些限制。尽管它模拟了STOMP消息代理，但是它只支持STOMP命令的子集。因为它是基于内存的，所以它并不适合集群，因为如果集群的话，每个节点也只能管理自己的代理和自己的那部分消息。
+
+对于生产环境下的应用来说，你可能会希望使用真正支持STOMP的代理来支撑WebSocket消息，如RabbitMQ或ActiveMQ。这样的代理提供了可扩展性和健壮性更好的消息功能，当然它们也会完整支持STOMP命令。我们需要根据相关的文档来为STOMP搭建代理。搭建就绪之后，就可以使用STOMP代理来替换内存代理了，只需按照如下方式重载`configureMessageBroker()`方法即可：
+
+```java
+@Override
+public void configureMessageBroker(MessageBrokerRegistry registry) {
+    registry.enableStompBrokerRelay("/topic", "/queue");
+    registry.setApplicationDestinationPrefixes("/app");
+}
+```
+
+上述`configureMessageBroker()`方法的第一行代码启用了STOMP代理中继（broker relay）功能，并将其目的地前缀设置为“/topic”和“/queue”。这样的话，Spring就能知道所有目的地前缀为“/topic”或“/queue”的消息都会发送到STOMP代理中。根据你所选择的STOMP代理不同，目的地的可选前缀也会有所限制。例如，RabbitMQ只允许目的地的类型为“/temp-queue”、“/exchange”、“/topic”、“/queue”、“/amq/queue”和“/replyqueue”。这需要我们参阅代理的文档来确定其所支持的目的地类型及使用场景。
+
+除了目的地前缀，在第二行的`configureMessageBroker()`方法中将应用的前缀设置为“/app”。所有目的地以“/app”打头的消息都将会路由到带有`@MessageMapping`注解的方法中，而不会发布到代理队列或主题中。
+
+下图说明了代理中继如何应用于Spring的STOMP消息处理值中。我们可以看到，关键的区别在于这里不再模拟STOMP代理的功能，而是由代理中继将消息传送到一个真正的消息代理中来进行处理。
+
+<center>
+    ![图18.3-STOMP代理中继会将STOMP消息的处理委托给一个真正的消息代理](images\图18.3-STOMP代理中继会将STOMP消息的处理委托给一个真正的消息代理.PNG)
+    **STOMP代理中继会将STOMP消息的处理委托给一个真正的消息代理**
+</center>
+
+注意，`enableStompBrokerRelay()`和`setApplicationDestinationPrefixes()`方法都接收可变长度的`String`参数，所以我们可以配置多个目的地和应用前缀。例如：
+
+```java
+@Override
+public void configureMessageBroker(MessageBrokerRegistry registry) {
+    registry.enableStompBrokerRelay("/topic", "/queue");
+    registry.setApplicationDestinationPrefixes("/app", "/foo");
+}
+```
+
+默认情况下（这里应该是使用RabbitMQ作为中级代理的默认情况），STOMP代理中继会假设代理监听localhost的61613端口，并且客户端的username和password均为“guest”。如果你的STOMP代理位于其他的服务器上，或者配置成了不同的客户端凭证，那么我们可以在启用STOMP代理中继的时候，需要配置这些细节信息：
+
+```java
+@Override
+public void configureMessageBroker(MessageBrokerRegistry registry) {
+    
+    registry.enableStompBrokerRelay("/topic", "/queue")
+            .setRelayHost("rabbit.someohterserver")
+            .setRelayPort(62623)
+            .setClientLogin("marcopolo")
+            .setClientPasscode("letmein");
+    
+    registry.setApplicationDestinationPrefixes("/app", "/foo");
+}
+```
+
+以上的这个配置调整了服务器、端口以及凭证信息。但是，并不是必须要配置所有的这些选项。例如，如果我们只想修改中继端口，那么可以只调用`setRelayHost()`方法，在配置中不必使用其他的Setter方法。
+
+#### 18.3.2 处理来自客户端的STOMP消息
+
+STOMP和WebSocket更多的是关于异步消息，与HTTP的请求-响应方式有所不同。但是，Spring提供了非常类似于Spring MVC的编程模型来处理STOMP消息。它非常地相似，以至于对STOMP消息的处理器方法也会包含在带有@Controller注解的类中。
+
+Spring 4.0引入了`@MessageMapping`注解，它用于STOMP消息的处理，类似于Spring MVC的`@RequestMapping`注解。当消息抵达某个特定的目的地时，带有`@MessageMapping`注解的方法能够处理这些消息：
+
+```java
+@Controller
+public class MarcoController {
+    
+    private static final Logger LOGGER = LoggerFactory.getLogger(MarcoController.class);
+
+    // 处理发往“/app/marco”目的地的消息
+    @MessageMapping("/marco")
+    public void handleShout(Shout incoming) {
+        LOGGER.info("Received message: " + incoming.getMessage());
+    }
+}
+```
+
+上述控制器非常类似于其他的Spring MVC控制器类。它使用了`@Controller`注解，所以组件扫描能够找到它并将其注册为bean。就像其他的`@Controller`类一样，它也包含了处理器方法。
+
+但是这个处理器方法与我们之前看到的有一点区别。`handleShout()`方法没有使用`@RequestMapping`注解，而是使用了`@MessageMapping`注解。这表示`handleShout()`方法能够处理指定目的地上到达的消息。在本例中，这个目的地也就是“/app/marco”（“/app”前缀是隐含的，因为我们将其配置为应用的目的地前缀）。
+
+因为`handleShout()`方法接收一个`Shout`参数，所以Spring的某一个消息转换器会将STOMP消息的负载转换为`Shout`对象。`Shout`类非常简单，它是只具有一个属性的JavaBean，包含了消息的内容：
+
+```java
+package marcopolo;
+
+public class Shout {
+
+    private String message;
+
+    public String getMessage() {
+        return message;
+    }
+
+    public void setMessage(String message) {
+        this.message = message;
+    }
+
+}
+```
+
+因为我们现在处理的不是HTTP，所以无法使用Spring的`HttpMessageConverter`实现将负载转换为`Shout`对象。Spring 4.0提供了几个消息转换器，作为其消息API的一部分。下表描述了这些消息转换器，在处理STOMP消息的时候可能会用到它们：
+
+消息转换器 | 描述
+-----|-----
+`ByteArrayMessageConverter` | 实现MIME类型为“application/octetstream”的消息与byte[]之间的相互转换
+`MappingJackson2MessageConverter` | 实现MIME类型为“application/json”的消息与Java对象之间的相互转换
+`StringMessageConverter` | 实现MIME类型为“text/plain”的消息与String之间的相互转换
+
+假设handleShout()方法所处理消息的内容类型为“application/json”，`MappingJackson2MessageConverter`会负责将JSON消息转换为`Shout`对象。就像在HTTP中对应的`MappingJackson2HttpMessageConverter`一样，`MappingJackson2MessageConverter`会将其任务委托给底层的Jackson 2 JSON处理器。默认情况下，Jackson会使用反射将JSON属性映射为Java对象的属性。
+
+**处理订阅**
+
+除了`@MessagingMapping`注解以外，Spring还提供了`@SubscribeMapping`注解。与@MessagingMapping注解方法类似，当收到STOMP订阅消息的时候，带有`@SubscribeMapping`注解的方法将会触发。
+
+与`@MessagingMapping`方法类似，`@SubscribeMapping`方法也是通过`AnnotationMethodMessageHandler`接收消息的这就意味着`@SubscribeMapping`方法只能处理目的地以“/app”为前缀的消息。
+
+这可能看上去有些诡异，因为应用发出的消息都会经过代理，目的地要以“/topic”或“/queue”打头。客户端会订阅这些目的地，而不会订阅前缀为“/app”的目的地。如果客户端订阅“/topic”和“/queue”这样的目的地，那么`@SubscribeMapping`方法也就无法处理这样的订阅了。如果是这样的话，`@SubscribeMapping`有什么用处呢？
+
+`@SubscribeMapping`的主要应用场景是实现请求-回应模式。在请求-回应模式中，客户端订阅某一个目的地，然后预期在这个目的地上获得一个一次性的响应。
+
+例如：
+
+```java
+@SubscribeMapping("/marco")
+public Shout handleSubscription() {
+    Shout outgoing = new Shout();
+    outgoing.setMessage("Polo!");
+    return outgoing;
+}
+```
+
+可以看到，`handleSubscription()`方法使用了`@SubscribeMapping`注解，用这个方法来处理对“/app/marco”目的地的订阅（与`@MessageMapping`类似，“/app”是隐含的）。当处理这个订阅时，`handleSubscription()`方法会产生一个输出的Shout对象并将其返回。然后，`Shout`对象会转换成一条消息，并且会按照客户端订阅时相同的目的地发送回客户端。
+
+如果你觉得这种请求-回应模式与HTTP GET的请求-响应模式并没有太大差别的话，那么你基本上是正确的。但是，这里的关键区别在于HTTP GET请求是同步的，而订阅的请求-回应模式则是异步的，这样客户端能够在回应可用时再去处理，而不必等待。
+
+**编写JavaScript客户端**
+
+`handleShout()`方法已经可以处理发送过来的消息了。现在，我们需要的就是发送消息的客户端。
+
+如下的代码会链接“/marcopolo”端点并发送“Marco！”消息：
+
+```js
+// 创建SockJS连接
+var url = 'http://' + window.location.host + '/stomp/marcopolo';
+var sock = new SockJS(url);
+
+// 创建STOMP客户端
+var stomp = Stomp.over(sock);
+
+var payload = JSON.stringify({
+    'message'： 'Marco!'    
+});
+
+// 连接STOMP端点
+stomp.connect('guest', 'guest', funtion(frame)) {
+    // 发送消息
+    stomp.send("/marco", {}, payload);
+}
+```
+
+与我们之前的JavaScript客户端样例类似，在这里首先针对给定的URL创建一个SockJS实例。
+
+但是，这里的区别在于，我们不再直接使用SockJS，而是通过调用`Stomp.over(sock)`创建了一个STOMP客户端实例。这实际上封装了SockJS，这样就能在WebSocket连接上发送STOMP消息。
+
+接下来，我们使用STOMP进行连接，假设连接成功，然后发送带有JSON负载的消息到名为“/marco”的目的地。往`send()`方法传递的第二个参数是一个头信息的Map，它会包含在STOMP的帧中，不过在这个例子中，我们没有提供任何参数，Map是空的。
+
+现在，我们有了能够发送消息到服务器的客户端，以及用来处理消息的服务端处理器方法。这是一个好的开端，但是你可能已经发现这都是单向的。接下来，我们让服务器发出的声音，看一下如何发送消息给客户端。
+
+#### 18.3.3 发送消息到客户端
+
+到目前为止，客户端负责了所有的消息发送，服务器只能监听这些消息。对于WebSocket和STOMP来说，这是一种合法的用法，但是当你考虑使用WebSocket的时候，所设想的使用场景恐怕并非如此。WebSocket通常视为服务器发送数据给浏览器的一种方式，采用这种方式所发送的数据不必位于HTTP请求的响应中。使用Spring和WebSocket/STOMP的话，该如何与基于浏览器的客户端通信呢？
+
+Spring提供了两种发送数据给客户端得方法：
+
+- 作为处理消息或处理订阅的附带结果
+- 使用消息模板
+
+我们已经了解了一些处理消息和处理订阅的方法，所以首先看一下如何通过这些方法发送消息给客户端。然后，再看一下Spring的`SimpMessagingTemplate`，它能够在应用的任何地方发送消息。
+
+**在处理消息之后，发送消息**
+
+之前的`handleShout()`只是简单地返回void。它的任务就是处理消息，并不需要给客户端回应。
+
+如果我们想要在接收消息的时候，同时在响应中发送一条消息，那么需要做的仅仅是将内容返回就可以了，方法签名不再是使用`void`。例如，如果你想发送“Polo!”消息作为“Marco!”消息的回应，那么只需将`handleShout()`修改为如下所示：
+
+```java
+@MessageMapping("/marco")
+public Shout handleShout(Shout incoming) {
+    LOGGER.info("Received message: " + incoming.getMessage());
+    Shout outgoing = new Shout();
+    outgoing.setMessage("Polo!");
+    return outgoing;
+}
+```
+
+在这个新版本的`handleShout()`方法中，会返回一个新的Shout对象。通过简单地返回一个对象，处理器方法同时也变成了发送方法。当`@MessageMapping`注解标示的方法有返回值的时候，返回的对象将会进行转换（通过消息转换器）并放到STOMP帧的负载中，然后发送给消息代理。
+
+默认情况下，帧所发往的目的地会与触发处理器方法的目的地相同，只不过会添加上“/topic”前缀。就本例而言，这意味着`handleShout()`方法所返回的`Shout`对象会写入到STOMP帧的负载中，并发布到“/topic/marco”目的地。不过，我们可以通过为方法添加`@SendTo`注解，重载目的地：
+
+```java
+@MessageMapping("/marco")
+@SendTo("/topic/shout")
+public Shout handleShout(Shout incoming) {
+    LOGGER.info("Received message: " + incoming.getMessage());
+    Shout outgoing = new Shout();
+    outgoing.setMessage("Polo!");
+    return outgoing;
+}
+```
+
+按照这个`@SendTo`注解，消息将会发布到“/topic/shout”。所有订阅这个主题的应用（如客户端）都会收到这条消息。
+
+这样的话，`handleShout()`在收到一条消息的时候，作为响应也会发送一条消息。按照类似的方式，`@SubscribeMapping`注解标注的方式也能发送一条消息，作为订阅的回应。例如，通过为控制器添加如下的方法，当客户端订阅的时候，将会发送一条`Shout`信息：
+
+```java
+@SubscribeMapping("/marco")
+public Shout handleSubcription() {
+    Shout outgoing = new Shout();
+    outgoing.setMessage("Polo!");
+    return outgoing;
+}
+```
+
+这里的`@SubscribeMapping`注解表明当客户端订阅“/app/marco”（“/app”是应用目的地的前缀）目的地的时候，将会调用`handleSubscription()`方法。它所返回的`Shout`对象将会进行转换并发送回客户端。
+
+`@SubscribeMapping`的区别在于这里的`Shout`消息将会直接发送给客户端，而不必经过消息代理。如果你为方法添加`@SendTo`注解的话，那么消息将会发送到指定的目的地，这样会经过代理。
+
+`@MessageMapping`和`@SubscribeMapping`提供了一种很简单的方式来发送消息，这是接收消息或处理订阅的附带结果。不过，Spring的`SimpMessagingTemplate`能够在应用的任何地方发送消息，甚至不必以首先接收一条消息作为前提。
+
+使用`SimpMessagingTemplate`的最简单方式是将它（或者其接口`SimpMessageSendingOperations`）自动装配到所需的对象中。
+
+假设我们要为Spittr的首页提供一个Spittle更新的实时feed。我们不必要求用户刷新页面，而是让首页订阅一个STOMP主题，在Spittle创建的时候，改主题能够收到Spittle更新的实时feed。在首页中，我们需要添加如下的JavaScript代码：
+
+```html
+<script>
+    var sock = new SockJS('spittr');
+    var stomp = Stomp.over(sock);
+
+    stomp.connect('guest', 'guest', function(frame) {
+        console.log('Connected');
+        stomp.subscribe("/topic/spittlefeed", handleSpittle);
+    });
+
+    function handleSpittle(incoming) {
+        var spittle = JSON.parse(incoming.body);
+        console.log('Received: ', spittle);
+        var source = $("#spittle-template").html();
+        var template = Handlebars.compile(source);
+        var spittleHtml = template(spittle);
+        $('.spittleList').prepend(spittleHtml);
+    }
+</script>
+```
+
+与之前的样例一样，我们首先创建了SockJS实例，然后基于该SockJS实例创建了Stomp实例。在连接到STOMP代理之后，我们订阅了“/topic/spittlefeed”，并指定当消息达到的时候，由`handleSpittle()`函数来处理Spittle更新。`handleSpittle()`函数会将传入的消息体解析为对应的JavaScript对象，然后使用Handlebars库将`Spittle`数据渲染为HTML并插入到列表中。Handlebars模板定义在一个单独的`<script>`标签中，如下所示：
+
+```html
+<script id="spittle-template" type="text/x-handlebars-template">
+    <li id="preexist">
+        <div class="spittleMessage">{{message}}</div>
+        <div>
+            <span class="spittleTime">{{time}}</span>
+            <span class="spittleLocation">({{latitude}}, {{longitude}})</span>
+        </div>
+    </li>
+</script>
+```
+
+在服务器端，我们可以使用`SimpMessagingTemplate`将所有新创建的`Spittle`以消息的形式发布到“/topic/spittlefeed”主题上。如下程序清单展现的`SpittleFeedServiceImpl`就是实现该功能的简单服务：
+
+```java
+@Service
+public class SpittleFeedServiceImpl implements SpittleFeedService {
+
+    // 注入消息模板
+    @Autowired
+    private SimpMessageSendingOperations messaging;
+    
+    public void broadcastSpittle(Spittle spittle) {
+        // 发送消息
+        messaging.convertAndSend("/topic/spittlefeed", spittle);
+    }
+}
+```
+
+配置Spring支持STOMP的一个副作用就是在Spring应用上下文中已经包含了`SimpMessagingTemplate`。因此，我们在这里没有必要再创建新的实例。
+
+发送Spittle消息的地方在`broadcastSpittle()`方法中。它在注入的`SimpMessageSendingOperations`上调用了`convertAndSend()`方法，将Spittle转换为消息，并将其发送到“/topic/spittlefeed”主题上。如果你觉得`convertAndSend()`方法看起来很眼熟的话，那是因为它模拟了`JmsTemplate`和`RabbitTemplate`所提供的同名方法。
+
+不管我们通过`convertAndSend()`方法，还是借助处理器方法的结果，在发布消息给STOMP主题的时候，所有订阅该主题的客户端都会收到消息。在这个场景下，我们希望所有的客户端都能及时看到实时的Spittle feed，这种做法是很好的。但有的时候，我们希望发送消息给指定的用户，而不是所有的客户端。
+
+### 18.4 为目标用户发送消息
+
+到目前为止，我们所发送和接收的消息都是客户端（在Web浏览器中）和服务器端之间的，并没有考虑到客户端的用户。当带有`@MessageMapping`注解的方法触发时，我们知道收到了消息，但是并不知道消息来源于谁。类似地，因为我们不知道用户是谁，所以消息会发送到所有订阅对应主题的客户端上，没有办法发送消息给指定用户。
+
+但是，如果你知道用户是谁的话，那么就能处理与某个用户相关的消息，而不仅仅是与所有客户端相关联。好消息是我们已经了解了如何识别用户。通过使用与第9章相同的认证机制，我们可以使用Spring Security来认证用户，并为目标用户处理消息。
+
+在使用Spring和STOMP消息功能的时候，我们有三种方式利用认证用户：
+
+- `@MessageMapping`和`@SubscribeMapping`标注的方法能够使用`Principal`来获取认证用户；
+- `@MessageMapping`、`@SubscribeMapping`和`@MessageException`方法返回的值能够以消息的形式发送给认证用户；
+- `SimpMessagingTemplate`能够发送消息给特定用户。
+
+首先看一下前两种方式，它们都能让控制器的消息处理方法使用针对特定用户的消息。
+
+#### 18.4.1 在控制器中处理用户的消息
+
+如前所述，在控制器的`@MessageMapping`或`@SubscribeMapping`方法中，处理消息时有两种方式了解用户信息。在处理器方法中，通过简单地添加一个`Principal`参数，这个方法就能知道用户是谁并利用该信息关注此用户相关的数据。除此之外，处理器方法还可以使用`@SendToUser`注解，表明它的返回值要以消息的形式发送给某个认证用户的客户端（只发送给该客户端）。但是REST请求是同步的，当服务器处理的时候，客户端必须要等待。通过将Spittle发送为STOMP消息，我们可以充分发挥STOMP消息异步的优势。
+
+考虑如下的`handleSpittle()`方法，他会处理传入的消息并将其存储为`Spittle`：
+
+```java
+@MessageMapping("/spittle")
+@SendToUser("/queue/notifications")
+public Notification handleSpittle(Principal principal, SpittleForm form) {
+    Spittle spittle = new Spittle(principal.getName(), form.getText(), new Date());
+    spittleRepo.save(spittle);
+    return new Notification("Saved Spittle");
+}
+```
+
+可以看到，`handleSpittle()`方法接受`Principal`对象和`SpittleForm`对象作为参数。它使用这两个对象创建一个`Spittle`实例并借助`SpittleRepository`将实例保存起来。最后，它返回一个新的`Notification`，表明`Spittle`已经保存成功。
+
+因为这个方法使用了`@MessageMapping`注解，因此当有发往“/app/spittle”目的地的消息到达时，该方法就会触发，并且会根据消息创建`SpittleForm`对象，如果用户已经认证过的话，将会根据STOMP帧上的头信息得到`Principal`对象。
+
+但是，需要特别关注的是，返回的`Notification`到哪里去了。`@SendToUser`注解指定返回的`Notification`要以消息的形式发送到“/queue/notifications”目的地上。在表面上，“/queue/notifications”并没有与特定用户关联。但因为这里使用的是`@SendToUser`注解而不是`@SendTo`，所以就会发生更多的事情了。
+
+为了理解Spring如何发布消息，让我们先退后一步，看一下针对控制器方法发布`Notification`对象的目的地，客户端该如何进行订阅。考虑如下的这行JavaScript代码，它订阅了一个用户特定的目的地：
+
+```js
+stomp.subscribe("/user/queue/notifications", handleNotifications);
+```
+
+这个目的地使用了“/user”作为前缀，在内部，以“/user”作为前缀的目的地将会以特殊的方式进行处理。这种消息不会通过`AnnotationMethodMessageHandler`（像应用消息那样）来处理，也不会通过`SimpleBrokerMessageHandler`或`StompBrokerRelayMessageHandler`（像代理消息那样）来处理，以“/user”为前缀的消息将会通过`UserDestinationMessageHandler`进行处理，如下图所示：
+
+<center>
+    ![图18.4-用户消息流会通过UserDestinationMessageHandler进行处理](images\图18.4-用户消息流会通过UserDestinationMessageHandler进行处理.PNG)
+    **用户消息流会通过UserDestinationMessageHandler进行处理，它会将消息重路由到某个用户独有的目的地上**
+</center>    
+
+`UserDestinationMessageHandle`r的主要任务是将用户消息重新路由到某个用户独有的目的地上。在处理订阅的时候，它会将目标地址中的“/user”前缀去掉，并基于用户的会话添加一个后缀。例如，对“/user/queue/notifications”的订阅最后可能路由到名为“/queue/notifications-user6hr83v6t”的目的地上。
+
+在我们的样例中，`handleSpittle()`方法使用了@SendToUser("/queue/notifications")注解。这个新的目的地以“/queue”作为前缀，根据配置，这是`StompBrokerRelayMessageHandler`（或`SimpleBrokerMessageHandler`要处理的前缀，所以消息接下来会到达这里。最终，客户端会订阅这个目的地，因此客户端会收到`Notification`消息。
+
+在控制器方法中，`@SendToUser`注解和`Principal`参数是很有用的。接下来看一下如何使用`SimpMessagingTemplate`将消息发送给特定用户。
+
+#### 18.4.2 为指定用户发送消息
+
+除了`convertAndSend()`以外，`SimpMessagingTemplate`还提供了`convertAndSendToUser()`方法。按照名字就可以判断出来，`convertAndSendToUser()`方法能够让我们给特定用户发送消息。
+
+为了阐述该功能，我们要在Spittr应用中添加一项特性，当其他用户提交的Spittle提到某个用户时，将会提醒该用户。例如，如果Spittle文本中包含“@jbauer”，那么我们就应该发送一条消息给使用“jbauer”用户名登录的客户端。如下程序清单中的`broadcastSpittle()`方法使用了`convertAndSendToUser()`，从而能够提醒所谈论到的用户。
+
+```java
+@Service
+public class SpittleFeedServiceImpl implements SpittleFeedService {
+
+    @Autowired
+    private SimpMessagingTemplate messaging;
+
+    // 实现@功能的正则表达式
+    private Pattern pattern = Pattern.compile("\\@(\\S+)");
+
+    public void broadcastSpittle(Spittle spittle) {
+        messaging.convertAndSend("/topic/spittlefeed", spittle);
+        Matcher matcher = pattern.matcher(spittle.getMessage());
+        if (matcher.find()) {
+            String username = matcher.group(1);
+            // 发送提醒给用户
+            messaging.convertAndSendToUser(username, "/queue/notifications", new Notification("You just got mentioned!"));
+        }
+    }
+}
+```
+
+在`broadcastSpittle()`中，如果给定`Spittle`对象的消息中包含了类似于用户名的内容（也就是以“@”开头的文本），那么一个新的`Notification`将会发送到名为“/queue/notifications”的目的地上。因此，如果Spittle中包含“@jbauer”的话，`Notification`将会发送到“/user/jbauer/queue/notifications”目的地上。
+
+### 18.5 处理消息异常
+
+有时候，事情并不会按照我们预期的那样发展。在处理消息的时候，有可能会出错并抛出异常。因为STOMP消息异步的特点，发送者可能永远也不会知道出现了错误。除了Spring的日志记录以外，异常有可能会丢失，没有资源或机会恢复。
+
+在Spring MVC中，如果在请求处理中，出现异常的话，`@ExceptionHandler`方法将有机会处理异常。与之类似，我们也可以在某个控制器方法上添加`@MessageExceptionHandler`注解，让它来处理`@MessageMapping`方法所抛出的异常。
+
+例如，如下的方法会处理消息方法所抛出的异常：
+
+```java
+@MessageExceptionHandler
+public void handleExceptions(Throwable t) {
+    LOGGER.error("Error handling message: " + t.getMessage());
+}
+```
+
+按照最简单的形式，`@MessageExceptionHandler`标注的方法能够处理消息方法中所抛出的异常。但是，我们也可以以参数的形式声明它所能处理的异常：
+
+```java
+@MessageExceptionHandler("SpittleException.class")
+public void handleExceptions(Throwable t) {
+    LOGGER.error("Error handling message: " + t.getMessage());
+}
+```
+
+尽管它只是以日志的方式记录了所发生的错误，但是这个方法可以做更多的事情。例如，它可以回应一个错误：
+
+```java
+@MessageExceptionHandler("SpittleException.class")
+@SendToUser("/queue/errors")
+public SpittleException handleExceptions(SpittleException e) {
+    LOGGER.error("Error handling message: " + e.getMessage());
+    return e;
+}
+```
+
+在这里，如果抛出`SpittleException`的话，将会记录这个异常，然后将其返回。`UserDestinationMessageHandler`会重新路由这个消息到特定用户所对应的唯一路径。
+
+### 18.6 小结
+
+>
+如果在应用间发送消息的话，那WebSocket是一种令人兴奋的通信方式，尤其是如果其中某个应用运行在Web浏览器中更是如此。当编写存在大量交互的Web应用程序时，它是很重要的，能够实现从服务器无缝的发送和接收数据。
+>
+Spring对WebSocket的支持包括低层级的API，它能够让我们使用原始的WebSocket连接。但是，WebSocket并没有在Web浏览器、服务器以及网络代理上得到广泛支持。因此，Spring同时还支持SockJS，这个协议能够在WebSocket不可用的时候提供备用的通信模式。
+>
+Spring还提供了高级的编程模型，也就是使用STOMP线路级协议来处理WebSocket消息。在这个更高级的模型中，能够在Spring MVC控制器中处理STOMP消息，类似于处理HTTP消息的方式。
+>
+在过去的两章中，我们看到了多种在应用间异步发送消息的方式。Spring还有另外一种处理异步消息的方式。在下一章中，我们将会看到如何使用Spring发送Email。
+
+
+## 第十九章 使用Spring发送Email
+
+本章内容：
+
+- 配置Spring的Email抽象功能
+- 发送丰富内容的Email消息
+- 使用模板构建Email消息
+
+毫无疑问，Email已经成为常见的通信形式，取代了很多传统的通信方式，如邮政邮件、电话，在一定程度上也替代了面对面的交流。Email能够提供了与第17章中所讨论的异步消息相同的收益，只不过发送者和接收者都是实际的人而已。只要你在邮件客户端上点击“发送”按钮，就可以转移到其他的任务中了，因为我们知道接收者最终将会收到并阅读（希望如此）你的Email。
+
+但是，Email的发送者不一定是实际的人。有时候，Email消息是由应用程序发送给用户的。有可能是电子商务网站上的订单确认邮件，也有可能是银行账户某项交易的自动提醒。不管邮件的主题是什么，我们都可能需要开发发送Email消息的应用程序。幸好，在这个方面，Spring会为我们提供帮助。
+
+### 19.1 配置Spring发送邮件
+
+Spring Email抽象的核心是`MailSender`接口。这个接口的实现能够连接Email服务器实现邮件发送功能：
+
+<center>
+    ![图19.1-Spring的MailSender接口是Spring Email抽象API的核心组件](images\图19.1-Spring的MailSender接口是Spring Email抽象API的核心组件.PNG)
+    **Spring的MailSender接口是Spring Email抽象API的核心组件。它把Email发送给邮件服务器，由服务器进行邮件投递**
+</center>
+
+Spring自带了一个`MailSender`实现，也就是`JavaMailSenderImpl`。它会使用JavaMail API来发送Email。Spring应用在发送Email之前，我们必须要将`JavaMailSenderImpl`装配为Spring应用上下文中的一个bean。
+
+#### 19.1.1 配置邮件发送器
+
+按照最简单的形式，我们只需要在`@Bean`方法中使用几行代码就能将`JavaMailSenderImpl`配置为一个bean：
+
+```java
+@Bean
+public MailSender mailSender(Environment env) {
+    JavaMailSenderImpl mailSender = new JavaMailSenderImpl();
+    mailSender.setHost(env.getProperty("mailserver.host"));
+    return mailSender;
+}
+```
+
+属性host是可选的（它默认是底层JavaMail会话的主机），它指定了要用来发送Email的邮件服务器主机名。按照这里的配置，会从注入的`Environment`中获取值，这样我们就能在Spring之外管理邮件服务器的配置（比如在属性文件中）。
+
+默认情况下，JavaMailSenderImpl假设邮件服务器监听25端口（标准的SMTP端口）。当然，如果我们的邮件服务器监听不同的端口，那么我们也可以进行指定：
+
+```java
+@Bean
+public MailSender mailSender(Environment env) {
+    JavaMailSenderImpl mailSender = new JavaMailSenderImpl();
+    mailSender.setHost(env.getProperty("mailserver.host"));
+    mailSender.setPort(Integer.parseInt(env.getProperty("mailserver.port")));
+    return mailSender;
+}
+```
+
+类似地，如果邮件服务器需要认证的话，我们还需要设置`username`和`password`属性：
+
+```java
+@Bean
+public MailSender mailSender(Environment env) {
+    JavaMailSenderImpl mailSender = new JavaMailSenderImpl();
+    mailSender.setHost(env.getProperty("mailserver.host"));
+    mailSender.setPort(Integer.parseInt(env.getProperty("mailserver.port")));
+    mailSender.setUsername(env.getProperty("mailserver.username"));
+    mailSender.setPassword(env.getProperty("mailserver.password"));
+    return mailSender;
+}
+```
+
+到目前为止，`JavaMailSenderImpl`已经配置完成，它可以创建自己的邮件会话。但如果我们已经在JNDI中配置了`Session`，那就没有必要为`JavaMailSenderImpl`配置详细的服务器细节了，我们可以配置它使用JNDI中已经就绪的`Session`。
+
+借助`JndiObjectFactoryBean`，我们可以在如下的`@Bean`方法中配置一个bean，他会从JNDI中查找`Session`：
+
+```java
+@Bean
+public JndiObjectFactoryBean mailSession() {
+    JndiObjectFactoryBean jndi = new JndiObjectFactoryBean();
+    jndi.setJndiName("mail/Session");
+    jndi.setProxyInterface(Session.class);
+    jndi.setResourceRef(true);
+    return jndi;
+}
+```
+
+或者使用XML进行配置：
+
+```xml
+<jee:jndi-lookup id="mailSession" jndi-name="mail/Session" resource-ref="true" />
+```
+
+邮件会话准备就绪之后，我们现在可以将其装配到`mailSender` bean中了：
+
+```java
+@Bean
+public MailSender mailSender(Session session) {
+    JavaMailSenderImpl mailSender = new JavaMailSenderImpl();
+    mailSender.setSession(session);
+    return mailSender;
+}
+```
+
+通过将邮件会话装配到JavaMailSenderImpl的session属性中，我们已经完全替换了原来的服务器（以及用户名/密码）配置。现在邮件会话完全通过JNDI进行配置和管理。JavaMailSenderImpl能够专注于发送邮件而不必自己处理邮件服务器了。
+
+#### 19.1.2 装配和使用邮件发送器
+
+邮件发送器已经配置完成，现在需要将其装配到使用它的bean中了。
+
+定义一个用于发送邮件的`SpitterEmailServiceImpl`类，这个类实现接口`SpitterEmailService`：
+
+```java
+public interface SpitterMailService {
+    void sendSimpleSpittleEmail(String to, Spittle spittle);
+}
+```
+
+`SpitterEmailServiceImpl`类使用`@Autowired`注解自动注入`JavaMailSender`：
+
+```java
+@Autowired
+private JavaMailSender mailSender;
+```
+
+`mailSender` bean装配完成后，我们就可以构建和发送Email了。
+
+我们想要给Spitter用户发送Email提示他的朋友写了新的Spittle，所以我们需要一个方法来发送Email，这个方法要接受Email地址和`Spittle`对象信息。如下的`sendSimpleSpittleEmail()`方法使用邮件发送器完成了该功能：
+
+```java
+@Override
+public void sendSimpleSpittleEmail(String to, Spittle spittle) {
+    SimpleMailMessage message = new SimpleMailMessage();
+    String spitterName = spittle.getSpitter().getFullName();
+    // 设置发件人地址
+    message.setFrom("noreply@spitter.com");
+    // 设置收件人地址
+    message.setTo(to);
+    // 设置邮件标题
+    message.setSubject("New spittle from " + spitterName);
+    // 设置邮件正文
+    message.setText(spitterName + " says: " + spittle.getText());
+    // 发送Email
+    mailSender.send(message);
+}
+```
+
+`sendSimpleSpittleEmail()`方法所做的第一件事就是构造`SimpleMailMessage`实例。正如其名称所示，这个对象可以很便捷地发送Email消息。
+
+接下来，将设置消息的细节。通过邮件消息的`setFrom()`和`setTo()`方法指定了Email的发送者和接收者。在通过`setSubject()`方法设置完主题后，虚拟的“信封”已经完成了。剩下的就是调用`setText()`方法来设置消息的内容。
+
+最后一步是将消息传递给邮件发送器的`send()`方法，这样邮件就发送出去了。
+
+现在，我们已经配置好了邮件发送器并使用它来发送简单的Email消息。可以看到，使用Spring的Email抽象非常简单。我们可以到此为止并转到下一章，但是如果这样的话将会错过Spring Email抽象中很有意思的内容。让我们更进一步，看一下如何添加附件并创建丰富内容的Email消息。
+
+### 19.2 构建丰富内容的Email消息
+
+对于简单的事情来讲，纯文本的Email消息是比较合适的。但是，如果你要发送照片或文档的话，这种方式就不那么理想了。如果作为市场推广Email的话，它也无法吸引接收者的注意。
+
+幸好，Spring的Email功能并不局限于纯文本的Email。我们可以添加附件，甚至可以使用HTML来美化消息体的内容。让我们首先从基本的添加附件开始，然后更进一步，借助HTML使我们的Email消息更加美观。
+
+#### 19.2.1 添加附件
+
+如果发送带有附件的Email，关键技巧是创建`multipart`类型的消息——Email由多个部分组成，其中一部分是Email体，其他部分是附件。
+
+对于发送附件这样的需求来说，`SimpleMailMessage`过于简单了。为了发送`multipart`类型的Email，你需要创建一个MIME（Multipurpose Internet Mail Extensions）的消息，我们可以从邮件发送器的`createMimeMessage()`方法开始。
+
+```java
+MimeMessage message = mailSender.createMimeMessage();
+```
+
+就这样，我们已经有了要使用的MIME消息。看起来，我们所需要做的就是指定收件人和发件人地址、主题、一些内容以及一个附件。尽管确实是这样，但并不是你想的那么简单。`javax.mail.internet.MimeMessage`本身的API有些笨重。好消息是，Spring提供的`MimeMessageHelper`可以帮助我们。
+
+为了使用`MimeMessageHelper`，我们需要实例化它并将`MimeMessage`传给其构造器：
+
+```java
+MimeMessageHelper helper = new MimeMessageHelper(message, true);
+```
+
+构造方法的第二个参数，在这里是个布尔值`true`，表明这个消息是`multipart`类型的。
+
+得到了`MimeMessageHelper`实例后，我们就可以组装Email消息了。这里最主要区别在于使用helper的方法来指定Email细节，而不再是设置消息对象。
+
+重新定义接口，添加方法：
+
+```java
+public interface SpitterMailService {
+
+    void sendSimpleSpittleEmail(String to, Spittle spittle);
+
+    void sendSpittleEmailWithAttachment(String to, Spittle spittle) throws MessagingException;
+
+}
+```
+
+接下来进行实现：
+
+```java
+@Override
+public void sendSpittleEmailWithAttachment(String to, Spittle spittle) throws MessagingException {
+
+    // 创建MimeMessage对象
+    MimeMessage message = mailSender.createMimeMessage();
+
+    // 创建MimeMessageHelper对象
+    MimeMessageHelper helper = new MimeMessageHelper(message, true);
+    String spitterName = spittle.getSpitter().getFullName();
+    helper.setFrom("noreply@spitter.com");
+    helper.setTo(to);
+    helper.setSubject("New spittle from " + spitterName);
+    helper.setText(spitterName + " says: " + spittle.getText());
+
+    // 添加附件
+    ClassPathResource couponImage = new ClassPathResource("/collateral/coupon.png");
+    helper.addAttachment("Coupon.png", couponImage);
+    mailSender.send(message);
+}
+```
+
+在这里，我们使用Spring的`ClassPathResource`来加载位于应用类路径下的coupon.png。然后，调用`addAttachment()`。第一个参数是要添加到Email中附件的名称，第二个参数是图片资源。
+
+`multipart`类型的Email能够实现很多的功能，添加附件只是其中之一。除此之外，通过将Email体指明为HTML，我们可以生成比简单文本更漂亮的Email。接下来，看一下如何使用`MimeMessageHelper`来发送更吸引人的Email。
+
+#### 19.2.2 发送富文本内容的Email
+
+发送富文本的Email与发送简单文本的Email并没有太大区别。关键是将消息的文本设置为HTML。要做到这一点只需将HTML字符串传递给helper的`setText()`方法，并将第二个参数设置为`true`：
+
+```java
+helper.setText(
+    "<html><body><img src='cid:spitterLogo'>" + "<h4>" + spittle.getSpitter().getFullName() + " say...</h4>" + "<i>" + spittle.getText() + "</i>" + "</body></html>", true
+);
+```
+
+上述方法与纯Servlet编写JSP页面很相似。第二个参数表明传递进来的第一个参数是HTML，所以需要对消息的内容类型进行相应的设置。
+
+要注意的是，传递进来的HTML包含了一个`<img>`标签，用来在Email中展现Spittr应用程序的logo。`src`属性可以设置为标准的“http:”URL，以便于从Web中获取Spittr的logo。但在这里，我们将logo图片嵌入在了Email之中。值“cid:spitterLogo”表明在消息中会有一部分是图片并以spitterLogo来进行标识。
+
+为消息添加嵌入式的图片与添加附件很类似。不过这次不再使用helper的`addAttachment()`方法，而是要调用`addInline()`方法：
+
+```java
+ClassPathResource image = new ClassPathResource("spitter_logo_50.png");
+helper.addInline("spitterLogo", image);
+```
+
+`addInline()`的第一个参数表明内联图片的标识符——与`<img>`标签的`src`属性所指定的相同。第二个参数是图片的资源引用，这里使用`ClassPathResource`从应用程序的类路径中获取图片。
+
+除了`setText()`方法稍微不同以及使用了`addInline()`方法以外，发送含有富文本内容的Email与发送带有附件的普通文本消息很类似。为了进行对比，以下是新的`sendRichSpitterEmail()`方法。
+
+现在你发送的Email带有富文本内容和嵌入式图片了！你可以到此为止并完全结束你的Email代码。但创建Email体时，使用字符串拼接的办法来构建HTML消息依旧让我觉得美中不足。在结束Email话题之前，让我们看看如何用模板来代替字符串拼接消息。
+
+### 19.3　使用模板生成Email
+
+使用字符串拼接来构建Email消息的问题在于Email最终会是什么样子并不清晰。在你的大脑中解析HTML标签并想象它在渲染时会是什么样子是挺困难的。而将HTML混合在Java代码中又会使得这个问题更加复杂。如果能够将Email的布局抽取到一个模板中，而这个模板可以由美术设计师（可能是很讨厌Java代码的人）来完成将会是很棒的一件事。
+
+我们需要与最终HTML接近的方式来表达Email布局，然后将模板转换成`String`并传递给helper的`setText()`方法。在将模板转换为`String`时，我们有多种模板方案可供选择，包括Apache Velocity和Thymeleaf。让我们看一下如何使用这两种方案创建富文本的Email消息，先从Velocity开始吧。
+
+#### 19.3.1 使用Velocity构建Email消息
+
+（注意，Spring已经不推荐使用Velocity了，`VelocityEngineFactoryBean`也已经被标注为`@Deprecated`。同时，Spring推荐使用FreeMaker）
+
+Apache Velocity是由Apache提供的通用模板引擎。Velocity有挺长的历史了，并且已经应用于各种任务中，包括代码生成以及代替JSP。它还能用于格式化富文本Email消息，也就是我们在这里的用法。
+
+为了使用Velocity对Email进行布局，我们需要将`VelocityEngine`装配到`SpitterEmailServiceImpl`中。Spring提供了一个名为`VelocityEngineFactoryBean`的工厂bean，它能够在Spring应用上下文中很便利地生成`VelocityEngine`。`VelocityEngineFactoryBean`的声明如下：
+
+```java
+@Bean
+public VelocityEngineFactoryBean velocityEngine() {
+    VelocityEngineFactoryBean engine = new VelocityEngineFactoryBean();
+    Properties properties = new Properties();
+    properties.setProperty("resource.loader", "class");
+    properties.setProperty("class.resource.loader.class", ClasspathResourceLoader.class.getName());
+    engine.setVelocityProperties(properties);
+    return engine;
+}
+```
+
+`VelocityEngineFactoryBean`唯一要设置的属性是`velocityProperties`。在本例中，我们将其配置为从类路径下加载Velocity模板。
+
+现在，我们可以将Velocity引擎装配到`SpitterEmailServiceImpl`中。因为`SpitterEmailServiceImpl`是使用组件扫描实现自动注册的，我们可以使用`@Autowired`来自动装配`velocityEngine`属性：
+
+```java
+@Autowired
+private VelocityEngine velocityEngine;
+```
+
+现在，`velocityEngine`已经可用了，我们可以使用它将Velocity模板转换为`String`，并作为Email文本进行发送。为了帮助我们完成这一点，Spring自带了`VelocityEngineUtils`来简化将Velocity模板与模型数据合并成String的工作。以下是我们可能的使用方式：
+
+```java
+Map<String, String> model = new HashMap<>();
+model.put("spitterName", spitterName);
+model.put("spitterText", spittle.getText());
+String emailText = VelocityEngineUtils.mergeTemplateIntoString(velocityEngine, "emailTemplate.vm", model);
+```
+
+为了给处理模板做准备，我们首先创建了一个`Map`用来保存模板使用的模型数据。在前面字符串拼接的代码中，我们需要Spitter的全名及其Spittle的文本，这里也是一样。为了产生合并后的Email文本，我们只需调用`VelocityEngineUtils`的`mergeTemplateIntoString()`方法并将Velocity引擎、模板路径（相对于类路径根）以及模型`Map`传递进去。
+
+最终，我们将合并后的Email文本传递给helper的setText()方法：
+
+```java
+helper.setText(emailText, true);
+```
+
+模板位于类路径的根目录下，是一个名为emailTemplate.vm的文件，它看起来可能是这样的：
+
+```html
+<html>
+<body>
+    <img src='cid:spitterLogo'>
+    <h4>${spitterName} says...</h4>
+    <i>${spittleText}</i>
+</body>
+</html>
+```
+
+接下来，我们看一下如何使用Thymeleaf来构建Spittle Email消息。
+
+### 19.3.2　使用Thymeleaf构建Email消息
+
+Thymeleaf是一种很有吸引力的HTML模板引擎，因为它能够创建WYSIWYG（What You See Is What You Get）的模板。与JSP和Velocity不同，Thymeleaf模板不包含任何特殊的标签库和特有的标签。这样模板设计师在工作的时候，能够使用任意他们所喜欢的HTML工具，而不必担心某个工具无法处理特定的标签。
+
+当我们将Email模板转换为Thymeleaf模板时，Thymeleaf的WYSIWYG特性体现得非常明显：
+
+```html
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+    <img src="spitterLogo.png" th:src='cid:spitterLogo'>
+    <h4><span th:text="${spitterName}">Craig Walls</span> says...</h4>
+    <i><span th:text="${spittleText}">Hello there!</span></i>
+</body>
+</html>
+```
+
+这里没有任何自定义的标签，尽管模型属性是通过“${}”标记的，但是它们仅用于属性的值中，不会像Velocity那样用在外边。这种模板可以很容易地在Web浏览器中打开，并且以完整的形式进行展现，不必依赖于Thymeleaf引擎的处理。
+
+使用Thymeleaf来生成和发送Email消息的做法与Velocity十分类似：
+
+```java
+Context ctx = new Context();
+ctx.setVariable("spitterName", spitterName);
+ctx.setVariable("spittleText", spittle.getText());
+String emailText = thymeleafEngine.process("emailTemplate.html", ctx);
+// ...
+helper.setText(emailText, true);
+mailSender.send(message);
+```
+
+这里做的第一件事情就是创建Thymeleaf `Context`实例，并将模型数据填充进去。这与我们使用Velocity的时候，将模型数据填充到`Map`中很类似。然后，我们要求Thymeleaf处理模板，通过调用Thymeleaf引擎的`process()`方法，将上下文中的模型数据合并到模板中。最后，我们将结果形成的文本借助消息helper设置到Email消息中，并使用邮件发送器将消息发送出去。
+
+这里的Thymeleaf引擎与我们在第六章构建Web视图时使用的`SpringTemplateEngine` bean是相同的。
+
+不过，我们必要要对`SpringTemplateEngine` bean做一点小修改。在第六章中，它配置为从Servlet上下文中解析模板：
+
+```java
+@Bean
+public ITemplateResolver webTemplateResolver() {
+
+    WebApplicationContext webApplicationContext = ContextLoader.getCurrentWebApplicationContext();
+
+    ServletContextTemplateResolver templateResolver = new ServletContextTemplateResolver(webApplicationContext.getServletContext());
+    
+    templateResolver.setPrefix("/WEB-INF/thymeleaf/");
+    templateResolver.setSuffix(".html");
+    templateResolver.setTemplateMode(TemplateMode.HTML);
+    return templateResolver;
+}
+```
+
+而我们的Email模板需要从类路径中解析。所以我们还需要一个`ClassLoaderTemplateResolver`：
+
+```java
+@Bean
+public ITemplateResolver emailTemplateResolver() {
+    ClassLoaderTemplateResolver resolver = new ClassLoaderTemplateResolver();
+    resolver.setPrefix("mail/");
+    resolver.setTemplateMode(TemplateMode.HTML);
+    resolver.setCharacterEncoding("UTF-8");
+    resolver.setOrder(1);
+    return resolver;
+}
+```
+
+就大部分而言，配置`ClassLoaderTemplateResolver` bean的方式类似于`ServletContextTemplateResolver`。不过，需要注意，我们将prefix属性设置为“mail/”，这表明它会在类路径根的“mail”目录下开始查找Thymeleaf模板。因此，Email模板文件的名字必须是emailTemplate.html，并且位于类路径根的“mail”目录下。
+
+因为我们现在有两个模板解析器，所以需要使用`order`属性表明优先使用哪一个。`ClassLoaderTemplateResolver`的`order`属性为1，因此我们修改一下`ServletContextTemplateResolver`，将其`order`属性设置为2：
+
+```java
+@Bean
+public ITemplateResolver webTemplateResolver() {
+
+    WebApplicationContext webApplicationContext = ContextLoader.getCurrentWebApplicationContext();
+    ServletContextTemplateResolver templateResolver = new ServletContextTemplateResolver(webApplicationContext.getServletContext());
+    templateResolver.setPrefix("/WEB-INF/thymeleaf/");
+    templateResolver.setSuffix(".html");
+    templateResolver.setTemplateMode(TemplateMode.HTML);
+    templateResolver.setOrder(2);
+    return templateResolver;
+}
+```
+
+现在，剩下的任务就是修改`SpringTemplateEngine` bean的配置，让它使用这两个模板解析器：
+
+```java
+@Bean
+public TemplateEngine templateEngine(Set<ITemplateResolver> templateResolvers) {
+    SpringTemplateEngine templateEngine = new SpringTemplateEngine();
+    templateEngine.setTemplateResolvers(templateResolvers);
+    return templateEngine;
+}
+```
+
+在此之前，我们只有一个模板解析器，所以可以将其注入到`SpringTemplateEngine`的`templateResolver`属性中。但现在我们有了两个模板解析器，所以必须将它们作为`Set`的成员，然后将这个Set注入到`templateResolvers`（复数）属性中。
+
+### 19.4 小结
+
+>
+Email是人与人之间通信的重要形式，通常也是应用与人进行通信的一种形式。Spring基于Java所提供的Email功能，抽象了JavaMail，使得在Spring中使用和配置起来都更加简单。
+>
+在本章中，我们看到了如何使用Spring的Email抽象功能发送简单的Email消息，然后更进一步，学习了如何发送包含附件和经过HTML格式化的富文本消息。我们还看到了如何使用像Velocity和Thymeleaf这样的模板引擎生成富文本Email文本，避免了通过字符串拼接创建HTML。
+>
+在下一章中，我们将会学习如何借助Java管理扩展（Java Management Extensions，JMX）为Spring bean添加管理和通知功能。
