@@ -17744,3 +17744,503 @@ Email是人与人之间通信的重要形式，通常也是应用与人进行通
 在本章中，我们看到了如何使用Spring的Email抽象功能发送简单的Email消息，然后更进一步，学习了如何发送包含附件和经过HTML格式化的富文本消息。我们还看到了如何使用像Velocity和Thymeleaf这样的模板引擎生成富文本Email文本，避免了通过字符串拼接创建HTML。
 >
 在下一章中，我们将会学习如何借助Java管理扩展（Java Management Extensions，JMX）为Spring bean添加管理和通知功能。
+
+## 第20章 使用JMX管理Spring Bean
+
+本章内容：
+
+- 将Spring bean暴露为MBean
+- 远程管理Spring Bean
+- 处理JMX通知
+
+
+Spring对DI的支持是通过在应用中配置bean属性，这是一种非常不错的方法。不过，一旦应用已经部署并且正在运行，单独使用DI并不能帮助我们改变应用的配置。假设我们希望深入了解正在运行的应用并要在运行时改变应用的配置，此时，就可以使用Java管理扩展（JavaManage- ment Extensions，JMX）了。
+
+JMX这项技术能够让我们管理、监视和配置应用。这项技术最初作为Java的独立扩展，从Java 5开始，JMX已经成为标准的组件。
+
+使用JMX管理应用的核心组件是托管bean（managed bean，MBean）。所谓的MBean就是暴露特定方法的JavaBean，这些方法定义了管理接口。JMX规范定义了如下4种类型的MBean：
+
+- 标准MBean：标准MBean的管理接口是通过在固定的接口上执行反射确定的，bean类会实现这个接口；
+- 动态MBean：动态MBean的管理接口是在运行时通过调用DynamicMBean接口的方法来确定的。因为管理接口不是通过静态接口定义的，因此可以在运行时改变；
+- 开放MBean：开放MBean是一种特殊的动态MBean，其属性和方法只限定于原始类型、原始类型的包装类以及可以分解为原始类型或原始类型包装类的任意类型；
+- 模型MBean：模型MBean也是一种特殊的动态MBean，用于充当管理接口与受管资源的中介。模型Bean并不像它们所声明的那样来编写。它们通常通过工厂生成，工厂会使用元信息来组装管理接口。
+
+Spring的JMX模块可以让我们将Spring bean导出为模型MBean，这样我们就可以查看应用程序的内部情况并且能够更改配置——甚至在应用的运行期。
+
+### 20.1 将Spring bean导出为MBean
+
+假设我们为`SpittleController`增加一个新的`spittlesPerPage`属性：
+
+```java
+public static final int DEFAULT_SPITTLES_PER_PAGE = 25;
+private int spittlesPerPage = DEFAULT_SPITTLES_PER_PAGE;
+
+public void setSpittlesPerPage(int spittlesPerPage) {
+    this.spittlesPerPage = spittlesPerPage;
+}
+
+public int getSpittlesPerPage() {
+    return spittlesPerPage;
+}
+```
+
+之前，在我们调用`Spittles()`方法时，方法默认将20作为参数：
+
+```java
+@RequestMapping(method = RequestMethod.GET)
+public String spittles(@RequestParam(value = "max", defaultValue = MAX_LONG_AS_STRING) long max,
+        @RequestParam(value = "count", defaultValue = "20") int count, Model model) {
+    
+    model.addAttribute("spittleList", spittleRepository.findSpittles(max, count));
+    
+    return "spittles";
+}
+```
+
+这会查询最近的20条Spittle。现在，不再是在构建应用时通过硬编码进行决策，而是通过使用JMX在运行时进行决策。新增的`spittlesPerPage`属性只是第一步而已。
+
+但是`spittlesPerPage`属性本身并不能实现通过外部配置来改变页面上所显示Spittle的数量。它只是bean的一个属性，跟bean的其他属性一样。我们下一步需要做的是把`SpittleController` bean暴露为MBean，而`spittlePerPage`属性将成为MBean的托管属性（managed attribute）。这时，我们就可以在运行时改变该属性的值。
+
+Spring的`MBeanExporter`是将Spring Bean转变为MBean的关键。`MBeanExporter`可以把一个或多个Spring bean导出为MBean服务器（MBean server）内的模型 MBean。MBean服务器（有时候也被称为MBean代理）是MBean生存的容器。对MBean的访问，也是通过MBean服务器来实现的。
+
+如下图所示，将Spring bean导出为JMX MBean之后，可以使用基于JMX的管理工具，例如Oracle Java Mission Control或者VisualVM查看正在运行的引用程序，显式bean的属性并调用bean的方法：
+
+<center>
+    ![图20.1-通过JMX服务器，JMX管理工具（例如Oracle Java Mission Control）可以查看到正在运行的应用程序的内部情况](images\图20.1-通过JMX服务器，JMX管理工具（例如Oracle Java Mission Control）可以查看到正在运行的应用程序的内部情况.PNG)
+    **Spring的MBeanExporter可以将Spring bean的属性和方法导出为MBean服务器中的JMX属性和操作。通过JMX服务器，JMX管理工具（例如Oracle Java Mission Control）可以查看到正在运行的应用程序的内部情况**
+</center>
+
+下面的`@Bean`方法在Spring中声明了一个`MBeanExporter`，它会将`spittleController` bean导出为一个模型MBean：
+
+```java
+@Bean
+public MBeanExporter mbeanExporter(SpittleController spittleController) {
+    MBeanExporter exporter = new MBeanExporter();
+    Map<String, Object> beans = new HashMap<>();
+    beans.put("spitter:name=SpittleController", spittleController);
+    exporter.setBeans(beans);
+    return exporter;
+}
+```
+
+配置`MBeanExporter`的最简单方式是为它的beans属性配置一个Map集合，该集合中的元素是我们希望暴露为JMX MBean的一个或多个bean。每个Map条目的key就是MBean的名称（由管理域的名字和一个key-value对组成，在`SpittleController` MBean示例中是spitter:name=HomeController），而Map条目的值则是需要暴露的Spring bean引用。在这里，我们将输出`spittleController` bean，以便它的属性可以通过JMX在运行时进行管理。
+
+通过`MBeanExporter`，`spittleController` bean将作为模型MBean以`SpittleController`的名称导出到MBean服务器中，以实现管理功能。
+
+<center>
+    ![图20.2-查看导出的MBean](images\图20.2-查看导出的MBean.PNG)
+    **SpittleController导出为MBean，并且可以通过Oracle Java Mission Control查看**
+</center>
+
+`SpittleController`属性和public方法（在“操作”选项卡中可以找到）都被导出为MBean的属性或操作。这可能并不是我们所希望看到的结果，我们真正需要的只是可以配置`spittlesPerPage`属性。我们不需要调用`spittles()`方法或`SpittleController`中的其他方法或属性。因此，我们需要一个方式来筛选所需要的属性或方法。
+
+为了对MBean的属性和操作获得更细粒度的控制，Spring提供了几种选择，包括：
+
+- 通过名称来声明需要暴露或忽略的bean方法；
+- 通过为bean增加接口来选择要暴露的方法；
+- 通过注解标注bean来标识托管的属性和操作。
+
+我们会尝试每一种方式来决定哪一种最适合`SpittleController` MBean。我们首先通过名称来选择bean的哪些方法需要暴露。
+
+**MBean服务器从何而来**
+
+我们现在的MBean服务器在应用服务器（Tomcat）中运行。但是，如果Spring应用程序是独立的应用或运行的容器没有提供MBean服务器，我们就需要在Spring上下文中配置一个MBean服务器。
+
+在XML配置中，`<context:mbean-server>`元素可以为我们实现该功能。如果使用Java配置的话，我们需要更直接的方式，也就是配置类型为`MBeanServerFactoryBean`的bean（这也是在XML中`<context:mbean-server>`元素所作的事情）。
+
+`MBeanServerFactoryBean`会创建一个MBean服务器，并将其作为Spring应用上下文中的bean。默认情况下，这个bean的ID是mbeanServer。了解到这一点，我们就可以将它装配到`MBeanExporter`的`server`属性中用来指定MBean要暴露到哪个MBean服务器中。
+
+#### 20.1.1 通过名称暴露方法
+
+MBean信息装配器（MBean info assembler）是限制哪些方法和属性将在MBean上暴露的关键。其中有一个MBean信息装配器是`MethodNameBasedMBeanInfoAssembler`。这个装配器指定了需要暴露为MBean操作的方法名称列表。对于`SpittleController` bean来说，我们希望把`spittlePerPage`暴露为托管属性。基于方法名的装配器如何帮我们导出一个托管属性呢？
+
+我们回顾下JavaBean的规则（这不是Spring Bean所必需的），`spittlesPerPage`属性需要定义对应的存取器（accessor）方法，方法名必须为`setSpittlesPerPage()`和`getSpittlesPerPage()`。为了限制MBean所暴露的内容，我们需要告诉`MethodNameBaseMBeanInfoAssembler`仅在MBean的接口中包含这两个方法。如下`MethodNameBaseMBeanInfoAssembler`的bean声明就配置了这些方法：
+
+```java
+@Bean
+public MethodNameBasedMBeanInfoAssembler assembler() {
+    MethodNameBasedMBeanInfoAssembler assembler = new MethodNameBasedMBeanInfoAssembler();
+    assembler.setManagedMethods(new String[] { "getSpittlesPerPage", "setSpittlesPerPage" });
+    return assembler;
+}
+```
+
+`managedMethods`属性可以接受一个方法名称的列表，指定了哪些方法将暴露为MBean的操作。因为本示例所配置的是`spittlesPerPage`属性的存取器方法，所以`spittlesPerPage`属性也自然成为了MBean的托管属性。
+
+为了让这个装配器生效，我们需要将它装配进`MBeanExporter`中：
+
+```java
+@Bean
+public MBeanExporter mbeanExporter(SpittleController spittleController,
+        AbstractConfigurableMBeanInfoAssembler assembler) {
+    MBeanExporter exporter = new MBeanExporter();
+    Map<String, Object> beans = new HashMap<>();
+    beans.put("spitter:name=SpittleController", spittleController);
+    exporter.setBeans(beans);
+    exporter.setAssembler(assembler);
+    return exporter;
+}
+```
+
+现在启动应用查看此时暴露为MBean的操作：
+
+<center>
+    ![图20.3-spittles()等方法不再作为MBean的托管操作](images\图20.3-spittles()等方法不再作为MBean的托管操作.PNG)
+    **当指定了哪些方法在SpittleController MBean上暴露后，spittles()方法不再作为MBean的托管操作**
+</center>
+
+另一个基于方法名称的装配器是`MethodExclusionMBeanInfoAssembler`。这个MBean信息装配器是`MethodNameBaseMBeanInfoAssembler`的反操作。它不是指定哪些方法需要暴露为MBean的托管操作，`MethodExclusionMBeanInfoAssembler`指定了不需要暴露为MBean托管操作的方法名称列表。例如，在这里我们使用`MethodExclusionMBeanInfoAssemble`指定`spittles()`等方法作为不暴露的方法：
+
+```java
+@Bean
+public MethodExclusionMBeanInfoAssembler assembler() {
+    MethodExclusionMBeanInfoAssembler assembler = new MethodExclusionMBeanInfoAssembler();
+    assembler.setIgnoredMethods(new String[] { "spittles", "showSpittle" });
+    return assembler;
+}
+```
+
+基于方法名称的装配器是最直接和易于使用的。但是如果需要把多个Spring bean导出为MBean，我们能想象将出现什么样的情形吗？为装配器所配置的方法名称清单将会变得非常庞大；而且还有一种可能，我们希望暴露一个bean的某个方法，但不希望暴露另一个bean的同名方法。
+
+很明显，在Spring配置方面，当导出多个MBean时，基于方法名称的方式并不能很好地满足此场景。让我们看一下如果使用接口暴露MBean的操作和属性是否更为合适。
+
+#### 20.1.2 使用接口定义MBean的操作和属性
+
+Spring的`InterfaceBasedMBeanInfoAssembler`是另一种MBean信息装配器，可以让我们通过使用接口来选择bean的哪些方法需要暴露为MBean的托管操作。`InterfaceBasedMBeanInfoAssembler`与基于方法名称的装配器很相似，只不过不再通过罗列方法名称来确定暴露哪些方法，而是通过列出接口来声明哪些方法需要暴露。
+
+例如，假设这里定义一个名为`SpittleControllerManagedOperations`接口，如下所示：
+
+```java
+package spittr.jmx;
+
+public interface SpittleControllerManagedOperations {
+
+    int getSpittlesPerPage();
+
+    void setSpittlesPerPage(int spittlesPerPage);
+}
+```
+
+在这里，我们选择了`setSpittlesPerPage()`方法和`getSpittlesPerPage()`方法作为需要暴露的方法。这一对存取器方法间接暴露了`spittlesPerPage`属性作为MBean的托管属性。为了应用此装配器，我们只需要使用如下的`assembler` bean替换之前基于方法名称的装配器即可：
+
+```java
+@Bean
+public InterfaceBasedMBeanInfoAssembler assembler() {
+    InterfaceBasedMBeanInfoAssembler assembler = new InterfaceBasedMBeanInfoAssembler();
+    assembler.setManagedInterfaces(new Class<?>[] { SpittleControllerManagedOperations.class });
+    return assembler;
+}
+```
+
+`managedInterfaces`属性接受一个或多个接口组成的列表作为MBean的管理接口——在本示例中为`SpittleControllerManagedOperations`接口。
+
+`SpittleController`并没有显式实现`SpittleControllerManagedOperations`接口，这可能并不明显，但相当有趣。这个接口只是为了标识导出的内容，但我们并不需要在代码中直接实现该接口。不过，`SpittleController`应该实现这个接口，其实也没有其他的原因，只是在MBean和实现类之间应该有一个一致的协议。
+
+如果通过接口来选择MBean操作的话，最吸引人的一点在于我们可以把很多方法放在少量的接口中，从而确保`InterfaceBasedMBeanInfoAssembler`的配置尽量简洁。在输出多个MBean时，基于接口的方式可以帮助保持Spring配置的简洁。
+
+最终，这些托管操作必须在某处声明，无论是在Spring配置中还是在某个接口中。此外，从代码角度看，托管操作的声明是一种重复——在接口中或Spring上下文中声明的方法名称与实现中所声明的方法名称存在重复。之所以存在这种重复，没有其他原因，仅仅是为了满足`MBeanExporter`的需要而产生的。
+
+Java注解的一项工作就是帮助消除这种重复。
+
+#### 20.1.3 使用注解驱动的MBean
+
+Spring还提供了另一种装配器——`MetadataMBeanInfoAssembler`，这种装配器可以使用注解标识哪些bean的方法需要暴露为MBean的托管操作和属性。由于手工装配它非常复杂，仅仅为了使用注解并不值得这么做，相反我们这里使用Spring `context`命名空间中的`<context:mbean-export>`元素。这个便捷的元素装配了MBean导出器以及为了在Spring启用注解启动的MBean所需要的装配器我们所需要做的就是使用它来替换我们之前所使用的`MBeanExporter` bean：
+
+```xml
+<context:mbean-server id="mbeanServer" />
+<context:mbean-export server="mbeanServer" />
+```
+
+现在，要把任意一个Spring bean转变为MBean，我们所需要做的仅仅是使用`@ManagedResource`注解标注bean并使用`@ManagedOperation`或`@ManagedAttribute`注解标注bean的方法。
+
+```java
+@Controller
+@RequestMapping("/spittles")
+@ManagedResource(objectName = "spitter:name=SpitteleController")
+public class SpittleController implements SpittleControllerManagedOperations {
+
+    private SpittleRepository spittleRepository;
+
+    private final String MAX_LONG_AS_STRING = Long.MAX_VALUE + "";
+
+    public static final int DEFAULT_SPITTLES_PER_PAGE = 25;
+
+    private int spittlesPerPage = DEFAULT_SPITTLES_PER_PAGE;
+
+    @ManagedAttribute
+    public void setSpittlesPerPage(int spittlesPerPage) {
+        this.spittlesPerPage = spittlesPerPage;
+    }
+
+    @ManagedAttribute
+    public int getSpittlesPerPage() {
+        return spittlesPerPage;
+    }
+
+    // ...
+}
+```
+
+在类级别使用了`@ManagedResource`注解来标识这个bean应该被导出为MBean。`objectName`属性标识了域（Spitter）和MBean的名称（SpittleController）。
+
+`spittlesPerPage`属性的存取器方法都使用了`@ManagedAttribute`注解来进行标注，这表示该属性应该暴露为MBean的托管属性。注意，其实并不需要使用注解同时标注这两个存取器方法。如果我们选择仅标注`setSpittlesPerPage()`方法，那我们仍可以通过JMX设置该属性，但这样的话我们将不能查看该属性的值。相反，如果仅仅标注`getSpittlesPerPage()`方法，那我们可以通过JMX查看该属性的值，但无法修改该属性的值。
+
+我们还可以使用`@ManagedOperation`注解替换`@ManagedAttribute`注解来标注存取器方法。如下所示：
+
+```java
+@ManagedOperation
+public void setSpittlesPerPage(int spittlesPerPage) {
+    this.spittlesPerPage = spittlesPerPage;
+}
+
+@ManagedOperation
+public int getSpittlesPerPage() {
+    return spittlesPerPage;
+}
+```
+
+这会将方法暴露为MBean的托管操作，但是并不会把`spittlesPerPage`属性暴露为MBean的托管属性。这是因为在暴露MBean功能时，使用`@ManagedOperation`注解标注方法是严格限制方法的，并不会把它作为JavaBean的存取器方法。因此，使用`@ManagedOperation`可以用来把bean的方法暴露为MBean托管操作，而使用`@ManagedAttribute`可以把bean的属性暴露为MBean托管属性。
+
+#### 20.1.4 处理MBean冲突
+
+到目前为止，我们已经看到可以使用多种方式在MBean服务器中注册MBean。在所有的示例中，我们为MBean指定的对象名称是由管理域名和key-value对组成的。如果MBean服务器中不存在与我们MBean名字相同的已注册的MBean，那我们的MBean注册时就不会有任何问题。但是如果名字冲突时，将会发生什么呢？
+
+默认情况下，`MBeanExporter`将抛出`InstanceAlreadyExistsException`异常，该异常表明MBean服务器中已经存在相同名字的MBean。不过，我们可以通过`MBeanExporter`的`registrationBehaviorName`属性或者`<context:mbean-export>`的`registration`属性指定冲突处理机制来改变默认行为。
+
+Spring提供了3种借助`registrationBehaviorName`属性来处理MBean名字冲突的机制：
+
+- FAIL_ON_EXISTING（默认行为）：如果已存在相同名字的MBean，则失败
+- IGNORE_EXISTING：忽略冲突，同时也不注册新的MBean
+- REPLACING_EXISTING：用新的MBEAN覆盖已存在的Mean
+
+例如，如果我们使用`MBeanExporter`，我们可以通过设置`registrationBehaviorName`属性为`RegistrationPolicy.IGNORE_EXISTING`来忽略冲突，如下所示：
+
+```java
+@Bean
+public MBeanExporter mbeanExporter(SpittleController spittleController,
+        MBeanInfoAssembler assembler) {
+    MBeanExporter exporter = new MBeanExporter();
+    Map<String, Object> beans = new HashMap<>();
+    beans.put("spitter:name=SpittleController", spittleController);
+    exporter.setBeans(beans);
+    exporter.setAssembler(assembler);
+    exporter.setRegistrationPolicy(RegistrationPolicy.IGNORE_EXISTING);
+    return exporter;
+}
+```
+
+现在我们已使用`MBeanExporter`注册了我们的MBean，我们还需要一种方式来访问它们并进行管理。正如之前所看到的，我们可以使用诸如Oracle Java Mission Console之类的工具来访问本地的MBean服务器，进而显示和操纵MBean，但是像Oracle Java Mission Console之类的工具并不适合在程序中对MBean进行管理。我们如何在一个应用中操纵另一个应用中的MBean呢？幸运的是，还存在另一种方式可以把MBean作为远程对象进行访问。让我们进一步研究Spring对远程MBean的支持，了解如何通过远程接口以标准的方式来访问MBean。
+
+### 20.2 远程MBean
+
+使MBean成为远程对象的最简单方式是配置Spring的`ConnectorServerFactoryBean`：
+
+```java
+@Bean
+public ConnectorServerFactoryBean connectorServerFactoryBean() {
+    return new ConnectorServerFactoryBean();
+}
+```
+
+`ConnectorServerFactoryBean`会创建和启动JSR-160 `JMXConnectorServer`。默认的情况下，服务器使用JMXMP协议并舰艇9875端口，因此它将绑定“service:jmx:jmxmp://localhost:9875”。但是我们导出MBean的可选方案变更不局限于JMXMP。
+
+根据不同JMX的实现，我们有多种远程访问协议可供选择，包括远程方法调用（Remote Method Invocation，RMI）、SOAP、Hessian/Burlap和IIOP（Internet InterORB Protocol）。为MBean绑定不同的远程访问协议，我们仅需要设置`ConnectorServerFactoryBean`的`serviceUrl`属性。例如，如果我们想使用RMI远程访问MBean，我们可以像下面示例这样配置：
+
+```java
+@Bean
+public ConnectorServerFactoryBean connectorServerFactoryBean() {
+    ConnectorServerFactoryBean csfb = new ConnectorServerFactoryBean();
+    csfb.setServiceUrl("service:jmx:rmi://localhost/jndi/rmi://localhost:1099/spitter");
+    return csfb;
+}
+```
+
+在这里，我们将`ConnectorServerFactoryBean`绑定到了一个RMI注册表，该注册表监听本机的1099端口。这意味着我们需要一个RMI注册表运行时，并监听该端口。
+
+本示例中我们使用`RmiRegistryFactoryBean`来启动一个RMI注册表：
+
+```java
+@Bean 
+public RmiRegistryFactoryBean rmiRegistryFB() {
+    RmiRegistryFactoryBean rmiRegistryFB = new RmiRegistryFactoryBean();
+    rmiRegistryFB.setPort(1099);
+    return rmiRegistryFB;
+}
+```
+
+#### 20.2.2 访问远程MBean
+
+要访问远程MBean服务器，我们需要在Spring上下文中配置`MBeanServerConnectionFactoryBean`。下面的bean声明装配了一个`MBeanServerConnectionFactoryBean`，该bean用于访问我们在上一节中所创建的基于RMI的远程服务器：
+
+```java
+@Bean
+public MBeanServerConnectionFactoryBean connectionFactoryBean() throws MalformedURLException {
+    MBeanServerConnectionFactoryBean mbscfb = new MBeanServerConnectionFactoryBean();
+    mbscfb.setServiceUrl("service:jmx:rmi://localhost/jndi/rmi://localhost:1099/spitter");
+    return mbscfb;
+}
+```
+
+`MBeanServerConnectionFactoryBean`是一个可用于创建`MbeanServerConnection`的工厂bean。由`MBeanServerConnectionFactoryBean`所生成的`MBeanServerConnection`实际上是作为远程MBean服务器的本地代理。它能够以`MBeanServerConnection`的形式注入到其他bean的属性中：
+
+```java
+@Bean
+public JmxClient jmxClient(MBeanServerConnection connection) {
+    JmxClient jmxClient = new JmxClient();
+    jmxClient.setMBeanServerConnection(connection);
+    return jmxClient;
+}
+```
+
+`MBeanServerConnection`提供了多种方法，我们可以使用这些方法查询远程MBean服务器并调用MBean服务器内所注册的MBean的方法。例如，如果我们希望知道在远程MBean服务器中有多少已注册的MBean，可以用如下的代码片段打印这些信息：
+
+```java
+int mbeanCount = mbeanServerConnection.getMBeanCount();
+System.out.println("There are " + mbeanCount + " MBeans");
+```
+
+还可以使用`queryNames()`方法查询远程服务器中所有MBean的名称：
+
+```java
+Set<ObjectName> mbeanNames = mbeanServerConnection.queryNames(null, null);
+```
+
+远程访问 MBean服务器的真正价值在于访问远程服务器上已注册MBean的属性以及调用它们的方法。
+
+为了访问MBean属性，我们可以使用`getAttribute()`和`setAttribute()`方法。例如，为了获取MBean属性的值，我们可以按照下面的方法调用`getAttribute()`方法：
+
+```java
+String cronExpressuib = mbeanServerConnection.getAttribute(new ObjectName("spitter:name=SpittleController"), "spitttlesPerPage");
+```
+
+同样地，也可以对属性：
+
+```java
+mbeanServerConnection.setAttribute(new ObjectName("spitter:name=SpittleController"), new Attribute("spittlesPerPage", 10));
+```
+
+如果希望调用MBean的操作，那么我们需要使用`invoke()`方法，例如调用`SpittleController` MBean的`setSpittlesPerPage()`方法：
+
+```java
+mbeanServerConnection.invoke(
+    new ObjectName("spitter:name=SpittleController", "setSpittlesPerPage"), 
+    new Object[] { 100 }, 
+    new String[] { "int" });
+```
+
+不过，通过`MBeanServerConnection`对远程MBean进行方法调用和属性设置是一种很笨拙的方法。要想调用`setSpittlesPerPage()`这样一个简单的方法，我们需要创建一个`ObjectName`实例，并向`invoke()`方法传递几个参数。它并不是直观的方法调用。为了更直接地调用方法，我们需要代理远程MBean。
+
+#### 20.2.3 代理MBean
+
+Spring的`MBeanProxyFactoryBean`是一个代理工厂bean，他会提供代理，让我们可以直接访问远程的MBean，就如通配置在本地的其他bean一样：
+
+<center>
+    ![图20.4-客户端通过此代理与远程MBean进行交互](images\图20.4-客户端通过此代理与远程MBean进行交互.PNG)
+    **MBeanFactoryBean创建远程MBean的代理。客户端通过此代理与远程MBean进行交互，就像它是本地Bean一样**
+</center>
+
+例如考虑如下的`MBeanProxyFactoryBean`声明：
+
+```java
+@Bean
+public MBeanProxyFactoryBean remoteSpittleControllerMBean(MBeanServerConnection mbeanServerClient) throws MalformedObjectNameException {
+    MBeanProxyFactoryBean proxy = new MBeanProxyFactoryBean();
+    proxy.setObjectName("spitter:name=SpittleController");
+    proxy.setServer(mbeanServerClient);
+    proxy.setProxyInterface(SpittleControllerManagedOperations.class);
+    return proxy;
+}
+```
+
+`objectName`属性指定了远程MBean的对象名称。在这里是引用我们之前导出的`SpittleControllerMBean`。server属性引用了`MBeanServerConnection`，通过它实现MBean所有通信的路由。在这里，我们注入了之前配置的`MBeanServerConnectionFactoryBean`。最后`proxyInterface`属性指定了代理需要实现的接口。
+
+对于上面声明的`remoteSpittleControllerMBean`，我们现在可以把它注入到类型为`SpittleControllerManagedOperations`的bean属性中，并使用它来访问远程的MBean。这样，我们就可以调用`setSpittlesPerPage()`和`getSpittlesPerPage()`方法了。
+
+我们已经看到与MBean通信的几种方式，现在我们可以在应用运行的时候显示和调整Spring bean配置。但是目前为止，这都是单方面的会话。都是我们与MBean在沟通。现在是时候通过监听通知（notification）来倾听它们在说什么。
+
+### 20.3 处理通知
+
+通过查询MBean获得信息只是查看应用状态的一种方法。但当应用发生重要事件时，如果希望能够及时告知我们，这通常不是最有效的方法。
+
+例如，假设Spittr应用保存了已发布的Spittle数量，而我们希望知道每发布一百万Spittle时的精确时间（例如一百万、两百万、三百万等）。一种解决方法是编写代码定期查询数据库，计算Spittle的数量。但是执行这种查询会让应用和数据库都很繁忙，因为它需要不断的检查Spittle的数量。
+
+与重复查询数据库获得Spittle的数量相比，更好的方式是当这类事件发生时让MBean通知我们。JMX通知（JMX notification，如下图所示）是MBean与外部世界主动通信的一种方法，而不是等待外部应用对MBean进行查询以获得信息。
+
+<center>
+    ![图20.5-JMX通知使MBean与外部世界进行主动通信](images\图20.5-JMX通知使MBean与外部世界进行主动通信.PNG)
+    **JMX通知使MBean与外部世界进行主动通信**
+</center>
+
+Spring通过`NotificationPublisherAware`接口提供了发送通知的支持。任何希望发送通知的MBean都必须实现这个接口。
+
+例如：
+
+```java
+@Component
+@ManagedResource("spitter:name=SpitterNotifier")
+@ManagedNotification(notificationTypes = "SpittleNotifier.OneMillionSpittles", name = "TODO")
+public class SpittleNotifierImpl implements NotificationPublisherAware, SpittleNotifier {
+    private NotificationPublisher notificationPublisher;
+
+    @Override
+    public void setNotificationPublisher(NotificationPublisher notificationPublisher) {
+        this.notificationPublisher = notificationPublisher;
+    }
+
+    @Override
+    public void millionthSpittlePosted() {
+        notificationPublisher.sendNotification(new Notification("SpittleNotifier.OneMillionSpittles", this, 0));
+    }
+}
+```
+
+`SpittleNotifierImpl`实现了`NotificationPublisherAware`接口。这并不是一个要求苛刻的接口，它仅要求实现一个方法：`setNotificationPublisher`。`SpittleNotificationImpl`也实现了`SpittleNotifier`接口的方法：`millionthSpittlePosted()`。这个方法使用了`setNotificationPublisher()`方法所注入的`NotificationPublisher`来发送通知：我们的Spittle数量又到了一个新的百万级别。
+
+一旦`sendNotification()`方法被调用，就会发出通知。
+
+#### 20.3.1 监听通知
+
+接收MBean通知的标准方法是实现`javax.management.NotificationListener`接口。例如，考虑一下`PagingNotificationListener`：
+
+```java
+public class PagingNotificationListener implements NotificationListener {
+    
+    @Override
+    public void handleNotification(Notification notification, Object handback) {
+        // ...
+    }
+}
+```
+
+`PagingNotificationListener`是一个典型的JMX通知监听器。当接收到通知时，将会调用`handleNotification()`方法处理通知。
+
+剩下的工作就是要使用`MBeanExporter`注册这个监听器了：
+
+```java
+@Bean
+public MBeanExporter mbeanExporter(SpittleController spittleController,
+        MBeanInfoAssembler assembler) {
+    
+    MBeanExporter exporter = new MBeanExporter();
+    
+    Map<String, Object> beans = new HashMap<>();
+    beans.put("spitter:name=SpittleController", spittleController);
+    exporter.setBeans(beans);
+    exporter.setAssembler(assembler);
+    exporter.setRegistrationPolicy(RegistrationPolicy.IGNORE_EXISTING);
+    
+    Map<String, NotificationListener> mappings = new HashMap<>();
+    mappings.put("spitter:name=PagingNotificationListener", new PagingNotificationListener());
+    exporter.setNotificationListenerMappings(mappings);
+    return exporter;
+}
+```
+
+`MBeanExporter`的`notificationListenerMappings`属性用于在监听器和监听器所希望监听的MBean之间建立映射。在本示例中，我们建立了`PagingNotificationListener`来监听由`SpittleNotifier` MBean所发布的通知。
+
+### 20.4 小结
+
+>
+JMX是对应用程序进行操纵的一扇窗口。在本章，我们了解了如何配置Spring自动地把Spring bean导出为JMX MBean，从而可以让我们通过JMX管理工具查看和操作bean的信息。我们也了解了当MBean和工具彼此距离很远时，如何创建和使用远程MBean。最后，我们还了解了如何使用Spring发布和监听JMX通知。
+>
+现在你或许注意到这本书剩余的页数越来越少，我们的Spring之旅即将结束。但是在这之前，我们沿途还会经停一站。在下一章，我们将会看一下Spring Boot，这是开发Spring应用的一种新方法，借助这种令人激动的新方法我们可以只保留很少的显式配置，甚至可能完全没有配置。
