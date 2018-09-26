@@ -17753,7 +17753,6 @@ Email是人与人之间通信的重要形式，通常也是应用与人进行通
 - 远程管理Spring Bean
 - 处理JMX通知
 
-
 Spring对DI的支持是通过在应用中配置bean属性，这是一种非常不错的方法。不过，一旦应用已经部署并且正在运行，单独使用DI并不能帮助我们改变应用的配置。假设我们希望深入了解正在运行的应用并要在运行时改变应用的配置，此时，就可以使用Java管理扩展（JavaManage- ment Extensions，JMX）了。
 
 JMX这项技术能够让我们管理、监视和配置应用。这项技术最初作为Java的独立扩展，从Java 5开始，JMX已经成为标准的组件。
@@ -17768,6 +17767,8 @@ JMX这项技术能够让我们管理、监视和配置应用。这项技术最�
 Spring的JMX模块可以让我们将Spring bean导出为模型MBean，这样我们就可以查看应用程序的内部情况并且能够更改配置——甚至在应用的运行期。
 
 ### 20.1 将Spring bean导出为MBean
+
+*以下内容代码在工程sia4e-P4_Integrating_Spring-C20_Managing_Spring_beans_with_JMX中*。
 
 假设我们为`SpittleController`增加一个新的`spittlesPerPage`属性：
 
@@ -18244,3 +18245,2912 @@ public MBeanExporter mbeanExporter(SpittleController spittleController,
 JMX是对应用程序进行操纵的一扇窗口。在本章，我们了解了如何配置Spring自动地把Spring bean导出为JMX MBean，从而可以让我们通过JMX管理工具查看和操作bean的信息。我们也了解了当MBean和工具彼此距离很远时，如何创建和使用远程MBean。最后，我们还了解了如何使用Spring发布和监听JMX通知。
 >
 现在你或许注意到这本书剩余的页数越来越少，我们的Spring之旅即将结束。但是在这之前，我们沿途还会经停一站。在下一章，我们将会看一下Spring Boot，这是开发Spring应用的一种新方法，借助这种令人激动的新方法我们可以只保留很少的显式配置，甚至可能完全没有配置。
+
+## 第二十一章 借助Spring Boot简化Spring开发
+
+本章内容：
+
+- 使用Spring Boot Starter添加项目依赖
+- 自动化的bean配置
+- Groovy与Spring Boot CLI
+- Spring Boot Actuator
+
+本章将会介绍Spring Boot如何让简化Java开发变得更加简单。从Spring创建以来，Spring Boot大概是Spring领域中最令人兴奋的事情了。它在Spring之上，构建了全新的开发模型，移除了开发Spring应用中很多单调乏味的内容。
+
+### 21.1 Spring Boot简介
+
+Spring Boot提供了四个主要特性：
+
+- Spring Boot Starter：它将常用的依赖分组进行了整合，将其合并到一个依赖中，这样就可以一次性添加到项目的Maven或Gradle构建中；
+- 自动配置：Spring Boot的自动配置特性利用了Spring 4对条件化配置的支持，合理地推测应用所需的bean并自动化配置它们；
+- 命令行接口（Command-line interface，CLI）：Spring Boot的CLI发挥了Groovy编程语言的优势，并结合自动配置进一步简化Spring应用的开发；
+- Actuator：它为Spring Boot应用添加了一定的管理特性。
+
+#### 添加Starter依赖
+
+（Spring Boot 2.0.5版本要求使用Spring Framework的版本在5.0.9以上；Spring Boot 1.5.16版本要求Spring Framework的版本在4.3.19以上。所以这里使用4.3.19版本的Spring Framework）
+
+Spring Boot Starter将应用所需的各种依赖聚合成一项依赖。
+
+为了阐述该功能，假设我们要从头开始编写一个新的Spring应用。这是一个Web项目，所以需要使用Spring MVC。同时，还要有REST API将资源暴露为JSON，所以在构建中需要包含Jackson JSON库。因为应用需要使用JDBC从关系型数据库中存储和查询数据，因此我们希望确保包含了Spring的JDBC模块（为了使用JdbcTemplate）和Spring的事务模块（为了使用声明式事务的支持）。对于数据库本身，H2数据库是个不错的选择。另外我们还需要使用Thymeleaf来建立Spring MVC视图。
+
+假如此时我们要使用Gradle来构建项目的话，在build.gradle中至少要包含如下依赖：
+
+```groovy
+// https://mvnrepository.com/artifact/javax.servlet/javax.servlet-api
+providedCompile group: 'javax.servlet', name: 'javax.servlet-api', version: '3.1.0'
+// https://mvnrepository.com/artifact/org.springframework/spring-web
+compile group: 'org.springframework', name: 'spring-web', version: '4.3.19.RELEASE'
+// https://mvnrepository.com/artifact/org.springframework/spring-webmvc
+compile group: 'org.springframework', name: 'spring-webmvc', version: '4.3.19.RELEASE'
+// https://mvnrepository.com/artifact/com.fasterxml.jackson.core/jackson-databind
+compile group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: '2.9.6'
+// https://mvnrepository.com/artifact/org.springframework/spring-jdbc
+compile group: 'org.springframework', name: 'spring-jdbc', version: '4.3.19.RELEASE'
+// https://mvnrepository.com/artifact/org.springframework/spring-tx
+compile group: 'org.springframework', name: 'spring-tx', version: '4.3.19.RELEASE'
+// https://mvnrepository.com/artifact/com.h2database/h2
+compile group: 'com.h2database', name: 'h2', version: '1.4.197'
+// https://mvnrepository.com/artifact/org.thymeleaf/thymeleaf-spring4
+compile group: 'org.thymeleaf', name: 'thymeleaf-spring4', version: '3.0.9.RELEASE'
+```
+
+幸好，Gradle能够非常简洁地表达依赖。即便如此，创建这个文件还是牵扯到许多的事情，而对它的维护则会更加麻烦。这些依赖之间是如何协作的呢？当应用程序不断地成长和演进，依赖管理将会变得更加具有挑战性。
+
+但是，如果我们使用Spring Boot Starter所提供的预打包依赖的话，那么Gradle依赖列表能够更加简短：
+
+```groovy
+// https://mvnrepository.com/artifact/org.springframework.boot/spring-boot-starter-web
+compile group: 'org.springframework.boot', name: 'spring-boot-starter-web', version: '1.5.16.RELEASE'
+// https://mvnrepository.com/artifact/org.springframework.boot/spring-boot-starter-jdbc
+compile group: 'org.springframework.boot', name: 'spring-boot-starter-jdbc', version: '1.5.16.RELEASE'
+// https://mvnrepository.com/artifact/com.h2database/h2
+compile group: 'com.h2database', name: 'h2', version: '1.4.197'
+// https://mvnrepository.com/artifact/org.thymeleaf/thymeleaf-spring4
+compile group: 'org.thymeleaf', name: 'thymeleaf-spring4', version: '3.0.9.RELEASE'
+```
+
+Spring Boot的Web和JDBC Starter取代了几个更加细粒度的依赖。我们依然还需要包含H2和Thymeleaf的依赖，不过其他的依赖都已经放到了Starter中。除了依赖列表更加简短，我们可以相信由Starter所提供的依赖版本能够互相兼容。
+
+Spring Boot提供了多个Starter，Web和JDBC只是其中的两个。下表列出了Spring Boot 1.5.16中提供的所有starter：
+
+Name | Description
+-----|-----
+spring-boot-starter | Core starter, including auto-configuration support, logging and YAML
+spring-boot-starter-activemq | Starter for JMS messaging using Apache ActiveMQ
+spring-boot-starter-amqp | Starter for using Spring AMQP and Rabbit MQ
+spring-boot-starter-aop | Starter for aspect-oriented programming with Spring AOP and AspectJspring-boot-starter-artemis | Starter for JMS messaging using Apache Artemis
+spring-boot-starter-batch | Starter for using Spring Batch
+spring-boot-starter-cache | Starter for using Spring Framework’s caching support
+spring-boot-starter-cloud-connectors | Starter for using Spring Cloud Connectors which simplifies connecting to services in cloud platforms like Cloud Foundry and Heroku
+spring-boot-starter-data-cassandra | Starter for using Cassandra distributed database and Spring Data Cassandra
+spring-boot-starter-data-couchbase | Starter for using Couchbase document-oriented database and Spring Data Couchbase
+spring-boot-starter-data-elasticsearch | Starter for using Elasticsearch search and analytics engine and Spring Data Elasticsearch
+spring-boot-starter-data-gemfire | Starter for using GemFire distributed data store and Spring Data GemFire
+spring-boot-starter-data-jpa | Starter for using Spring Data JPA with Hibernate
+spring-boot-starter-data-ldap | Starter for using Spring Data LDAP
+spring-boot-starter-data-mongodb | Starter for using MongoDB document-oriented database and Spring Data MongoDB
+spring-boot-starter-data-neo4j | Starter for using Neo4j graph database and Spring Data Neo4j
+spring-boot-starter-data-redis | Starter for using Redis key-value data store with Spring Data Redis and the Jedis client
+spring-boot-starter-data-rest | Starter for exposing Spring Data repositories over REST using Spring Data REST
+spring-boot-starter-data-solr | Starter for using the Apache Solr search platform with Spring Data Solr
+spring-boot-starter-freemarker | spring-boot-starter-groovy-templates
+spring-boot-starter-hateoas | Starter for building hypermedia-based RESTful web application with Spring MVC and Spring HATEOAS
+spring-boot-starter-integration | Starter for using Spring Integration
+spring-boot-starter-jdbc | Starter for using JDBC with the Tomcat JDBC connection pool
+spring-boot-starter-jersey | Starter for building RESTful web applications using JAX-RS and Jersey. An alternative to spring-boot-starter-web
+spring-boot-starter-jooq | Starter for using jOOQ to access SQL databases. An alternative to spring-boot-starter-data-jpa or spring-boot-starter-jdbc
+spring-boot-starter-jta-atomikos | Starter for JTA transactions using Atomikos
+spring-boot-starter-jta-bitronix | Starter for JTA transactions using Bitronix
+spring-boot-starter-jta-narayana | Spring Boot Narayana JTA Starter
+spring-boot-starter-mail | Starter for using Java Mail and Spring Framework’s email sending support
+spring-boot-starter-mobile | Starter for building web applications using Spring Mobile
+spring-boot-starter-mustache | Starter for building MVC web applications using Mustache views
+spring-boot-starter-security | Starter for using Spring Security
+spring-boot-starter-social-facebook | Starter for using Spring Social Facebook
+spring-boot-starter-social-linkedin | Stater for using Spring Social LinkedIn
+spring-boot-starter-social-twitter | Starter for using Spring Social Twitter
+spring-boot-starter-test | Starter for testing Spring Boot applications with libraries including JUnit, Hamcrest and Mockito
+spring-boot-starter-thymeleaf | Starter for building MVC web applications using Thymeleaf views
+spring-boot-starter-validation | Starter for using Java Bean Validation with Hibernate Validator
+spring-boot-starter-web | Starter for building web, including RESTful, applications using Spring MVC. Uses Tomcat as the default embedded container
+spring-boot-starter-web-services | Starter for using Spring Web Services
+spring-boot-starter-websocket | Starter for building WebSocket applications using Spring Framework’s WebSocket support
+
+如果查看这些Starter依赖的内部原理，你会发现Starter的工作方式也没有什么神秘之处。它使用了Maven和Gradle的依赖传递方案，Starter在自己的pom.xml文件中声明了多个依赖。当我们将某一个Starter依赖添加到Maven或Gradle构建中的时候，Starter的依赖将会自动地传递性解析。这些依赖本身可能也会有其他的依赖。一个Starter可能会传递性地引入几十个依赖。
+
+需要注意，很多Starter引用了其他的Starter。例如，mobile Starter就引用了Web Starter，而后者又引用了Tomcat Starter。大多数的Starter都会引用spring-boot-starter，它实际上是一个基础的Starter。依赖是传递性的，将mobile Starter添加为依赖之后，就相当于添加了它下面的所有Starter。
+
+#### 21.1.2 自动配置
+
+Spring Boot的Starter减少了构建中依赖列表的长度，而Spring Boot的自动配置功能则削减了Spring配置的数量。它在实现时，会考虑应用中的其他因素并推断你所需要的Spring配置。
+
+例如，在之前的章节中，如果我们要将Thymeleaf作为Spring MVC的视图，那么在配置Thymeleaf时至少需要以下三个bean：
+
+- ThymeleafViewResolver
+- SpringTemplateEngine
+- ServletContextTemplateResolver
+
+但是，如果使用Spring Boot自动配置的话，我们需要做的仅仅是将Thymeleaf添加到项目的类路径中。如果Spring Boot探测到Thymeleaf位于类路径中，它就会推断我们需要使用Thymeleaf实现Spring MVC的视图功能，并自动配置这些bean。
+
+Spring Boot Starter也会触发自动配置。例如，在Spring Boot应用中，如果我们想要使用Spring MVC的话，所需要做的仅仅是将Web Starter作为依赖放到构建之中。将Web Starter作为依赖放到构建中以后，它会自动添加Spring MVC依赖。如果Spring Boot的Web自动配置探测到Spring MVC位于类路径下，它将会自动配置支持Spring MVC的多个bean，包括视图解析器、资源处理器以及消息转换器（等等）。我们接下来需要做的就是编写处理请求的控制器。
+
+#### 21.1.3 Spring Boot CLI
+
+Spring Boot CLI充分利用了Spring Boot Starter和自动配置的魔力，并添加了一些Groovy的功能。它简化了Spring的开发流程，通过CLI，我们能够运行一个或多个Groovy脚本，并查看它是如何运行的。在应用的运行过程中，CLI能够自动导入Spring类型并解析依赖。
+
+例如如下的Groovy脚本：
+
+```groovy
+@RestController
+class Hi {
+    @RequestMapping("/")
+    String hi() {
+        "Hi!"
+    }
+}
+```
+
+这是一个完整的（尽管比较简单）Spring应用，它可以在Spring Boot CLI中运行。如果
+我们已经安装过Spring Boot CLI，我们可以使用如下的命令行来运行它：
+
+```text
+$ spring run Hi.groovy
+```
+
+#### 21.1.4 Actuator
+
+Spring Boot Actuator为Spring Boot项目带来了很多有用的特性，包括：
+
+- 管理端点
+- 合理的异常处理以及默认的“/error”映射端点
+- 获取应用信息的“/info”端点
+- 当启用Spring Security时，会有一个审计事件框架
+
+这些特性都是很有用的，但Actuator最有用和最有意思的特性是管理端点。
+
+### 21.2 使用Spring Boot构建应用
+
+*以下内容在工程sia4e-P4_Integrating_Spring-C21_Simplifying_Spring_development_with_Spring_Boot中。*
+
+我们的应用是一个简单的联系人列表。它允许用户输入联系人信息（名字、电话号码以及Email地址），并且能够列出用户之前输入的所有联系人信息。
+
+如下是我们的build.gradle：
+
+```groovy
+plugins {
+    // Apply the java-library plugin to add support for Java Library
+    id 'java-library'
+    id 'org.springframework.boot' version '1.5.16.RELEASE'
+}
+
+jar {
+    baseName = 'contacts'
+    version = '0.1.0-SNAPSHOT'
+}
+
+dependencies {
+    // dependencies goes here
+}
+
+// In this section you declare where to find the dependencies of your project
+repositories {
+    // Use jcenter for resolving your dependencies.
+    // You can declare any Maven/Ivy/file repository here.
+    maven { 
+        url 'http://maven.aliyun.com/nexus/content/groups/public/' 
+    }
+    jcenter()
+}
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+compileJava.options.encoding = 'UTF-8'
+compileTestJava.options.encoding = 'UTF-8'
+```
+
+我们的工程文件结构如下：
+
+```text
+$ tree
+.
+├── build.gradle
+└── src
+    └── main
+            ├── java
+            │       └── contacts
+            │               ├── Application.java
+            │               ├── Contact.java
+            │               ├── ContactController.java
+            │               └── ContactRepository.java
+            └── resources
+                    ├── schema.sql
+                    ├── static
+                    │       └── style.css
+                    └── templates
+                            └── home.html
+```
+
+#### 21.2.1 处理请求
+
+因为我们要使用Spring MVC来开发应用的Web层，因此要将Spring MVC作为依赖添加进来。我们已经讨论过，Spring Boot的Web Starter能够将Spring MVC需要的所有内容一站式添加到构建中。如下是我们所需的Gradle依赖：
+
+```groovy
+// https://mvnrepository.com/artifact/org.springframework.boot/spring-boot-starter-web
+compile group: 'org.springframework.boot', name: 'spring-boot-starter-web', version: '1.5.16.RELEASE'
+```
+
+Web Starter依赖就绪之后，使用Spring MVC需要的所有依赖都会添加到项目中。现在，我们就可以编写应用所需的控制器类了。
+
+控制器相对会非常简单，包含展现联系人表单的HTTP GET请求以及处理表单提交的POST请求。它本身并没有做太多的事情，而是委托`ContactRepository`（稍后就会创建它）来持久化联系人信息：
+
+```java
+@Controller
+@RequestMapping("/")
+public class ContactController {
+
+    @Autowired
+    private ContactRepository contactRepo;
+
+    @RequestMapping(method = RequestMethod.GET)
+    public String home(Map<String, Object> model) {
+        List<Contact> contacts = contactRepo.findAll();
+        model.put("contacts", contacts);
+        return "home";
+    }
+
+    @RequestMapping(method = RequestMethod.POST)
+    public String submit(Contact contact) {
+        contactRepo.save(contact);
+        return "redirect:/";
+    }
+}
+```
+
+`ContactController`就是一个典型的SpringMVC控制器。尽管Spring Boot会管理构建依赖并最小化Spring配置，但是在编写应用逻辑的时候，编程模型是一致的。
+
+在本例中，`ContactController`遵循了Spring MVC控制器的典型模式，它会展现表单并处理表单的提交。其中`home()`方法使用注入的`ContactRepository`来获取所有`Contact`对象的列表，并将它们放到模型中，然后把请求转交给home视图。这个视图将会展现联系人的列表以及添加新Contact的表单。`submit()`方法将会处理表单提交的POST请求，保存`Contact`，并重定向到首页。
+
+因为`ContactController`使用了`@Controller`注解，所以组件扫描将会找到它。因此，我们不需要在Spring应用上下文中明确将其声明为bean。
+
+而Contact模型类是一个简单的POJO，具有一些属性和存取器方法：
+
+```java
+package contacts;
+
+public class Contact {
+
+    private Long id;
+    private String firstName;
+    private String lastName;
+    private String phoneNumber;
+    private String emailAddress;
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getFirstName() {
+        return firstName;
+    }
+
+    public void setFirstName(String firstName) {
+        this.firstName = firstName;
+    }
+
+    public String getLastName() {
+        return lastName;
+    }
+
+    public void setLastName(String lastName) {
+        this.lastName = lastName;
+    }
+
+    public String getPhoneNumber() {
+        return phoneNumber;
+    }
+
+    public void setPhoneNumber(String phoneNumber) {
+        this.phoneNumber = phoneNumber;
+    }
+
+    public String getEmailAddress() {
+        return emailAddress;
+    }
+
+    public void setEmailAddress(String emailAddress) {
+        this.emailAddress = emailAddress;
+    }
+
+    @Override
+    public String toString() {
+        return "Contact [id=" + id + ", firstName=" + firstName + ", lastName=" + lastName + ", phoneNumber="
+                + phoneNumber + ", emailAddress=" + emailAddress + "]";
+    }
+}
+```
+
+应用程序的Web层基本上已经完成了，剩下的就是创建定义home视图的Thymeleaf模板。
+
+#### 21.2.2 创建视图
+
+按照传统的方式，Java Web应用会使用JSP作为视图层的技术。Thymeleaf的原生模板比JSP更加便于使用，而且它能够让我们以HTML的形式编写模板。鉴于此，我们将会使用Thymeleaf来定义Contacts应用的home视图。
+
+Spring Boot提供了相应的Starter，即spring-boot-starter-thymeleaf，我们将其加入依赖。这个Starter提供的thymeleaf-spring4的版本为2.1.6。
+
+```groovy
+// https://mvnrepository.com/artifact/org.springframework.boot/spring-boot-starter-thymeleaf
+compile group: 'org.springframework.boot', name: 'spring-boot-starter-thymeleaf', version: '1.5.16.RELEASE'
+```
+
+只要我们将Thymeleaf添加到项目的类路径下，就启用了Spring Boot的自动配置。当应用运行时，Spring Boot将会探测到类路径中的Thymeleaf，然后会自动配置视图解析器、模板解析器以及模板引擎，这些都是在Spring MVC中使用Thymeleaf所需要的。因此，在我们的应用中，不需要使用显式Spring配置的方式来定义Thymeleaf。
+
+接下来我们要做的就是定义视图模板：
+
+```html
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="UTF-8" />
+<title>Spring Boot Contacts</title>
+<link rel="stylesheet" th:href="@{/style.css}" />
+</head>
+<body>
+    <form method="POST">
+        <label for="firstName">First Name:</label>
+        <input type="text" name="firstName" />
+        <br />
+        <label for="lastName">Last Name:</label>
+        <input type="text" name="lastName" />
+        <br />
+        <label for="phoneNumber">Phone #:</label>
+        <input type="text" name="phoneNumber"></input>
+        <br />
+        <label for="emailAddress">Email:</label>
+        <input type="text" name="emailAddress"></input>
+        <br />
+        <input type="submit"></input>
+    </form>
+
+    <ul th:each="contact : ${contacts}">
+        <li>
+            <span th:text="${contact.firstName}">First</span>
+            <span th:text="${contact.lastName}">Last</span>:
+            <span th:text="${contact.phoneNumber}">phoneNumber</span>,
+            <span th:text="${contact.emailAddress}">emailAddress</span>
+        </li>
+    </ul>
+</body>
+</html>
+```
+
+（注意，这里的`meta`元素使用“/”终止，默认情况下是不需要进行终止的，但是在默认下Spring Boot中对thymeleaf模板的解析模式是严格模式，这意味着某些元素如果不被显式终止，则会发生报错）
+
+它实际上是一个非常简单的Thymeleaf模板，分为两部分：一个表单和一个联系人的列表。表单将会POST数据到`ContactController`的`submit()`方法上（`form`元素中不使用`action`属性，则表单会提交到当前url上，即“/”，而我们配置了这个url由`ContactController`的`submit()`处理），用来创建新的`Contact`。列表部分将会循环列出模型中的`Contact`对象。
+
+因为ContactController中home()方法所返回的逻辑视图名为home，因此模板文件应该命名为home.html，自动配置的模板解析器会在指定的目录下查找Thymeleaf模板，这个目录也就是相对于根类路径下的templates目录下，所以在Gradle项目中，我们需要将home.html放到“src/main/ resources/templates”中。
+
+这个模板还有一点小事情需要处理，它所产生的HTML将会引用名为style.css的样式表。因此，需要将这个样式表放到项目中。
+
+#### 21.2.3 添加静态内容
+
+当采用Spring Boot的Web自动配置来定义Spring MVC bean时，这些bean中会包含一个资源处理器（resource handler），它会将“/**”映射到几个资源路径中。这些资源路径包括（相对于类路径的根）：
+
+- /META-INF/resources
+- /resources/
+- /static/
+- /public/
+
+在传统的基于Maven/Gradle构建的项目中，我们通常会将静态内容放在“src/main/webapp”目录下，这样在构建所生成的WAR文件里面，这些内容就会位于WAR文件的根目录下。如果使用Spring Boot构建WAR文件的话，这依然是可选的方案。但是，我们也可以将静态内容放在资源处理器所映射的上述四个路径下。
+
+这里，我们将其放在static文件夹下，这个样式表的内容如下：
+
+```css
+@charset "UTF-8";
+
+body {
+    background-color: #eeeeee;
+    font-family: sans-serif;
+}
+
+label {
+    display: inline-block;
+    width: 120px;
+    text-align: right;
+}
+```
+
+Web层全部完成了，接下来我们需要创建`ContactRepository`，用来处理`Contact`对象的持久化。
+
+#### 21.2.4 持久化数据
+
+在Spring应用中，有多种使用数据库的方式。我们可以使用JPA或Hibernate将对象映射为关系型数据库中的表和列。或者，我们干脆放弃关系型数据库，使用其他类型的数据库，如Mongo或Neo4j。
+
+对于Contacts应用来说，关系型数据库是不错的选择。我们将会使用H2数据库和JDBC（使用Spring的JdbcTemplate），让这个过程尽可能地简单。
+
+选择这种方案就需要在构建中添加一些依赖。JDBC Starter依赖会将Spring JdbcTemplate需要的所有内容都引入进来。不过，要结合使用H2数据库的话，我们还需要添加H2依赖。如果使用Gradle的话，在dependencies代码块添加如下代码就能完成这项任务：
+
+```groovy
+// https://mvnrepository.com/artifact/org.springframework.boot/spring-boot-starter-jdbc
+compile group: 'org.springframework.boot', name: 'spring-boot-starter-jdbc', version: '1.5.16.RELEASE'
+
+// https://mvnrepository.com/artifact/com.h2database/h2
+compile group: 'com.h2database', name: 'h2', version: '1.4.197'
+```
+
+现在我们可以编写Repository类了。如下的`ContactRepository`将会使用注入的`JdbcTemplate`实现在数据库中读取和写入`Contact`对象：
+
+```java
+@Repository
+public class ContactRepository {
+
+    @Autowired
+    private JdbcTemplate jdbc;
+
+    public List<Contact> findAll() {
+        return jdbc.query("select id, firstName, lastName, phoneNumber, emailAddress"
+                + " from contacts order by lastName",
+                new RowMapper<Contact>() {
+
+                    @Override
+                    public Contact mapRow(ResultSet rs, int rowNum) throws SQLException {
+
+                        Contact contact = new Contact();
+                        contact.setId(rs.getLong(1));
+                        contact.setFirstName(rs.getString(2));
+                        contact.setLastName(rs.getString(3));
+                        contact.setPhoneNumber(rs.getString(4));
+                        contact.setEmailAddress(rs.getString(5));
+                        return contact;
+                    }
+                });
+    }
+
+    public void save(Contact contact) {
+        jdbc.update("insert into contacts (firstName, lastName, phoneNumber, emailAddress)"
+                + " values (?, ?, ?, ?)",
+                contact.getFirstName(), 
+                contact.getLastName(), 
+                contact.getPhoneNumber(), 
+                contact.getEmailAddress());
+    }
+}
+```
+
+与`ContactController`类似，这个Repository类非常简单。它与传统Spring应用中的Repository类并没有什么差别。从实现中，根本无法看出它要用于Spring Boot的应用程序中。findAll()方法使用注入的`JdbcTemplate`从数据库中获取`Contact`对象，`save()`方法使用注入的`JdbcTemplate`保存新的`Contact`对象。因为`ContactRepository`使用了`@Repository`注解，因此在组件扫描的时候，它会被发现并创建为Spring应用上下文中的bean。
+
+但是，`JdbcTemplate`呢？我们难道不需要在Spring应用上下文中声明JdbcTemplatebean吗？为了声明它，我们是不是还要声明一个H2 DataSource？
+
+对这两个问题的简短问答就是“不需要”。当Spring Boot探测到Spring的JDBC模块和H2在类路径下的时候，自动配置就会发挥作用，将会自动配置`JdbcTemplate` bean和H2数据源。Spring Boot再一次为我们处理了所有的Spring配置。
+
+但是，我们需要自定义contacts表，毕竟Spring Boot无法猜测这个表是什么样子：
+
+```sql
+create table contacts (
+    id identity,
+    firstName varchar(30) not null,
+    lastName varchar(50) not null,
+    phoneNumber varchar(13),
+    emailAddress varchar(30)
+);
+```
+
+现在，我们只需要有一种方式加载这个“create table”的SQL并将其在H2数据库中执行就可以了。幸好，Spring Boot也涵盖了这项功能。如果我们将这个文件命名为schema.sql并将其放在类路径根下（也就是Maven或Gradle项目的“src/main/resources”目录下），当应用启动的时候，就会找到这个文件并进项数据加载。
+
+#### 21.2.5 尝试运行
+
+Contacts应用非常简单，但是也算得上现实中的Spring应用。它具有Spring MVC控制器和Thymeleaf模板所定义的Web层，并且具有Repository和Spring JdbcTemplate所定义的持久层。
+
+到此为止，我们已经编写完了Contacts所需的应用级别代码。不过，我们还没有编写任何形式的配置。我们没有编写任何Spring配置，也没有在web.xml或Servlet初始化类中配置`DispatcherServlet`（甚至，我们的工程是一个Java工程，而不是Java Web工程）。
+
+如果我说不需要编写任何的配置，你会相信吗？这应该做不到吧，毕竟在对Spring的批评中，人们都在说Spring全是配置，肯定有我们忽略掉的XML文件或Java配置类。我们所编写的Spring应用程序根本就不可能没有任何配置的……那么，我们到底能做到吗？
+
+通常来讲，Spring Boot的自动配置特性消除了绝大部分或者全部的配置。因此，完全可能编写出没有任何配置的Spring应用程序。当然，自动配置并不能涵盖所有的场景，因此典型的Spring Boot应用程序依然会需要一点配置。
+
+具体到Contacts应用，我们不需要任何的配置。Spring的自动配置功能已经将所有的事情都做好了。
+
+但是，我们需要有个特殊的类来启动Spring Boot应用。Spring本身并不知道自动配置的任何信息：
+
+```java
+@ComponentScan
+@EnableAutoConfiguration
+public class Application {
+    public static void main(String[] args) {
+        SpringApplication.run(Application.class, args);
+    }
+}
+```
+
+这个类使用`@ComponentScan`注解来启用组件扫描，另外它还使用了`@EnableAutoConfiguration`，这会启用Spring Boot的自动配置特性。
+
+Application类最有意思的一点在于它具有一个`main()`方法。稍后将会看到，Spring Boot应用会以一种特殊的方法运行，正是这里的`main()`方法使这一切成为可能。在`main()`方法中，这行代码会告诉Spring Boot（通过`SpringApplication`类）根据`Application`中的配置以及命令行中的参数来运行。
+
+现在我们可以运行这个主函数来启动应用了，或者使用gradle tasks中的build，将应用打包为jar。
+
+应用启动后，控制台输出：
+
+```text
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::       (v1.5.16.RELEASE)
+
+2018-09-25 20:21:12.921  INFO 1400 --- [           main] contacts.Application                     : Starting Application on DESKTOP-A8341UT with PID 1400 (started by Tavish in E:\myCode\Spring in Action 4th Edition\sia4e-P4_Integrating_Spring-C21_Simplifying_Spring_development_with_Spring_Boot)
+2018-09-25 20:21:12.922  INFO 1400 --- [           main] contacts.Application                     : No active profile set, falling back to default profiles: default
+2018-09-25 20:21:13.017  INFO 1400 --- [           main] ationConfigEmbeddedWebApplicationContext : Refreshing org.springframework.boot.context.embedded.AnnotationConfigEmbeddedWebApplicationContext@221af3c0: startup date [Tue Sep 25 20:21:13 CST 2018]; root of context hierarchy
+2018-09-25 20:21:13.606  INFO 1400 --- [           main] s.b.c.e.t.TomcatEmbeddedServletContainer : Tomcat initialized with port(s): 8080 (http)
+2018-09-25 20:21:13.619  INFO 1400 --- [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2018-09-25 20:21:13.619  INFO 1400 --- [           main] org.apache.catalina.core.StandardEngine  : Starting Servlet Engine: Apache Tomcat/8.5.34
+2018-09-25 20:21:13.686  INFO 1400 --- [ost-startStop-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2018-09-25 20:21:13.686  INFO 1400 --- [ost-startStop-1] o.s.web.context.ContextLoader            : Root WebApplicationContext: initialization completed in 671 ms
+2018-09-25 20:21:13.769  INFO 1400 --- [ost-startStop-1] o.s.b.w.servlet.ServletRegistrationBean  : Mapping servlet: 'dispatcherServlet' to [/]
+2018-09-25 20:21:13.771  INFO 1400 --- [ost-startStop-1] o.s.b.w.servlet.FilterRegistrationBean   : Mapping filter: 'characterEncodingFilter' to: [/*]
+2018-09-25 20:21:13.772  INFO 1400 --- [ost-startStop-1] o.s.b.w.servlet.FilterRegistrationBean   : Mapping filter: 'hiddenHttpMethodFilter' to: [/*]
+2018-09-25 20:21:13.772  INFO 1400 --- [ost-startStop-1] o.s.b.w.servlet.FilterRegistrationBean   : Mapping filter: 'httpPutFormContentFilter' to: [/*]
+2018-09-25 20:21:13.772  INFO 1400 --- [ost-startStop-1] o.s.b.w.servlet.FilterRegistrationBean   : Mapping filter: 'requestContextFilter' to: [/*]
+2018-09-25 20:21:13.926  INFO 1400 --- [           main] o.s.jdbc.datasource.init.ScriptUtils     : Executing SQL script from URL [file:/E:/myCode/Spring%20in%20Action%204th%20Edition/sia4e-P4_Integrating_Spring-C21_Simplifying_Spring_development_with_Spring_Boot/bin/main/schema.sql]
+2018-09-25 20:21:13.935  INFO 1400 --- [           main] o.s.jdbc.datasource.init.ScriptUtils     : Executed SQL script from URL [file:/E:/myCode/Spring%20in%20Action%204th%20Edition/sia4e-P4_Integrating_Spring-C21_Simplifying_Spring_development_with_Spring_Boot/bin/main/schema.sql] in 9 ms.
+2018-09-25 20:21:14.072  INFO 1400 --- [           main] s.w.s.m.m.a.RequestMappingHandlerAdapter : Looking for @ControllerAdvice: org.springframework.boot.context.embedded.AnnotationConfigEmbeddedWebApplicationContext@221af3c0: startup date [Tue Sep 25 20:21:13 CST 2018]; root of context hierarchy
+2018-09-25 20:21:14.099  INFO 1400 --- [           main] s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped "{[/],methods=[POST]}" onto public java.lang.String contacts.ContactController.submit(contacts.Contact)
+2018-09-25 20:21:14.100  INFO 1400 --- [           main] s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped "{[/],methods=[GET]}" onto public java.lang.String contacts.ContactController.home(java.util.Map<java.lang.String, java.lang.Object>)
+2018-09-25 20:21:14.101  INFO 1400 --- [           main] s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped "{[/error]}" onto public org.springframework.http.ResponseEntity<java.util.Map<java.lang.String, java.lang.Object>> org.springframework.boot.autoconfigure.web.BasicErrorController.error(javax.servlet.http.HttpServletRequest)
+2018-09-25 20:21:14.101  INFO 1400 --- [           main] s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped "{[/error],produces=[text/html]}" onto public org.springframework.web.servlet.ModelAndView org.springframework.boot.autoconfigure.web.BasicErrorController.errorHtml(javax.servlet.http.HttpServletRequest,javax.servlet.http.HttpServletResponse)
+2018-09-25 20:21:14.116  INFO 1400 --- [           main] o.s.w.s.handler.SimpleUrlHandlerMapping  : Mapped URL path [/webjars/**] onto handler of type [class org.springframework.web.servlet.resource.ResourceHttpRequestHandler]
+2018-09-25 20:21:14.116  INFO 1400 --- [           main] o.s.w.s.handler.SimpleUrlHandlerMapping  : Mapped URL path [/**] onto handler of type [class org.springframework.web.servlet.resource.ResourceHttpRequestHandler]
+2018-09-25 20:21:14.133  INFO 1400 --- [           main] o.s.w.s.handler.SimpleUrlHandlerMapping  : Mapped URL path [/**/favicon.ico] onto handler of type [class org.springframework.web.servlet.resource.ResourceHttpRequestHandler]
+2018-09-25 20:21:14.355  INFO 1400 --- [           main] o.s.j.e.a.AnnotationMBeanExporter        : Registering beans for JMX exposure on startup
+2018-09-25 20:21:14.374  INFO 1400 --- [           main] s.b.c.e.t.TomcatEmbeddedServletContainer : Tomcat started on port(s): 8080 (http)
+2018-09-25 20:21:14.376  INFO 1400 --- [           main] contacts.Application                     : Started Application in 1.581 seconds (JVM running for 2.102)
+2018-09-25 20:21:17.647  INFO 1400 --- [nio-8080-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring FrameworkServlet 'dispatcherServlet'
+2018-09-25 20:21:17.647  INFO 1400 --- [nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : FrameworkServlet 'dispatcherServlet': initialization started
+2018-09-25 20:21:17.659  INFO 1400 --- [nio-8080-exec-1] o.s.web.servlet.DispatcherServlet
+```
+
+此时访问“http://localhost:8080/” 就会打开我们的home.html。
+
+现在还有一个问题，此时我们访问应用使用的url是“http://localhost:8080/” ，这可能不符合我们的习惯，现在我们将其改为“http://localhost:8080/contacts-0.1.0-SNAPSHOT/” 。
+
+在“src/main/resources”下新建一个application.properties文件，内容如下：
+
+```text
+server.contextPath=/contacts-0.1.0-SNAPSHOT
+```
+
+现在，应用启动后我们就可以通过“http://localhost:8080/contacts-0.1.0-SNAPSHOT/” 进行访问了。
+
+如果我们想将应用打包为war文件然后再部署怎么办？我们只要在Gradle构建中进行如下改动就可以了：
+
+```groovy
+plugins {
+    // Apply the java-library plugin to add support for Java Library
+    id 'java-library'
+    id 'org.springframework.boot' version '1.5.16.RELEASE'
+    id 'war'
+}
+
+war {
+    baseName = 'contacts'
+    version = '0.1.0-SNAPSHOT'
+}
+```
+
+添加“id 'war'”，并将“jar”改为“war”即可。然后，修改我们的`Application`类：
+
+```java
+@ComponentScan
+@EnableAutoConfiguration
+public class Application extends SpringBootServletInitializer {
+    public static void main(String[] args) {
+        SpringApplication.run(Application.class, args);
+    }
+    
+    @Override
+    protected SpringApplicationBuilder configure(SpringApplicationBuilder builder) {
+        return builder.sources(Application.class);
+    }
+}
+```
+
+选择gradle tasks中的build。启动tomcat，将war包部署后就可以使用“http://localhost:8080/contacts-0.1.0-SNAPSHOT/” 来访问了。注意，此时不用配置application.properties属性文件，我们也没有提供任何web.xml文件。
+
+### 21.3 组合使用Groovy与Spring Boot CLI
+
+Groovy编程语言要比Java简单得多。它的语法允许有一些快捷方式，比如省略分号和public关键词。同时，Groovy类中的属性不像Java那样需要Setter和Getter方法。当然，Groovy还有其他的一些属性，能够消除Java代码中很多的繁文缛节。
+
+如果使用Groovy编写应用代码并通过Spring Boot CLI运行的话，那么Spring Boot能够借助Groovy的简洁性进一步简化Spring应用。为了阐述这一点，我们使用Groovy来重新编写Contacts应用程序。
+
+在这个过程中，我们还会移除一些代码。Spring Boot CLI本身就是启动器，所以不再需要前面所创建的Application类。Maven和Gradle构建文件也不再需要了，因为我们将会通过CLI运行未编译的Groovy文件。少了Maven和Gradle之后，项目的整体结构将会变得更加扁平化，新的项目结构将会如下所示：
+
+```text
+$ tree
+.
+├── src
+    └── main
+            ├── groovy
+                    ├──contacts
+                            ├── Contact.groovy
+                            ├── ContactController.groovy
+                            ├── ContactRepository.groovy
+                    ├── schema.sql
+                    ├── application.properties
+                    ├── static
+                    │       └── style.css
+                    └── templates
+                            └── home.html
+```
+
+schema.sql、style.css和home.html将会保持原样，但是需要将Java类转换为Groovy。我们先从使用Groovy编写Web层开始。
+
+#### 21.3.1 编写Groovy控制器
+
+如前所述，Groovy不像Java那样有很多的繁文缛节。这意味着我们在编写Groovy代码的时候，可以省略如下的内容：
+
+- 分号
+- public、private这样的修饰符
+- Setter/Getter方法
+- return关键字
+
+借助Groovy更加灵活的语法，我们可以使用Groovy重写`ContactController`类：
+
+```groovy
+@Grab(group='org.thymeleaf', module='thymeleaf-spring4', version='2.1.6.RELEASE')
+
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.stereotype.Controller
+import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestMethod;
+
+@Controller
+@RequestMapping("/")
+class ContactController {
+
+    @Autowired
+    ContactRepository contactRepo
+
+    @RequestMapping(method = RequestMethod.GET)
+    String home(Map<String,Object> model) {
+        List<Contact> contacts = contactRepo.findAll()
+        model.putAll([contacts: contacts])
+        "home"
+    }
+
+    @RequestMapping(method = RequestMethod.POST)
+    String submit(Contact contact) {
+        contactRepo.save(contact)
+        "redirect:/"
+    }
+}
+```
+
+我们可以看到，这个版本的`ContactController`要比对应的Java版本更加简洁。排除掉Groovy不需要的内容后，`ContactController`更加简短也更易于阅读。
+
+这里没有`import`行，Groovy默认会导入一些包和类，包括：
+
+- java.io.*
+- java.lang.*
+- java.math.BigDecimal
+- java.math.BigInteger
+- java.net.*
+- java.util.*
+- groovy.lang.*
+- groovy.util.*
+
+因为有了这些默认的导入，所以`ContactController`就不需要导入`List`类了。这个类位于`java.util`包中，包含在默认的导入里面。
+
+（注意，这里还是使用了`import`语句，因为如果不使用，eclipse的groovy插件会报错）
+
+但是，像`@Controller`、`@RequestMapping`、`@Autowired`以及`@RequestMethod`这样的Spring类型该怎么处理呢？它们没有位于默认的导入中，我们该如何省略`import`代码行呢？稍后，当我们运行应用的时候，Spring Boot CLI将会试图使用Groovy编译器编译这些Groovy类。因为这些类型没有导入进来，所以将会导致编译失败。
+
+但是，Spring Boot CLI却不会就这样轻易放弃，在这里CLI将自动配置达到了一个新高度。CLI将会识别出失败是因为缺少Spring类型，它会采取两个步骤来修正这个问题。首先会获取Spring Boot Web Starter依赖并将其依赖的其他内容都添加到类路径下（这样会下载并添加JAR到类路径下）。然后，它会将必要的包添加到Groovy编译器的默认导入列表中，然后重新尝试编译代码
+
+CLI这种自动添加依赖/自动导入的结果就是我们的控制器类不需要任何的`import`语句了，并且我们没有必要再手动或者通过Maven、Gradle来解析Spring库。Spring Boot CLI将会为我们完成所有的事情。
+
+现在，让我们后退一步，考虑一下这里都发生了什么。通过在代码中使用Spring MVC类型，如`@Controller`或`@RequestMapping`，CLI将会自动解析Spring Boot Web Starter依赖。将Web Starter的依赖传递添加到类路径之后，Spring Boot的自动配置将会发挥作用，它会为我们自动配置Spring MVC功能所需的bean。不过，在这里我们需要做的仅仅是使用这些类型，Spring Boot将会处理所有的事情。
+
+当然，CLI的功能也会有一些限制。尽管它知道如何解析众多的Spring依赖，并且能够自动将很多Spring类型（以及很多其他的库）添加到导入中，但是它不能自动解析和导入所有的功能。例如，使用Thymeleaf模板是一个可替换的方案，所以要在代码中通过`@Grab`显示声明。
+
+还要注意，很多的依赖都没有必要指定group ID和版本号。SpringBoot将会在解析`@Grab`依赖的时候参与进来，将缺失的group ID和版本号添加上。
+
+（同理，这里的`@Grab`语句至少要包含属性`group`，否则报错）
+
+借助`@Grab`注解，我们声明了要使用Thymeleaf，这会触发自动配置功能，将会自动配置在Spring MVC中支持Thymeleaf模板所需的bean。
+
+使用Groovy编写`Contact`类：
+
+```groovy
+class Contact {
+    long id
+    String firstName
+    String lastName
+    String phoneNumber
+    String emailAddress
+}
+```
+
+可以看到，`Contact`也更加简洁，没有分号、存取器方法以及像`public`和`private`这样的修饰符。这完全归功于Groovy简单的语法，其实Spring Boot并没有参与简化`Contact`类。
+
+#### 21.3.2 使用Groovy Repository实现数据持久化
+
+`ContactController`中所用到的Groovy和Spring Boot CLI技巧都可以应用到`ContactRepository`中：
+
+```groovy
+@Grab(group='com.h2database', module='h2', version='1.4.197', scope='test')
+
+import java.sql.ResultSet
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.jdbc.core.RowMapper
+
+class ContactRepository {
+    @Autowired
+    JdbcTemplate jdbc
+    List<Contact> findAll() {
+        jdbc.query(
+                "select id, firstName, lastName, phoneNumber, emailAddress " +
+                "from contacts order by lastName",
+                new RowMapper<Contact>() {
+                    Contact mapRow(ResultSet rs, int rowNum) {
+                        new Contact(id: rs.getLong(1), firstName: rs.getString(2),
+                        lastName: rs.getString(3), phoneNumber: rs.getString(4),
+                        emailAddress: rs.getString(5))
+                    }
+                })
+    }
+    void save(Contact contact) {
+        jdbc.update(
+                "insert into contacts " +
+                "(firstName, lastName, phoneNumber, emailAddress) " +
+                "values (?, ?, ?, ?)",
+                contact.firstName, contact.lastName,
+                contact.phoneNumber, contact.emailAddress)
+    }
+}
+```
+
+除了Groovy在语法方面带来的明显改善，这个新版的ContactRepository类使用了Spring Boot CLI自动导入`JdbcTemplate`和`RowMapper`。除此之外，当CLI发现我们使用这些类型的时候，将会自动解析JDBC Starter依赖。
+
+只有两件事情是CLI的自动导入和自动解析无法帮助我们的。可以看到，我们依然需要导入`ResultSet`。另外，Spring Boot无法知道我们使用哪种数据库，因此必须要使用`@Grab`注解添加`H2`数据库。
+
+（这里同样显式地使用了`import`语句及明确指定了`@Grab`）
+
+#### 21.3.3 运行Spring Boot CLI
+
+在编译完Java应用之后，有两种方法来运行它。我们可以按照可执行JAR或WAR文件的形式在命令行运行，也可以将WAR文件部署到Servlet容器中运行。Spring Boot CLI提供了第三种可选方案。
+
+从名字应该也能猜得出来，通过Spring Boot CLI运行应用需要使用命令行。但是，借助CLI，我们不需要首先将应用构建为JAR或WAR文件。运行应用的时候，我们可以直接将Groovy源码传给CLI。
+
+**安装CLI**
+
+为了使用Spring Boot CLI，我们需要安装它。有多种方案可供选择：
+
+- Groovy环境安装器（Groovy Environment Manager，GVM）
+- Homebrew
+- 手动安装
+
+这里我们手动安装，使用版本为spring-1.5.16.RELEASE。在设置好环境变量“SPRING_HOME”并将其“bin”目录添加到“path”下后，在cmd下使用`spring --version`查看是否安装成功。
+
+要使用Spring Boot CLI运行应用的话，我们需要在命令行输入springrun，然后后面再加上要通过CLI运行的一个或多个Groovy文件。例如，如果应用只有一个Groovy文件的话，那么可以这样运行：
+
+```text
+spring run Hello.groovy
+```
+
+如果我们的应用有多个Groovy文件的话，那么可以通过通配符来运行：
+
+```text
+spring run *.groovy
+```
+
+或者，如果这些Groovy类文件都位于一个或多个子目录下，那么我们可以使用Ant风格的通配符递归查找Groovy类：
+
+```text
+spring run **/*.groovy
+```
+
+由于我们的工程结构，所有的Groovy类以及其他sql schema和thymeleaf模板都美誉groovy文件夹下，所以这里我们打开cmd，cd到项目的groovy文件夹，使用命令`spring run **/*.groovy`，初次运行需要先等待Spring Boot CLI Resolving dependencies。
+
+```text
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::       (v1.5.16.RELEASE)
+
+2018-09-26 10:34:04.737  INFO 10028 --- [       runner-0] o.s.boot.SpringApplication               : Starting application on DESKTOP-A8341UT with PID 10028 (started by Tavish in E:\myCode\Spring in Action 4th Edition\sia4e-P4_Integrating_Spring-C21_Simplifying_Spring_development_with_Spring_Boot-CLI\src\main\groovy)
+2018-09-26 10:34:04.739  INFO 10028 --- [       runner-0] o.s.boot.SpringApplication               : No active profile set, falling back to default profiles: default
+2018-09-26 10:34:04.905  INFO 10028 --- [       runner-0] ationConfigEmbeddedWebApplicationContext : Refreshing org.springframework.boot.context.embedded.AnnotationConfigEmbeddedWebApplicationContext@117ba7f5: startup date [Wed Sep 26 10:34:04 CST 2018]; root of context hierarchy
+2018-09-26 10:34:05.999  INFO 10028 --- [       runner-0] s.b.c.e.t.TomcatEmbeddedServletContainer : Tomcat initialized with port(s): 8080 (http)
+2018-09-26 10:34:06.023  INFO 10028 --- [       runner-0] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2018-09-26 10:34:06.024  INFO 10028 --- [       runner-0] org.apache.catalina.core.StandardEngine  : Starting Servlet Engine: Apache Tomcat/8.5.34
+2018-09-26 10:34:06.069  INFO 10028 --- [ost-startStop-1] org.apache.catalina.loader.WebappLoader  : Unknown loader org.springframework.boot.cli.compiler.ExtendedGroovyClassLoader$DefaultScopeParentClassLoader@647aeeda class org.springframework.boot.cli.compiler.ExtendedGroovyClassLoader$DefaultScopeParentClassLoader
+2018-09-26 10:34:06.104  INFO 10028 --- [ost-startStop-1] o.a.c.c.C.[.[.[.1.0-SNAPSHOT]            : Initializing Spring embedded WebApplicationContext
+2018-09-26 10:34:06.105  INFO 10028 --- [ost-startStop-1] o.s.web.context.ContextLoader            : Root WebApplicationContext: initialization completed in 1202 ms
+2018-09-26 10:34:06.233  INFO 10028 --- [ost-startStop-1] o.s.b.w.servlet.ServletRegistrationBean  : Mapping servlet: 'dispatcherServlet' to [/]
+2018-09-26 10:34:06.238  INFO 10028 --- [ost-startStop-1] o.s.b.w.servlet.FilterRegistrationBean   : Mapping filter: 'characterEncodingFilter' to: [/*]
+2018-09-26 10:34:06.238  INFO 10028 --- [ost-startStop-1] o.s.b.w.servlet.FilterRegistrationBean   : Mapping filter: 'hiddenHttpMethodFilter' to: [/*]
+2018-09-26 10:34:06.239  INFO 10028 --- [ost-startStop-1] o.s.b.w.servlet.FilterRegistrationBean   : Mapping filter: 'httpPutFormContentFilter' to: [/*]
+2018-09-26 10:34:06.239  INFO 10028 --- [ost-startStop-1] o.s.b.w.servlet.FilterRegistrationBean   : Mapping filter: 'requestContextFilter' to: [/*]
+2018-09-26 10:34:06.482  INFO 10028 --- [       runner-0] o.s.jdbc.datasource.init.ScriptUtils     : Executing SQL script from URL [file:/E:/myCode/Spring%20in%20Action%204th%20Edition/sia4e-P4_Integrating_Spring-C21_Simplifying_Spring_development_with_Spring_Boot-CLI/src/main/groovy/schema.sql]
+2018-09-26 10:34:06.493  INFO 10028 --- [       runner-0] o.s.jdbc.datasource.init.ScriptUtils     : Executed SQL script from URL [file:/E:/myCode/Spring%20in%20Action%204th%20Edition/sia4e-P4_Integrating_Spring-C21_Simplifying_Spring_development_with_Spring_Boot-CLI/src/main/groovy/schema.sql] in 11 ms.
+2018-09-26 10:34:06.745  INFO 10028 --- [       runner-0] s.w.s.m.m.a.RequestMappingHandlerAdapter : Looking for @ControllerAdvice: org.springframework.boot.context.embedded.AnnotationConfigEmbeddedWebApplicationContext@117ba7f5: startup date [Wed Sep 26 10:34:04 CST 2018]; root of context hierarchy
+2018-09-26 10:34:06.797  INFO 10028 --- [       runner-0] s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped "{[/],methods=[GET]}" onto public java.lang.String contacts.ContactController.home(java.util.Map<java.lang.String, java.lang.Object>)
+2018-09-26 10:34:06.798  INFO 10028 --- [       runner-0] s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped "{[/],methods=[POST]}" onto public java.lang.String contacts.ContactController.submit(contacts.Contact)
+2018-09-26 10:34:06.800  INFO 10028 --- [       runner-0] s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped "{[/error]}" onto public org.springframework.http.ResponseEntity<java.util.Map<java.lang.String, java.lang.Object>> org.springframework.boot.autoconfigure.web.BasicErrorController.error(javax.servlet.http.HttpServletRequest)
+2018-09-26 10:34:06.800  INFO 10028 --- [       runner-0] s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped "{[/error],produces=[text/html]}" onto public org.springframework.web.servlet.ModelAndView org.springframework.boot.autoconfigure.web.BasicErrorController.errorHtml(javax.servlet.http.HttpServletRequest,javax.servlet.http.HttpServletResponse)
+2018-09-26 10:34:06.831  INFO 10028 --- [       runner-0] o.s.w.s.handler.SimpleUrlHandlerMapping  : Mapped URL path [/webjars/**] onto handler of type [class org.springframework.web.servlet.resource.ResourceHttpRequestHandler]
+2018-09-26 10:34:06.831  INFO 10028 --- [       runner-0] o.s.w.s.handler.SimpleUrlHandlerMapping  : Mapped URL path [/**] onto handler of type [class org.springframework.web.servlet.resource.ResourceHttpRequestHandler]
+2018-09-26 10:34:06.863  INFO 10028 --- [       runner-0] o.s.w.s.handler.SimpleUrlHandlerMapping  : Mapped URL path [/**/favicon.ico] onto handler of type [class org.springframework.web.servlet.resource.ResourceHttpRequestHandler]
+2018-09-26 10:34:07.267  INFO 10028 --- [       runner-0] o.s.j.e.a.AnnotationMBeanExporter        : Registering beans for JMX exposure on startup
+2018-09-26 10:34:07.304  INFO 10028 --- [       runner-0] s.b.c.e.t.TomcatEmbeddedServletContainer : Tomcat started on port(s): 8080 (http)
+2018-09-26 10:34:07.307  INFO 10028 --- [       runner-0] o.s.boot.SpringApplication               : Started application in 2.859 seconds (JVM running for 7.095)
+```
+
+现在可以访问“http://localhost:8080/contacts-cli-0.1.0-SNAPSHOT/” 来访问我们的应用了。（“/contacts-cli-0.1.0-SNAPSHOT”是我们在application.properties中进行设置的）
+
+到此为止，我们以两种方式编写了Spring Boot应用：一种使用Java，另一种使用Groovy。在这两种情况中，Spring Boot在最小化模板配置以及构建依赖方面都发挥了很大的作用。Spring Boot还有另外一项功能。让我们看一下如何借助Spring Boot Actuator为Web应用引入管理端点。
+
+### 21.4 通过Actuator获取应用内部状况
+
+Spring Boot Actuator所完成的主要功能就是为基于Spring Boot的应用添加多个有用的管理端点。这些端点包括以下几个内容。
+
+- GET /autoconfig：描述了Spring Boot在使用自动配置的时候，所做出的决策；
+- GET /beans：列出运行应用所配置的bean；
+- GET /configprops：列出应用中能够用来配置bean的所有属性及其当前的值；
+- GET /dump：列出应用的线程，包括每个线程的栈跟踪信息；
+- GET /env：列出应用上下文中所有可用的环境和系统属性变量；
+- GET /env/{name}：展现某个特定环境变量和属性变量的值；
+- GET /health：展现当前应用的健康状况；
+- GET /info：展现应用特定的信息；
+- GET /metrics：列出应用相关的指标，包括请求特定端点的运行次数；
+- GET /metrics/{name}：展现应用特定指标项的指标状况；
+- GET /trace：列出应用最近请求相关的元数据，包括请求和响应头。
+- POST /shutdown：强制关闭应用；
+
+为了启用Actuator，我们只需将Actuator Starter依赖添加到项目中即可。如果你使用Groovy编写应用并通过Spring Boot CLI来运行，那么可以通过`@Grab`注解来添加Actuator Starter，如下所示：
+
+```groovy
+@Grab(group='org.springframework.boot', module='spring-boot-starter-actuator', version='1.5.16.RELEASE')
+```
+
+如果使用Gradle构建Java应用的话，那么在build.gradle的dependencies代码块中需要添加如下的依赖：
+
+```text
+// https://mvnrepository.com/artifact/org.springframework.boot/spring-boot-starter-actuator
+compile group: 'org.springframework.boot', name: 'spring-boot-starter-actuator', version: '1.5.16.RELEASE'
+```
+
+添加完Spring Boot Actuator之后，我们可以重新构建并启动应用，然后打开浏览器访问以上所述的端点来获取更多信息。
+
+例如，访问“http://localhost:8080/contacts-cli-0.1.0-SNAPSHOT/beans” 来获得运行应用所配置的bean。但是这里会报错：
+
+```text
+Full authentication is required to access actuator endpoints. Consider adding Spring Security or set 'management.security.enabled' to false.
+```
+
+我们需要使用Spring Security配置认证，或取消安全管理。
+
+这里我们取消认证，是指application.properties：
+
+```text
+management.security.enabled=false
+```
+
+现在访问“http://localhost:8080/contacts-cli-0.1.0-SNAPSHOT/beans” 就不会报错了，以下是显示的内容;
+
+```json
+[
+  {
+    "context": "application",
+    "parent": null,
+    "beans": [
+      {
+        "bean": "contactController",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "contacts.ContactController",
+        "resource": "null",
+        "dependencies": [
+          "contactRepository"
+        ]
+      },
+      {
+        "bean": "contact",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "contacts.Contact",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "contactRepository",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "contacts.ContactRepository",
+        "resource": "null",
+        "dependencies": [
+          "jdbcTemplate"
+        ]
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.internalCachingMetadataReaderFactory",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.core.type.classreading.CachingMetadataReaderFactory",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.context.PropertyPlaceholderAutoConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.context.PropertyPlaceholderAutoConfiguration$$EnhancerBySpringCGLIB$$cf4e4937",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.condition.BeanTypeRegistry",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.condition.BeanTypeRegistry",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "propertySourcesPlaceholderConfigurer",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.context.support.PropertySourcesPlaceholderConfigurer",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/context/PropertyPlaceholderAutoConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.jackson.JacksonAutoConfiguration$Jackson2ObjectMapperBuilderCustomizerConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.jackson.JacksonAutoConfiguration$Jackson2ObjectMapperBuilderCustomizerConfiguration$$EnhancerBySpringCGLIB$$978efe97",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "standardJacksonObjectMapperBuilderCustomizer",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.jackson.JacksonAutoConfiguration$Jackson2ObjectMapperBuilderCustomizerConfiguration$StandardJackson2ObjectMapperBuilderCustomizer",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration$Jackson2ObjectMapperBuilderCustomizerConfiguration.class]",
+        "dependencies": [
+          "org.springframework.boot.context.embedded.AnnotationConfigEmbeddedWebApplicationContext@341e1733",
+          "spring.jackson-org.springframework.boot.autoconfigure.jackson.JacksonProperties"
+        ]
+      },
+      {
+        "bean": "spring.jackson-org.springframework.boot.autoconfigure.jackson.JacksonProperties",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.jackson.JacksonProperties",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor",
+        "resource": "null",
+        "dependencies": [
+          "org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor.store"
+        ]
+      },
+      {
+        "bean": "org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor.store",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.context.properties.ConfigurationBeanFactoryMetaData",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.jackson.JacksonAutoConfiguration$JacksonObjectMapperBuilderConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.jackson.JacksonAutoConfiguration$JacksonObjectMapperBuilderConfiguration$$EnhancerBySpringCGLIB$$dc7818a8",
+        "resource": "null",
+        "dependencies": [
+          "org.springframework.boot.context.embedded.AnnotationConfigEmbeddedWebApplicationContext@341e1733"
+        ]
+      },
+      {
+        "bean": "jacksonObjectMapperBuilder",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.http.converter.json.Jackson2ObjectMapperBuilder",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration$JacksonObjectMapperBuilderConfiguration.class]",
+        "dependencies": [
+          "standardJacksonObjectMapperBuilderCustomizer"
+        ]
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.jackson.JacksonAutoConfiguration$JacksonObjectMapperConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.jackson.JacksonAutoConfiguration$JacksonObjectMapperConfiguration$$EnhancerBySpringCGLIB$$2a2b568f",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "jacksonObjectMapper",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "com.fasterxml.jackson.databind.ObjectMapper",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration$JacksonObjectMapperConfiguration.class]",
+        "dependencies": [
+          "jacksonObjectMapperBuilder"
+        ]
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.jackson.JacksonAutoConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.jackson.JacksonAutoConfiguration$$EnhancerBySpringCGLIB$$c36f41e",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "jsonComponentModule",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.jackson.JsonComponentModule",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/jackson/JacksonAutoConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.websocket.WebSocketAutoConfiguration$TomcatWebSocketConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.websocket.WebSocketAutoConfiguration$TomcatWebSocketConfiguration$$EnhancerBySpringCGLIB$$fd6a5727",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "websocketContainerCustomizer",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.websocket.TomcatWebSocketContainerCustomizer",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/websocket/WebSocketAutoConfiguration$TomcatWebSocketConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.websocket.WebSocketAutoConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.websocket.WebSocketAutoConfiguration$$EnhancerBySpringCGLIB$$e1486b56",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.web.EmbeddedServletContainerAutoConfiguration$EmbeddedTomcat",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.web.EmbeddedServletContainerAutoConfiguration$EmbeddedTomcat$$EnhancerBySpringCGLIB$$821b1a1a",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "tomcatEmbeddedServletContainerFactory",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.context.embedded.tomcat.TomcatEmbeddedServletContainerFactory",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/EmbeddedServletContainerAutoConfiguration$EmbeddedTomcat.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.web.EmbeddedServletContainerAutoConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.web.EmbeddedServletContainerAutoConfiguration$$EnhancerBySpringCGLIB$$3b04a73e",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "embeddedServletContainerCustomizerBeanPostProcessor",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.context.embedded.EmbeddedServletContainerCustomizerBeanPostProcessor",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "errorPageRegistrarBeanPostProcessor",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.web.servlet.ErrorPageRegistrarBeanPostProcessor",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.web.DispatcherServletAutoConfiguration$DispatcherServletConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.web.DispatcherServletAutoConfiguration$DispatcherServletConfiguration$$EnhancerBySpringCGLIB$$74fd8650",
+        "resource": "null",
+        "dependencies": [
+          "spring.mvc-org.springframework.boot.autoconfigure.web.WebMvcProperties"
+        ]
+      },
+      {
+        "bean": "dispatcherServlet",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.web.servlet.DispatcherServlet",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/DispatcherServletAutoConfiguration$DispatcherServletConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "spring.mvc-org.springframework.boot.autoconfigure.web.WebMvcProperties",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.web.WebMvcProperties",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.web.DispatcherServletAutoConfiguration$DispatcherServletRegistrationConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.web.DispatcherServletAutoConfiguration$DispatcherServletRegistrationConfiguration$$EnhancerBySpringCGLIB$$efed1577",
+        "resource": "null",
+        "dependencies": [
+          "serverProperties",
+          "spring.mvc-org.springframework.boot.autoconfigure.web.WebMvcProperties"
+        ]
+      },
+      {
+        "bean": "dispatcherServletRegistration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.web.servlet.ServletRegistrationBean",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/DispatcherServletAutoConfiguration$DispatcherServletRegistrationConfiguration.class]",
+        "dependencies": [
+          "dispatcherServlet"
+        ]
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.web.DispatcherServletAutoConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.web.DispatcherServletAutoConfiguration$$EnhancerBySpringCGLIB$$c40c1952",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.validation.ValidationAutoConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.validation.ValidationAutoConfiguration$$EnhancerBySpringCGLIB$$3f976788",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "methodValidationPostProcessor",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.validation.beanvalidation.MethodValidationPostProcessor",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/validation/ValidationAutoConfiguration.class]",
+        "dependencies": [
+          "environment"
+        ]
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.web.ErrorMvcAutoConfiguration$WhitelabelErrorViewConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.web.ErrorMvcAutoConfiguration$WhitelabelErrorViewConfiguration$$EnhancerBySpringCGLIB$$14df486c",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "error",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.web.ErrorMvcAutoConfiguration$SpelView",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/ErrorMvcAutoConfiguration$WhitelabelErrorViewConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "beanNameViewResolver",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.web.servlet.view.BeanNameViewResolver",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/ErrorMvcAutoConfiguration$WhitelabelErrorViewConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.web.ErrorMvcAutoConfiguration$DefaultErrorViewResolverConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.web.ErrorMvcAutoConfiguration$DefaultErrorViewResolverConfiguration$$EnhancerBySpringCGLIB$$912fea52",
+        "resource": "null",
+        "dependencies": [
+          "org.springframework.boot.context.embedded.AnnotationConfigEmbeddedWebApplicationContext@341e1733",
+          "spring.resources-org.springframework.boot.autoconfigure.web.ResourceProperties"
+        ]
+      },
+      {
+        "bean": "conventionErrorViewResolver",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.web.DefaultErrorViewResolver",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/ErrorMvcAutoConfiguration$DefaultErrorViewResolverConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.web.ErrorMvcAutoConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.web.ErrorMvcAutoConfiguration$$EnhancerBySpringCGLIB$$8492e0f2",
+        "resource": "null",
+        "dependencies": [
+          "serverProperties"
+        ]
+      },
+      {
+        "bean": "errorAttributes",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.web.DefaultErrorAttributes",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/ErrorMvcAutoConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "basicErrorController",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.web.BasicErrorController",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/ErrorMvcAutoConfiguration.class]",
+        "dependencies": [
+          "errorAttributes"
+        ]
+      },
+      {
+        "bean": "errorPageCustomizer",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.web.ErrorMvcAutoConfiguration$ErrorPageCustomizer",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/ErrorMvcAutoConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "preserveErrorControllerTargetClassPostProcessor",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.web.ErrorMvcAutoConfiguration$PreserveErrorControllerTargetClassPostProcessor",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/ErrorMvcAutoConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "spring.resources-org.springframework.boot.autoconfigure.web.ResourceProperties",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.web.ResourceProperties",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.web.WebMvcAutoConfiguration$EnableWebMvcConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.web.WebMvcAutoConfiguration$EnableWebMvcConfiguration$$EnhancerBySpringCGLIB$$25c57907",
+        "resource": "null",
+        "dependencies": [
+          "org.springframework.beans.factory.support.DefaultListableBeanFactory@6d20f1ae",
+          "org.springframework.boot.autoconfigure.web.WebMvcAutoConfiguration$WebMvcAutoConfigurationAdapter",
+          "heapdumpMvcEndpoint",
+          "auditEventMvcEndpoint"
+        ]
+      },
+      {
+        "bean": "requestMappingHandlerAdapter",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/WebMvcAutoConfiguration$EnableWebMvcConfiguration.class]",
+        "dependencies": [
+          "mvcContentNegotiationManager",
+          "mvcConversionService",
+          "mvcValidator"
+        ]
+      },
+      {
+        "bean": "requestMappingHandlerMapping",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/WebMvcAutoConfiguration$EnableWebMvcConfiguration.class]",
+        "dependencies": [
+          "mvcConversionService",
+          "mvcResourceUrlProvider",
+          "mvcContentNegotiationManager"
+        ]
+      },
+      {
+        "bean": "mvcValidator",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.web.WebMvcValidator",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/WebMvcAutoConfiguration$EnableWebMvcConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "mvcContentNegotiationManager",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.web.accept.ContentNegotiationManager",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/WebMvcAutoConfiguration$EnableWebMvcConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "mvcPathMatcher",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.util.AntPathMatcher",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/WebMvcAutoConfiguration$EnableWebMvcConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "mvcUrlPathHelper",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.web.util.UrlPathHelper",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/WebMvcAutoConfiguration$EnableWebMvcConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "viewControllerHandlerMapping",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.web.servlet.config.annotation.WebMvcConfigurationSupport$EmptyHandlerMapping",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/WebMvcAutoConfiguration$EnableWebMvcConfiguration.class]",
+        "dependencies": [
+          "mvcPathMatcher",
+          "mvcUrlPathHelper"
+        ]
+      },
+      {
+        "bean": "beanNameHandlerMapping",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.web.servlet.handler.BeanNameUrlHandlerMapping",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/WebMvcAutoConfiguration$EnableWebMvcConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "resourceHandlerMapping",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.web.servlet.handler.SimpleUrlHandlerMapping",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/WebMvcAutoConfiguration$EnableWebMvcConfiguration.class]",
+        "dependencies": [
+          "mvcContentNegotiationManager",
+          "mvcUrlPathHelper",
+          "mvcPathMatcher",
+          "mvcResourceUrlProvider"
+        ]
+      },
+      {
+        "bean": "mvcResourceUrlProvider",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.web.servlet.resource.ResourceUrlProvider",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/WebMvcAutoConfiguration$EnableWebMvcConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "defaultServletHandlerMapping",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.web.servlet.config.annotation.WebMvcConfigurationSupport$EmptyHandlerMapping",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/WebMvcAutoConfiguration$EnableWebMvcConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "mvcConversionService",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.format.support.DefaultFormattingConversionService",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/WebMvcAutoConfiguration$EnableWebMvcConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "mvcUriComponentsContributor",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.web.method.support.CompositeUriComponentsContributor",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/WebMvcAutoConfiguration$EnableWebMvcConfiguration.class]",
+        "dependencies": [
+          "requestMappingHandlerAdapter",
+          "mvcConversionService"
+        ]
+      },
+      {
+        "bean": "httpRequestHandlerAdapter",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.web.servlet.mvc.HttpRequestHandlerAdapter",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/WebMvcAutoConfiguration$EnableWebMvcConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "simpleControllerHandlerAdapter",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.web.servlet.mvc.SimpleControllerHandlerAdapter",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/WebMvcAutoConfiguration$EnableWebMvcConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "handlerExceptionResolver",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.web.servlet.handler.HandlerExceptionResolverComposite",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/WebMvcAutoConfiguration$EnableWebMvcConfiguration.class]",
+        "dependencies": [
+          "mvcContentNegotiationManager"
+        ]
+      },
+      {
+        "bean": "mvcViewResolver",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.web.servlet.view.ViewResolverComposite",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/WebMvcAutoConfiguration$EnableWebMvcConfiguration.class]",
+        "dependencies": [
+          "mvcContentNegotiationManager"
+        ]
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.web.WebMvcAutoConfiguration$WebMvcAutoConfigurationAdapter$FaviconConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.web.WebMvcAutoConfiguration$WebMvcAutoConfigurationAdapter$FaviconConfiguration$$EnhancerBySpringCGLIB$$6b502f2",
+        "resource": "null",
+        "dependencies": [
+          "spring.resources-org.springframework.boot.autoconfigure.web.ResourceProperties"
+        ]
+      },
+      {
+        "bean": "faviconHandlerMapping",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.web.servlet.handler.SimpleUrlHandlerMapping",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/WebMvcAutoConfiguration$WebMvcAutoConfigurationAdapter$FaviconConfiguration.class]",
+        "dependencies": [
+          "faviconRequestHandler"
+        ]
+      },
+      {
+        "bean": "faviconRequestHandler",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.web.servlet.resource.ResourceHttpRequestHandler",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/WebMvcAutoConfiguration$WebMvcAutoConfigurationAdapter$FaviconConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.web.WebMvcAutoConfiguration$WebMvcAutoConfigurationAdapter",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.web.WebMvcAutoConfiguration$WebMvcAutoConfigurationAdapter$$EnhancerBySpringCGLIB$$b99b2e7a",
+        "resource": "null",
+        "dependencies": [
+          "spring.resources-org.springframework.boot.autoconfigure.web.ResourceProperties",
+          "spring.mvc-org.springframework.boot.autoconfigure.web.WebMvcProperties",
+          "org.springframework.beans.factory.support.DefaultListableBeanFactory@6d20f1ae"
+        ]
+      },
+      {
+        "bean": "defaultViewResolver",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.web.servlet.view.InternalResourceViewResolver",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/WebMvcAutoConfiguration$WebMvcAutoConfigurationAdapter.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "viewResolver",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.web.servlet.view.ContentNegotiatingViewResolver",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/WebMvcAutoConfiguration$WebMvcAutoConfigurationAdapter.class]",
+        "dependencies": [
+          "org.springframework.beans.factory.support.DefaultListableBeanFactory@6d20f1ae"
+        ]
+      },
+      {
+        "bean": "welcomePageHandlerMapping",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.web.WebMvcAutoConfiguration$WelcomePageHandlerMapping",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/WebMvcAutoConfiguration$WebMvcAutoConfigurationAdapter.class]",
+        "dependencies": [
+          "spring.resources-org.springframework.boot.autoconfigure.web.ResourceProperties"
+        ]
+      },
+      {
+        "bean": "requestContextFilter",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.web.filter.OrderedRequestContextFilter",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/WebMvcAutoConfiguration$WebMvcAutoConfigurationAdapter.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.web.WebMvcAutoConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.web.WebMvcAutoConfiguration$$EnhancerBySpringCGLIB$$3dd4c03e",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "hiddenHttpMethodFilter",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.web.filter.OrderedHiddenHttpMethodFilter",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/WebMvcAutoConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "httpPutFormContentFilter",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.web.filter.OrderedHttpPutFormContentFilter",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/WebMvcAutoConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.actuate.autoconfigure.AuditAutoConfiguration$AuditEventRepositoryConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.autoconfigure.AuditAutoConfiguration$AuditEventRepositoryConfiguration$$EnhancerBySpringCGLIB$$385a62c3",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "auditEventRepository",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.audit.InMemoryAuditEventRepository",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/AuditAutoConfiguration$AuditEventRepositoryConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.actuate.autoconfigure.AuditAutoConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.autoconfigure.AuditAutoConfiguration$$EnhancerBySpringCGLIB$$71e2ccda",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "auditListener",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.audit.listener.AuditListener",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/AuditAutoConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.jdbc.DataSourceConfiguration$Tomcat",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.jdbc.DataSourceConfiguration$Tomcat",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "dataSource",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.apache.tomcat.jdbc.pool.DataSource",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/jdbc/DataSourceConfiguration$Tomcat.class]",
+        "dependencies": [
+          "spring.datasource-org.springframework.boot.autoconfigure.jdbc.DataSourceProperties"
+        ]
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration$PooledDataSourceConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration$PooledDataSourceConfiguration$$EnhancerBySpringCGLIB$$4d3bc7f0",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.jdbc.metadata.DataSourcePoolMetadataProvidersConfiguration$TomcatDataSourcePoolMetadataProviderConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.jdbc.metadata.DataSourcePoolMetadataProvidersConfiguration$TomcatDataSourcePoolMetadataProviderConfiguration$$EnhancerBySpringCGLIB$$2dfdc52c",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "tomcatPoolDataSourceMetadataProvider",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.jdbc.metadata.DataSourcePoolMetadataProvidersConfiguration$TomcatDataSourcePoolMetadataProviderConfiguration$1",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/jdbc/metadata/DataSourcePoolMetadataProvidersConfiguration$TomcatDataSourcePoolMetadataProviderConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.jdbc.metadata.DataSourcePoolMetadataProvidersConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.jdbc.metadata.DataSourcePoolMetadataProvidersConfiguration$$EnhancerBySpringCGLIB$$ab88bf3f",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration$$EnhancerBySpringCGLIB$$b08b7a5e",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "dataSourceInitializer",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.jdbc.DataSourceInitializer",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/jdbc/DataSourceAutoConfiguration.class]",
+        "dependencies": [
+          "spring.datasource-org.springframework.boot.autoconfigure.jdbc.DataSourceProperties",
+          "org.springframework.boot.context.embedded.AnnotationConfigEmbeddedWebApplicationContext@341e1733"
+        ]
+      },
+      {
+        "bean": "spring.datasource-org.springframework.boot.autoconfigure.jdbc.DataSourceProperties",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.jdbc.DataSourceProperties",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.info.ProjectInfoAutoConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.info.ProjectInfoAutoConfiguration$$EnhancerBySpringCGLIB$$a91e417",
+        "resource": "null",
+        "dependencies": [
+          "spring.info-org.springframework.boot.autoconfigure.info.ProjectInfoProperties"
+        ]
+      },
+      {
+        "bean": "spring.info-org.springframework.boot.autoconfigure.info.ProjectInfoProperties",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.info.ProjectInfoProperties",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.actuate.autoconfigure.InfoContributorAutoConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.autoconfigure.InfoContributorAutoConfiguration$$EnhancerBySpringCGLIB$$77fea1a8",
+        "resource": "null",
+        "dependencies": [
+          "management.info-org.springframework.boot.actuate.autoconfigure.InfoContributorProperties"
+        ]
+      },
+      {
+        "bean": "envInfoContributor",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.info.EnvironmentInfoContributor",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/InfoContributorAutoConfiguration.class]",
+        "dependencies": [
+          "environment"
+        ]
+      },
+      {
+        "bean": "management.info-org.springframework.boot.actuate.autoconfigure.InfoContributorProperties",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.autoconfigure.InfoContributorProperties",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.actuate.autoconfigure.HealthIndicatorAutoConfiguration$DiskSpaceHealthIndicatorConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.autoconfigure.HealthIndicatorAutoConfiguration$DiskSpaceHealthIndicatorConfiguration$$EnhancerBySpringCGLIB$$73c1428a",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "diskSpaceHealthIndicator",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.health.DiskSpaceHealthIndicator",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/HealthIndicatorAutoConfiguration$DiskSpaceHealthIndicatorConfiguration.class]",
+        "dependencies": [
+          "diskSpaceHealthIndicatorProperties"
+        ]
+      },
+      {
+        "bean": "diskSpaceHealthIndicatorProperties",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.health.DiskSpaceHealthIndicatorProperties",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/HealthIndicatorAutoConfiguration$DiskSpaceHealthIndicatorConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.actuate.autoconfigure.HealthIndicatorAutoConfiguration$DataSourcesHealthIndicatorConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.autoconfigure.HealthIndicatorAutoConfiguration$DataSourcesHealthIndicatorConfiguration$$EnhancerBySpringCGLIB$$784312f",
+        "resource": "null",
+        "dependencies": [
+          "healthAggregator"
+        ]
+      },
+      {
+        "bean": "dbHealthIndicator",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.health.DataSourceHealthIndicator",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/HealthIndicatorAutoConfiguration$DataSourcesHealthIndicatorConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.actuate.autoconfigure.HealthIndicatorAutoConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.autoconfigure.HealthIndicatorAutoConfiguration$$EnhancerBySpringCGLIB$$8d55fbe2",
+        "resource": "null",
+        "dependencies": [
+          "management.health.status-org.springframework.boot.actuate.autoconfigure.HealthIndicatorProperties"
+        ]
+      },
+      {
+        "bean": "healthAggregator",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.health.OrderedHealthAggregator",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/HealthIndicatorAutoConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "management.health.status-org.springframework.boot.actuate.autoconfigure.HealthIndicatorProperties",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.autoconfigure.HealthIndicatorProperties",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.actuate.autoconfigure.MetricRepositoryAutoConfiguration$FastMetricServicesConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.autoconfigure.MetricRepositoryAutoConfiguration$FastMetricServicesConfiguration$$EnhancerBySpringCGLIB$$b5fb3b4d",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "counterBuffers",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.metrics.buffer.CounterBuffers",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/MetricRepositoryAutoConfiguration$FastMetricServicesConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "gaugeBuffers",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.metrics.buffer.GaugeBuffers",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/MetricRepositoryAutoConfiguration$FastMetricServicesConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "actuatorMetricReader",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.metrics.buffer.BufferMetricReader",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/MetricRepositoryAutoConfiguration$FastMetricServicesConfiguration.class]",
+        "dependencies": [
+          "counterBuffers",
+          "gaugeBuffers"
+        ]
+      },
+      {
+        "bean": "counterService",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.metrics.buffer.BufferCounterService",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/MetricRepositoryAutoConfiguration$FastMetricServicesConfiguration.class]",
+        "dependencies": [
+          "counterBuffers"
+        ]
+      },
+      {
+        "bean": "gaugeService",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.metrics.buffer.BufferGaugeService",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/MetricRepositoryAutoConfiguration$FastMetricServicesConfiguration.class]",
+        "dependencies": [
+          "gaugeBuffers"
+        ]
+      },
+      {
+        "bean": "org.springframework.boot.actuate.autoconfigure.MetricRepositoryAutoConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.autoconfigure.MetricRepositoryAutoConfiguration$$EnhancerBySpringCGLIB$$de95e7a5",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.jmx.JmxAutoConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.jmx.JmxAutoConfiguration$$EnhancerBySpringCGLIB$$4e03461a",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "mbeanExporter",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.jmx.export.annotation.AnnotationMBeanExporter",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/jmx/JmxAutoConfiguration.class]",
+        "dependencies": [
+          "objectNamingStrategy"
+        ]
+      },
+      {
+        "bean": "objectNamingStrategy",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.jmx.ParentAwareNamingStrategy",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/jmx/JmxAutoConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "mbeanServer",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "com.sun.jmx.mbeanserver.JmxMBeanServer",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/jmx/JmxAutoConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.actuate.autoconfigure.PublicMetricsAutoConfiguration$TomcatMetricsConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.autoconfigure.PublicMetricsAutoConfiguration$TomcatMetricsConfiguration$$EnhancerBySpringCGLIB$$ec8bd126",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "tomcatPublicMetrics",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.endpoint.TomcatPublicMetrics",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/PublicMetricsAutoConfiguration$TomcatMetricsConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.actuate.autoconfigure.PublicMetricsAutoConfiguration$DataSourceMetricsConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.autoconfigure.PublicMetricsAutoConfiguration$DataSourceMetricsConfiguration$$EnhancerBySpringCGLIB$$9c4dee7",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "dataSourcePublicMetrics",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.endpoint.DataSourcePublicMetrics",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/PublicMetricsAutoConfiguration$DataSourceMetricsConfiguration.class]",
+        "dependencies": [
+          "tomcatPoolDataSourceMetadataProvider"
+        ]
+      },
+      {
+        "bean": "org.springframework.boot.actuate.autoconfigure.PublicMetricsAutoConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.autoconfigure.PublicMetricsAutoConfiguration$$EnhancerBySpringCGLIB$$90933c9b",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "systemPublicMetrics",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.endpoint.SystemPublicMetrics",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/PublicMetricsAutoConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "metricReaderPublicMetrics",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.endpoint.MetricReaderPublicMetrics",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/PublicMetricsAutoConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.actuate.autoconfigure.EndpointAutoConfiguration$RequestMappingEndpointConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.autoconfigure.EndpointAutoConfiguration$RequestMappingEndpointConfiguration$$EnhancerBySpringCGLIB$$97dbac08",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "requestMappingEndpoint",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.endpoint.RequestMappingEndpoint",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/EndpointAutoConfiguration$RequestMappingEndpointConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.actuate.autoconfigure.EndpointAutoConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.autoconfigure.EndpointAutoConfiguration$$EnhancerBySpringCGLIB$$dca1112a",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "environmentEndpoint",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.endpoint.EnvironmentEndpoint",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/EndpointAutoConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "healthEndpoint",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.endpoint.HealthEndpoint",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/EndpointAutoConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "beansEndpoint",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.endpoint.BeansEndpoint",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/EndpointAutoConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "infoEndpoint",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.endpoint.InfoEndpoint",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/EndpointAutoConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "loggersEndpoint",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.endpoint.LoggersEndpoint",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/EndpointAutoConfiguration.class]",
+        "dependencies": [
+          "springBootLoggingSystem"
+        ]
+      },
+      {
+        "bean": "metricsEndpoint",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.endpoint.MetricsEndpoint",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/EndpointAutoConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "traceEndpoint",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.endpoint.TraceEndpoint",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/EndpointAutoConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "dumpEndpoint",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.endpoint.DumpEndpoint",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/EndpointAutoConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "autoConfigurationReportEndpoint",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.endpoint.AutoConfigurationReportEndpoint",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/EndpointAutoConfiguration.class]",
+        "dependencies": [
+          "autoConfigurationReport"
+        ]
+      },
+      {
+        "bean": "shutdownEndpoint",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.endpoint.ShutdownEndpoint",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/EndpointAutoConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "configurationPropertiesReportEndpoint",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.endpoint.ConfigurationPropertiesReportEndpoint",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/EndpointAutoConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "endpoints-org.springframework.boot.actuate.endpoint.EndpointProperties",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.endpoint.EndpointProperties",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.actuate.autoconfigure.EndpointMBeanExportAutoConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.autoconfigure.EndpointMBeanExportAutoConfiguration$$EnhancerBySpringCGLIB$$b8420979",
+        "resource": "null",
+        "dependencies": [
+          "endpoints.jmx-org.springframework.boot.actuate.autoconfigure.EndpointMBeanExportProperties"
+        ]
+      },
+      {
+        "bean": "endpointMBeanExporter",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.endpoint.jmx.EndpointMBeanExporter",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/EndpointMBeanExportAutoConfiguration.class]",
+        "dependencies": [
+          "mbeanServer"
+        ]
+      },
+      {
+        "bean": "auditEventsEndpoint",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.endpoint.jmx.AuditEventsJmxEndpoint",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/EndpointMBeanExportAutoConfiguration.class]",
+        "dependencies": [
+          "auditEventRepository"
+        ]
+      },
+      {
+        "bean": "endpoints.jmx-org.springframework.boot.actuate.autoconfigure.EndpointMBeanExportProperties",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.autoconfigure.EndpointMBeanExportProperties",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.web.ServerPropertiesAutoConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.web.ServerPropertiesAutoConfiguration$$EnhancerBySpringCGLIB$$84ed52ce",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "serverProperties",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.web.ServerProperties",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/ServerPropertiesAutoConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "duplicateServerPropertiesDetector",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.web.ServerPropertiesAutoConfiguration$DuplicateServerPropertiesDetector",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/ServerPropertiesAutoConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.actuate.autoconfigure.ManagementServerPropertiesAutoConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.autoconfigure.ManagementServerPropertiesAutoConfiguration$$EnhancerBySpringCGLIB$$b7522846",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "managementServerProperties",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.autoconfigure.ManagementServerProperties",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/ManagementServerPropertiesAutoConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.web.HttpMessageConvertersAutoConfiguration$StringHttpMessageConverterConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.web.HttpMessageConvertersAutoConfiguration$StringHttpMessageConverterConfiguration$$EnhancerBySpringCGLIB$$1bc5fffe",
+        "resource": "null",
+        "dependencies": [
+          "spring.http.encoding-org.springframework.boot.autoconfigure.web.HttpEncodingProperties"
+        ]
+      },
+      {
+        "bean": "stringHttpMessageConverter",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.http.converter.StringHttpMessageConverter",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/HttpMessageConvertersAutoConfiguration$StringHttpMessageConverterConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "spring.http.encoding-org.springframework.boot.autoconfigure.web.HttpEncodingProperties",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.web.HttpEncodingProperties",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.web.JacksonHttpMessageConvertersConfiguration$MappingJackson2HttpMessageConverterConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.web.JacksonHttpMessageConvertersConfiguration$MappingJackson2HttpMessageConverterConfiguration$$EnhancerBySpringCGLIB$$a9d429fe",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "mappingJackson2HttpMessageConverter",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.http.converter.json.MappingJackson2HttpMessageConverter",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/JacksonHttpMessageConvertersConfiguration$MappingJackson2HttpMessageConverterConfiguration.class]",
+        "dependencies": [
+          "jacksonObjectMapper"
+        ]
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.web.JacksonHttpMessageConvertersConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.web.JacksonHttpMessageConvertersConfiguration$$EnhancerBySpringCGLIB$$3cc1c274",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.web.HttpMessageConvertersAutoConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.web.HttpMessageConvertersAutoConfiguration$$EnhancerBySpringCGLIB$$5f4ff55e",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "messageConverters",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.web.HttpMessageConverters",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/HttpMessageConvertersAutoConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.actuate.autoconfigure.EndpointWebMvcManagementContextConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.autoconfigure.EndpointWebMvcManagementContextConfiguration$$EnhancerBySpringCGLIB$$ac6be8f3",
+        "resource": "null",
+        "dependencies": [
+          "endpoints.health-org.springframework.boot.actuate.autoconfigure.HealthMvcEndpointProperties",
+          "managementServerProperties",
+          "endpoints.cors-org.springframework.boot.actuate.autoconfigure.EndpointCorsProperties"
+        ]
+      },
+      {
+        "bean": "endpointHandlerMapping",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.endpoint.mvc.EndpointHandlerMapping",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/EndpointWebMvcManagementContextConfiguration.class]",
+        "dependencies": [
+          "mvcEndpoints"
+        ]
+      },
+      {
+        "bean": "mvcEndpoints",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.endpoint.mvc.MvcEndpoints",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/EndpointWebMvcManagementContextConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "environmentMvcEndpoint",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.endpoint.mvc.EnvironmentMvcEndpoint",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/EndpointWebMvcManagementContextConfiguration.class]",
+        "dependencies": [
+          "environmentEndpoint"
+        ]
+      },
+      {
+        "bean": "heapdumpMvcEndpoint",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.endpoint.mvc.HeapdumpMvcEndpoint",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/EndpointWebMvcManagementContextConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "healthMvcEndpoint",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.endpoint.mvc.HealthMvcEndpoint",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/EndpointWebMvcManagementContextConfiguration.class]",
+        "dependencies": [
+          "healthEndpoint",
+          "managementServerProperties"
+        ]
+      },
+      {
+        "bean": "loggersMvcEndpoint",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.endpoint.mvc.LoggersMvcEndpoint",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/EndpointWebMvcManagementContextConfiguration.class]",
+        "dependencies": [
+          "loggersEndpoint"
+        ]
+      },
+      {
+        "bean": "metricsMvcEndpoint",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.endpoint.mvc.MetricsMvcEndpoint",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/EndpointWebMvcManagementContextConfiguration.class]",
+        "dependencies": [
+          "metricsEndpoint"
+        ]
+      },
+      {
+        "bean": "auditEventMvcEndpoint",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.endpoint.mvc.AuditEventsMvcEndpoint",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/EndpointWebMvcManagementContextConfiguration.class]",
+        "dependencies": [
+          "auditEventRepository"
+        ]
+      },
+      {
+        "bean": "endpoints.health-org.springframework.boot.actuate.autoconfigure.HealthMvcEndpointProperties",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.autoconfigure.HealthMvcEndpointProperties",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "endpoints.cors-org.springframework.boot.actuate.autoconfigure.EndpointCorsProperties",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.autoconfigure.EndpointCorsProperties",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.actuate.autoconfigure.EndpointWebMvcAutoConfiguration$EndpointWebMvcConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.autoconfigure.EndpointWebMvcAutoConfiguration$EndpointWebMvcConfiguration$$EnhancerBySpringCGLIB$$b69bc79b",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.actuate.autoconfigure.EndpointWebMvcAutoConfiguration$ApplicationContextFilterConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.autoconfigure.EndpointWebMvcAutoConfiguration$ApplicationContextFilterConfiguration$$EnhancerBySpringCGLIB$$2325a49f",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "applicationContextIdFilter",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.web.filter.ApplicationContextHeaderFilter",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/EndpointWebMvcAutoConfiguration$ApplicationContextFilterConfiguration.class]",
+        "dependencies": [
+          "org.springframework.boot.context.embedded.AnnotationConfigEmbeddedWebApplicationContext@341e1733"
+        ]
+      },
+      {
+        "bean": "org.springframework.boot.actuate.autoconfigure.EndpointWebMvcAutoConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.autoconfigure.EndpointWebMvcAutoConfiguration$$EnhancerBySpringCGLIB$$8139a324",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "managementContextResolver",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.autoconfigure.ManagementContextResolver",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/EndpointWebMvcAutoConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "managementServletContext",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.autoconfigure.EndpointWebMvcAutoConfiguration$1",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/EndpointWebMvcAutoConfiguration.class]",
+        "dependencies": [
+          "managementServerProperties"
+        ]
+      },
+      {
+        "bean": "org.springframework.boot.actuate.autoconfigure.MetricExportAutoConfiguration$MetricExportPropertiesConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.autoconfigure.MetricExportAutoConfiguration$MetricExportPropertiesConfiguration$$EnhancerBySpringCGLIB$$be91f9b6",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "spring.metrics.export-org.springframework.boot.actuate.metrics.export.MetricExportProperties",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.metrics.export.MetricExportProperties",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/MetricExportAutoConfiguration$MetricExportPropertiesConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.actuate.autoconfigure.MetricExportAutoConfiguration$StatsdConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.autoconfigure.MetricExportAutoConfiguration$StatsdConfiguration$$EnhancerBySpringCGLIB$$1441aae8",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.actuate.autoconfigure.MetricExportAutoConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.autoconfigure.MetricExportAutoConfiguration$$EnhancerBySpringCGLIB$$168117bb",
+        "resource": "null",
+        "dependencies": [
+          "spring.metrics.export-org.springframework.boot.actuate.metrics.export.MetricExportProperties"
+        ]
+      },
+      {
+        "bean": "metricWritersMetricExporter",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.metrics.export.MetricExporters",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/MetricExportAutoConfiguration.class]",
+        "dependencies": [
+          "spring.metrics.export-org.springframework.boot.actuate.metrics.export.MetricExportProperties"
+        ]
+      },
+      {
+        "bean": "org.springframework.boot.actuate.autoconfigure.MetricFilterAutoConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.autoconfigure.MetricFilterAutoConfiguration$$EnhancerBySpringCGLIB$$eae82bf7",
+        "resource": "null",
+        "dependencies": [
+          "counterService",
+          "gaugeService",
+          "endpoints.metrics.filter-org.springframework.boot.actuate.autoconfigure.MetricFilterProperties"
+        ]
+      },
+      {
+        "bean": "metricsFilter",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.autoconfigure.MetricsFilter",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/MetricFilterAutoConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "endpoints.metrics.filter-org.springframework.boot.actuate.autoconfigure.MetricFilterProperties",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.autoconfigure.MetricFilterProperties",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.actuate.autoconfigure.TraceRepositoryAutoConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.autoconfigure.TraceRepositoryAutoConfiguration$$EnhancerBySpringCGLIB$$23e4bc86",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "traceRepository",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.trace.InMemoryTraceRepository",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/TraceRepositoryAutoConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.actuate.autoconfigure.TraceWebFilterAutoConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.autoconfigure.TraceWebFilterAutoConfiguration$$EnhancerBySpringCGLIB$$c70000d8",
+        "resource": "null",
+        "dependencies": [
+          "traceRepository",
+          "management.trace-org.springframework.boot.actuate.trace.TraceProperties"
+        ]
+      },
+      {
+        "bean": "webRequestLoggingFilter",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.trace.WebRequestTraceFilter",
+        "resource": "class path resource [org/springframework/boot/actuate/autoconfigure/TraceWebFilterAutoConfiguration.class]",
+        "dependencies": [
+          "org.springframework.beans.factory.support.DefaultListableBeanFactory@6d20f1ae"
+        ]
+      },
+      {
+        "bean": "management.trace-org.springframework.boot.actuate.trace.TraceProperties",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.actuate.trace.TraceProperties",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.context.ConfigurationPropertiesAutoConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.context.ConfigurationPropertiesAutoConfiguration$$EnhancerBySpringCGLIB$$be21624c",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.dao.PersistenceExceptionTranslationAutoConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.dao.PersistenceExceptionTranslationAutoConfiguration",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "persistenceExceptionTranslationPostProcessor",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.dao.annotation.PersistenceExceptionTranslationPostProcessor",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/dao/PersistenceExceptionTranslationAutoConfiguration.class]",
+        "dependencies": [
+          "environment"
+        ]
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.groovy.template.GroovyTemplateAutoConfiguration$GroovyWebConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.groovy.template.GroovyTemplateAutoConfiguration$GroovyWebConfiguration$$EnhancerBySpringCGLIB$$5e9f4e98",
+        "resource": "null",
+        "dependencies": [
+          "spring.groovy.template-org.springframework.boot.autoconfigure.groovy.template.GroovyTemplateProperties"
+        ]
+      },
+      {
+        "bean": "groovyMarkupViewResolver",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.web.servlet.view.groovy.GroovyMarkupViewResolver",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/groovy/template/GroovyTemplateAutoConfiguration$GroovyWebConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.groovy.template.GroovyTemplateAutoConfiguration$GroovyMarkupConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.groovy.template.GroovyTemplateAutoConfiguration$GroovyMarkupConfiguration$$EnhancerBySpringCGLIB$$b5ea0cfe",
+        "resource": "null",
+        "dependencies": [
+          "org.springframework.boot.context.embedded.AnnotationConfigEmbeddedWebApplicationContext@341e1733",
+          "spring.groovy.template-org.springframework.boot.autoconfigure.groovy.template.GroovyTemplateProperties"
+        ]
+      },
+      {
+        "bean": "groovyMarkupConfigurer",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.web.servlet.view.groovy.GroovyMarkupConfigurer",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/groovy/template/GroovyTemplateAutoConfiguration$GroovyMarkupConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.groovy.template.GroovyTemplateAutoConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.groovy.template.GroovyTemplateAutoConfiguration$$EnhancerBySpringCGLIB$$cfd4542",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "spring.groovy.template-org.springframework.boot.autoconfigure.groovy.template.GroovyTemplateProperties",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.groovy.template.GroovyTemplateProperties",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration$DataSourceTransactionManagerConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration$DataSourceTransactionManagerConfiguration$$EnhancerBySpringCGLIB$$7b986f6d",
+        "resource": "null",
+        "dependencies": [
+          "dataSource"
+        ]
+      },
+      {
+        "bean": "transactionManager",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.jdbc.datasource.DataSourceTransactionManager",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/jdbc/DataSourceTransactionManagerAutoConfiguration$DataSourceTransactionManagerConfiguration.class]",
+        "dependencies": [
+          "spring.datasource-org.springframework.boot.autoconfigure.jdbc.DataSourceProperties"
+        ]
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration$$EnhancerBySpringCGLIB$$df6ec74f",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.jdbc.JdbcTemplateAutoConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.jdbc.JdbcTemplateAutoConfiguration$$EnhancerBySpringCGLIB$$ee7c0bee",
+        "resource": "null",
+        "dependencies": [
+          "dataSource"
+        ]
+      },
+      {
+        "bean": "jdbcTemplate",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.jdbc.core.JdbcTemplate",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/jdbc/JdbcTemplateAutoConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "namedParameterJdbcTemplate",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/jdbc/JdbcTemplateAutoConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.transaction.annotation.ProxyTransactionManagementConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.transaction.annotation.ProxyTransactionManagementConfiguration$$EnhancerBySpringCGLIB$$ce97d6fe",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.transaction.TransactionAutoConfiguration$EnableTransactionManagementConfiguration$CglibAutoProxyConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.transaction.TransactionAutoConfiguration$EnableTransactionManagementConfiguration$CglibAutoProxyConfiguration$$EnhancerBySpringCGLIB$$3a7d1b2e",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.transaction.TransactionAutoConfiguration$EnableTransactionManagementConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.transaction.TransactionAutoConfiguration$EnableTransactionManagementConfiguration$$EnhancerBySpringCGLIB$$590675ba",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.transaction.TransactionAutoConfiguration$TransactionTemplateConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.transaction.TransactionAutoConfiguration$TransactionTemplateConfiguration$$EnhancerBySpringCGLIB$$cd223440",
+        "resource": "null",
+        "dependencies": [
+          "transactionManager"
+        ]
+      },
+      {
+        "bean": "transactionTemplate",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.transaction.support.TransactionTemplate",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/transaction/TransactionAutoConfiguration$TransactionTemplateConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.transaction.TransactionAutoConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.transaction.TransactionAutoConfiguration$$EnhancerBySpringCGLIB$$630bd208",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "platformTransactionManagerCustomizers",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.transaction.TransactionManagerCustomizers",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/transaction/TransactionAutoConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "spring.transaction-org.springframework.boot.autoconfigure.transaction.TransactionProperties",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.transaction.TransactionProperties",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.thymeleaf.ThymeleafAutoConfiguration$ThymeleafResourceHandlingConfig",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.thymeleaf.ThymeleafAutoConfiguration$ThymeleafResourceHandlingConfig$$EnhancerBySpringCGLIB$$593ff91a",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.thymeleaf.ThymeleafAutoConfiguration$ThymeleafDefaultConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.thymeleaf.ThymeleafAutoConfiguration$ThymeleafDefaultConfiguration$$EnhancerBySpringCGLIB$$8d60199a",
+        "resource": "null",
+        "dependencies": [
+          "defaultTemplateResolver"
+        ]
+      },
+      {
+        "bean": "templateEngine",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.thymeleaf.spring4.SpringTemplateEngine",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/thymeleaf/ThymeleafAutoConfiguration$ThymeleafDefaultConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.thymeleaf.ThymeleafAutoConfiguration$Thymeleaf2Configuration$Thymeleaf2ViewResolverConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.thymeleaf.ThymeleafAutoConfiguration$Thymeleaf2Configuration$Thymeleaf2ViewResolverConfiguration$$EnhancerBySpringCGLIB$$d4e21299",
+        "resource": "null",
+        "dependencies": [
+          "spring.thymeleaf-org.springframework.boot.autoconfigure.thymeleaf.ThymeleafProperties",
+          "templateEngine"
+        ]
+      },
+      {
+        "bean": "thymeleafViewResolver",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.thymeleaf.spring4.view.ThymeleafViewResolver",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/thymeleaf/ThymeleafAutoConfiguration$Thymeleaf2Configuration$Thymeleaf2ViewResolverConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.thymeleaf.ThymeleafAutoConfiguration$Thymeleaf2Configuration$DefaultTemplateResolverConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.thymeleaf.ThymeleafAutoConfiguration$Thymeleaf2Configuration$DefaultTemplateResolverConfiguration$$EnhancerBySpringCGLIB$$5e6060d6",
+        "resource": "null",
+        "dependencies": [
+          "spring.thymeleaf-org.springframework.boot.autoconfigure.thymeleaf.ThymeleafProperties",
+          "org.springframework.boot.context.embedded.AnnotationConfigEmbeddedWebApplicationContext@341e1733"
+        ]
+      },
+      {
+        "bean": "thymeleafResourceResolver",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.thymeleaf.spring4.resourceresolver.SpringResourceResourceResolver",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/thymeleaf/ThymeleafAutoConfiguration$Thymeleaf2Configuration$DefaultTemplateResolverConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "defaultTemplateResolver",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.thymeleaf.spring4.templateresolver.SpringResourceTemplateResolver",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/thymeleaf/ThymeleafAutoConfiguration$Thymeleaf2Configuration$DefaultTemplateResolverConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.thymeleaf.ThymeleafAutoConfiguration$Thymeleaf2Configuration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.thymeleaf.ThymeleafAutoConfiguration$Thymeleaf2Configuration$$EnhancerBySpringCGLIB$$6e540389",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.thymeleaf.ThymeleafAutoConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.thymeleaf.ThymeleafAutoConfiguration$$EnhancerBySpringCGLIB$$b843748e",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "spring.thymeleaf-org.springframework.boot.autoconfigure.thymeleaf.ThymeleafProperties",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.thymeleaf.ThymeleafProperties",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.web.HttpEncodingAutoConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.web.HttpEncodingAutoConfiguration$$EnhancerBySpringCGLIB$$a5843da9",
+        "resource": "null",
+        "dependencies": [
+          "spring.http.encoding-org.springframework.boot.autoconfigure.web.HttpEncodingProperties"
+        ]
+      },
+      {
+        "bean": "characterEncodingFilter",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.web.filter.OrderedCharacterEncodingFilter",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/HttpEncodingAutoConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "localeCharsetMappingsCustomizer",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.web.HttpEncodingAutoConfiguration$LocaleCharsetMappingsCustomizer",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/HttpEncodingAutoConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.web.MultipartAutoConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.web.MultipartAutoConfiguration$$EnhancerBySpringCGLIB$$89458a44",
+        "resource": "null",
+        "dependencies": [
+          "spring.http.multipart-org.springframework.boot.autoconfigure.web.MultipartProperties"
+        ]
+      },
+      {
+        "bean": "multipartConfigElement",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "javax.servlet.MultipartConfigElement",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/MultipartAutoConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "multipartResolver",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.web.multipart.support.StandardServletMultipartResolver",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/MultipartAutoConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "spring.http.multipart-org.springframework.boot.autoconfigure.web.MultipartProperties",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.web.MultipartProperties",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.web.WebClientAutoConfiguration$RestTemplateConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.web.WebClientAutoConfiguration$RestTemplateConfiguration$$EnhancerBySpringCGLIB$$d5c74e15",
+        "resource": "null",
+        "dependencies": []
+      },
+      {
+        "bean": "restTemplateBuilder",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.web.client.RestTemplateBuilder",
+        "resource": "class path resource [org/springframework/boot/autoconfigure/web/WebClientAutoConfiguration$RestTemplateConfiguration.class]",
+        "dependencies": []
+      },
+      {
+        "bean": "org.springframework.boot.autoconfigure.web.WebClientAutoConfiguration",
+        "aliases": [],
+        "scope": "singleton",
+        "type": "org.springframework.boot.autoconfigure.web.WebClientAutoConfiguration$$EnhancerBySpringCGLIB$$df36fbb1",
+        "resource": "null",
+        "dependencies": []
+      }
+    ]
+  }
+]
+```
+
+从这里，我们可以看到有一个ID为contactController的bean，它依赖于名为contactRepository的bean，而contactRepository又依赖于jdbcTemplate bean。
+
+对于自动装配和自动配置所形成的神秘结果，“/beans”端点提供了一种了解内部实现的手段。
+
+另外一个端点也能帮助我们了解Spring Boot自动配置的内部情况，这就是“/autoconfig”。这个端点所返回的JSON描述了Spring Boot在自动配置bean的时候所做出的决策。（这里不再列出）
+
+“/beans”和“/autoconfig”端点只是Spring Boot Actuator所提供的观察应用内部状况的两个样例。在本章中，我们没有足够的篇幅详细讨论每个端点，但是我建议你自行尝试这些端点，以便掌握Actuator都提供了哪些功能来帮助我们了解应用的内部状况。
+
+### 21.5 小结
+
+>
+Spring Boot是Spring家族中一个令人兴奋的新项目。Spring致力于简化Java开发，而Spring Boot致力于让Spring本身更加简单。
+>
+Spring Boot用了两个技巧来消除Spring项目中的样板式配置：Spring Boot Starter和自动配置。
+>
+一个简单的Spring Boot Starter依赖能够替换掉Maven或Gradle构建中多个通用的依赖。例如，在项目中添加Spring Boot Web依赖后，将会引入Spring Web和Spring MVC模块，以及Jackson 2数据绑定模块。
+>
+自动配置充分利用了Spring 4.0的条件化配置特性，能够自动配置特定的Spring bean，用来启用某项特性。例如，Spring Boot能够在应用的类路径中探测到Thymeleaf，然后自动将Thymeleaf模板配置为SpringMVC视图的bean
+>
+Spring Boot的命令行接口（command-line interface，CLI）使用Groovy进一步简化了Spring项目。通过在Groovy代码中简单地引用Spring组件，CLI就能自动添加所需的Starter依赖（而这又会触发自动配置）。除此之外，通过Spring Boot CLI运行时，很多的Spring类型都不需要在Groovy代码中显式使用import语句导入。
+>
+最后，Spring Boot Actuator为基于Spring Boot开发的Web应用提供了一些通用的管理特性，包括查看线程dump、Web请求历史以及Spring应用上下文中的bean。
+>
+在读完本章之后，你可能会想为什么要将像Spring Boot这样有用的话题放到书的结尾呢。你甚至可能会想，如果我早一点介绍Spring Boot的话，那么很多之前所学的内容将会更加简单。确实，Spring Boot在Spring之上提供了很有意思的编程模型，一旦用上它之后，很难想象如果没有它的话，该如何编写Spring应用。
+>
+我可以说之所以将Spring Boot留在最后，是因为想让你对Spring有更深入的理解（反正对你有好处就是了）。尽管可以这么讲，但真正的原因是Spring Boot推出的时候，本书的大部分内容已经写完了。所以我只能将其放到一个不影响整本书的地方：也就是结尾。
+>
+谁知道呢？也许在本书的下一版中，从一开始我就会介绍Spring Boot。
+
+
+
