@@ -1934,3 +1934,583 @@ java -jar 11-springboot-jar-0.0.1-SNAPSHOT.jar
 ```
 
 项目运行成功，现在我们的应用根路径为“http://localhost:9090/11-springboot-jar/boot/queryAll” 。
+
+### Spring Boot集成Thymeleaf
+
+Thymeleaf是一个流行的模板引擎，改模板引擎采用Java语言开发。Thymeleaf是基于HTML的，以HTML为载体。
+
+Thymeleaf模板既能用在web环境下，也能用于非web环境下。在非web环境下他能直接显示模板上的静态数据，在web环境下，他能像JSP一样从后台接收数据。
+
+Spring Boot集成了Thymeleaf模板技术，并且Spring Boot官方也推荐使用Thymeleaf来替代JSP。
+
+集成的第一步我们需要使用thymeleaf的starter依赖：
+
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-thymeleaf</artifactId>
+</dependency>
+```
+
+接下来在application.yml中对Thymeleaf进行配置：
+
+```yaml
+spring: 
+  thymeleaf:
+    servlet:
+      content-type: text/html # 设置content-type
+    enable-spring-el-compiler: true # 启用SpEL表达式编译器
+    encoding: UTF-8 # 字符集设置为UTF-8
+    cache: false # 关闭模板缓存，开发时关闭
+    mode: LEGACYHTML5 # 使用非严格模式的HTML
+```
+
+这里使用`LEGACYHTML5`模式（事实上我们很少使用严格的HTML模式），需要引入如下依赖，否则报错：
+
+```xml
+<!-- https://mvnrepository.com/artifact/net.sourceforge.nekohtml/nekohtml -->
+<dependency>
+    <groupId>net.sourceforge.nekohtml</groupId>
+    <artifactId>nekohtml</artifactId>
+</dependency>
+
+<!-- https://mvnrepository.com/artifact/org.unbescape/unbescape -->
+<dependency>
+    <groupId>org.unbescape</groupId>
+    <artifactId>unbescape</artifactId>
+    <version>1.1.6.RELEASE</version>
+</dependency>
+
+<!-- https://mvnrepository.com/artifact/org.attoparser/attoparser -->
+<dependency>
+    <groupId>org.attoparser</groupId>
+    <artifactId>attoparser</artifactId>
+    <version>2.0.5.RELEASE</version>
+</dependency>
+```
+
+编写Controller：
+
+```java
+@Controller
+@RequestMapping("/boot")
+public class ThymeleafController {
+
+    @RequestMapping("/salute")
+    public String salute(Model model) {
+        model.addAttribute("msg", "Spring Boot: Hello, Thymeleaf");
+        return "hello";
+    }
+}
+```
+
+编写HTML页面，Thymeleaf默认模板页面要存在于classpath:src/main/resources/templates下：
+
+```html
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="UTF-8">
+<title>Spring Boot集成Thymeleaf</title>
+</head>
+<body>
+    <p th:text="${msg}">
+        
+    </p>
+</body>
+</html>
+```
+
+要在HTML中使用Thymeleaf，我们需要设置它的命名空间`<html xmlns:th="http://www.thymeleaf.org">`。
+
+#### Thymeleaf简明语法
+
+##### Thymeleaf标准表达式
+
+**变量表达式**
+
+变量表达式：`${}`，用于获取容器上下文环境中的变量，功能与JSTL中的`${}`相同。
+
+例如Controller中代码：
+
+```java
+@RequestMapping("/studentInfo/{id}")
+public String studentInfo(Model model, @PathVariable int id) {
+    model.addAttribute("student", mapper.selectStudentById(id));
+    return "studentInfo";
+}
+```
+
+HTML中就可以这样获取：
+
+```html
+<body>
+    <table border="1">
+        <tr>
+            <th>ID</th>
+            <th>NAME</th>
+            <th>AGE</th>
+            <th>SCORE</th>
+        </tr>
+        <tr> 
+            <td th:text="${student.id}"></td>
+            <td th:text="${student.name}"></td>
+            <td th:text="${student.age}"></td>
+            <td th:text="${student.score}"></td>
+        </tr>
+    </table>
+</body>
+```
+
+其中`th:text`是Thymeleaf的属性，用于文本显示。
+
+**选择表达式**
+
+选择表达式：`*{}`，使用`th:object`绑定对象。
+
+控制器代码不变，HTML代码如下：
+
+```html
+<div th:object="${student}">
+    <p>ID: <span th:text="*{id}"></span></p>
+    <p>NAME: <span th:text="*{name}"></span></p>
+    <p>AGE: <span th:text="*{age}"></span></p>
+    <p>SCORE: <span th:text="*{score}"></span></p>
+</div>
+```
+
+这里首先使用`th:object`绑定后台传来的`Student`对象，然后使用`*`来代表这个对象，后面大括号中的值是该对象的属性。
+
+选择表达式在执行时是在选择的对象上秋节，而变量表达式是在上下文的`Model`中求解。
+
+上述代码事实上等价于：
+
+```html
+<div>
+    <p>ID: <span th:text="${student.id}"></span></p>
+    <p>NAME: <span th:text="*${student.name}"></span></p>
+    <p>AGE: <span th:text="*${student.age}"></span></p>
+    <p>SCORE: <span th:text="*${student.score}"></span></p>
+</div>
+```
+
+变量表达式与选择表达式可以混合使用。
+
+我们也可以不使用`th:object`进行对象的选择，而直接使用`*{}`来获取数据：
+
+```html
+<div>
+    <p>ID: <span th:text="*{student.id}"></span></p>
+    <p>NAME: <span th:text="*{student.name}"></span></p>
+    <p>AGE: <span th:text="*{student.age}"></span></p>
+    <p>SCORE: <span th:text="*{student.score}"></span></p>
+</div>
+```
+
+**URL表达式**
+
+URL表达式：`@{}`，可以用于`<script>`、`<link>`、`<a>`、`<form>`等元素中需要使用URL的地方。通常在URL包含动态变量时使用。在使用时需要使用属性`th:href`。
+
+根据写法，URL表达式分为三种：
+
+- 绝对URL：使用协议开头
+- 相对于当前页面的URL：不以“/”开头
+- 相对于项目上下文的URL：以“/”开头，应用上下文会自动添加
+
+示例如下，当前URL为“http://localhost:9090/12-springboot-thymeleaf/boot/studentInfo/1” ：
+
+```html
+<!-- 绝对URL -->
+<a th:href="@{'http://localhost:9090/12-springboot-thymeleaf/boot/studentInfo/' + ${student.id}}">查看ID为<span th:text="${student.id}"></span>的学生信息</a>
+<!-- 相对于当前页面的URL -->
+<a th:href="@{'' + ${student.id}}">查看ID为<span th:text="${student.id}"></span>的学生信息</a>
+<!-- 相对于应用上下文的URL -->
+<a th:href="@{'/boot/studentInfo/' + ${student.id}}">查看ID为<span th:text="${student.id}"></span>的学生信息</a>
+```
+
+这里静态的部分由“''”包括。
+
+##### Thymeleaf常用属性
+
+常用属性如下：
+
+- th:action
+- th:each
+- th:href
+- th:id
+- th:if
+- th:unless
+- th:switch/th:case
+- th:object
+- th:text
+- th:value
+- th:attr
+- ...
+
+**th:action**
+
+在form表单中使用，替换原有的`action`属性，通常搭配URL表达式使用。
+
+**th:each**
+
+遍历集合（List、Set、Map、数组）使用，例如：
+
+```html
+<ul th:each="student, iterStat:${students}">
+    <li th:text="${student.id}"></li>
+    <li th:text="${student.name}"></li>
+    <li th:text="${student.age}"></li>
+    <li th:text="${student.score}"></li>
+</ul>
+```
+
+`th:each="student, iterStat:${students}"`表示从后台传来一个名为“students”的集合（这里是`List`），用“iterStat”来代表，而“student”是集合中的一个元素。这类似于Java中的`for-each`循环写法。
+
+这里“student”和“iterStat”可以随便写。
+
+循环体信息，即这里的“iterStat”有如下属性：
+
+- index：当前迭代对象的index，从0开始计算
+- count：当前迭代对象的个数，从1开始计算
+- size：元素的总量
+- current：当前迭代变量
+- even/odd：布尔值，当前循环是否是偶数/奇数，从0开始计算
+- first：布尔值，当前迭代是否是第一个
+- last：布尔值，当前迭代是否是最后一个
+
+**th:id**
+
+类似于html标签中的`id`属性，例如：
+
+```html
+<span th:id="${student.id}">foo.bar</span>
+```
+
+**th:if**
+
+用于条件判断，例如：
+
+```html
+<div th:object="${student}" th:if="*{id} eq 1">
+    <span>如果id是1才输出本行</span>
+</div>
+```
+
+**th:unless**
+
+这个属性与`th:if`正好相反，例如：
+
+```html
+<div th:object="${student}" th:unless="*{id} eq 1">
+    <span>如果id不是1才输出本行</span>
+</div>
+```
+
+**th:switch/th:case**
+
+switch语句，case用于判断，例如：
+
+```html
+<div th:switch="${student.id}">
+    <span th:case="1">id为1</span>
+    <span th:case="2">id为2</span>
+    <span th:case="*">id即不为1也不为2</span>    
+</div>
+```
+
+一旦某个case判断为`true`，那么就不再向下判断了。`*`表示默认的case，当前面的case均不为`true`时，执行默认的case。
+
+**th:src**
+
+用于外部资源引入，替代`<script>`、`<img>`等的`src`属性，常与URL表达式联用。
+
+例如：
+
+```html
+<script th:src="@{/js/jquery-3.3.1.js}"></script>
+```
+
+**th:value**
+
+与html标签中的`value`属性对应，能对某元素的`value`属性进行赋值，例如：
+
+```html
+<input type="text" id="studentId" name="studentId" th:value="${student.id}" />
+```
+
+**th:attr**
+
+该属性也是用于给HTML中某元素的某属性赋值，例如：
+
+```html
+<input type="text" id="studentId" name="studentId" th:attr="value=${student.id}" />
+```
+
+**th:onclick**
+
+定义点击事件，例如：
+
+```html
+<button th:onclick="'clickMe()'">ClickMe!</button>
+<script type="text/javascript">
+    function clickMe() {
+        window.alert("Click!");
+    }
+</script>
+```
+
+**th:style**
+
+用于定义样式，例如：
+
+```html
+<span th:style="'display:none;'">你看不到我</span>
+```
+
+**th:name**
+
+与HTML的`name`属性类似，例如：
+
+```html
+<input type="text" th:name="${student.name}" />
+```
+
+**th:method**
+
+用于form表单，与HTML的`method`属性类似，例如：
+
+```html
+<form th:action="@{/foo/bar}" th:method="POST">
+</form>
+```
+
+**th:inline**
+
+该属性使用内联表达式`[[]]`获取变量数据，例如：
+
+```html
+<span th:inline="text">Hello, [[${student.name}]]</span>
+```
+
+它相当于：
+
+```html
+<span>Hello, <span th:text="${student.name}"></span></span>
+```
+
+该属性还可以用于内联脚本，使得js脚本可以直接获取后台传来的变量：
+
+```html
+<script th:inline="javascript" type="text/javascript">
+    var studentName = [[${student.name}]];
+    alert(studentName);
+</script>
+```
+
+##### Thymeleaf字面量
+
+**文本字面量**
+
+用给单引号`''`包围的字符串为文本字面量，例如：
+
+```html
+<a th:href="@{'/boot/studentInfo/' + ${student.id}}">查看ID为<span th:text="${student.id}"></span>的学生信息</a>
+```
+
+文本字面量的拼接有两种方式。
+
+方式一：
+
+```html
+<span th:text="'当前是第' + ${currentPage} + '页，共' + ${pageCount} + '页'"></span>
+```
+
+方式二：
+
+```html
+<span th:text="|当前是第${currentPage}页，共${pageCount}页|"></span>
+```
+
+
+**数字字面量**
+
+例如：
+
+```html
+<p>今年是<span th:text="2017"></span>年</p>
+```
+
+数字字面量可以直接进行数学运算：
+
+```html
+<p>20年后是<span th:text="2017 + 20"></span>年</p>
+```
+
+**布尔字面量**
+
+`true`和`false`，例如：
+
+```html
+<p th:if="${ifFlag == true}">foobar</p>
+```
+
+**null字面量**
+
+判断对象是否为空，例如：
+
+```html
+<p th:if="${studentList != null}">studentList不为空</p>
+```
+
+##### Thymeleaf三元运算符
+
+例如：
+
+```html
+<span th:text="${gender eq 1} ? 'MALE' : 'FEMALE'"></span>
+```
+
+##### Thymeleaf运算和关系判断
+
+- 算术运算：+、-、\*、/、%
+- 关系比较：>（gt）、<（lt）、>=（ge）、<=（le）
+- 相等判断：==（eq）、!=（ne）
+
+##### Thymeleaf表达式基本对象
+
+Thymeleaf模板引擎提供了一组内置的对象，这些内置的对象可以直接在模板中使用，这些对象由“#”号开头。
+
+**#request**
+
+获取应用上下文路径：
+
+```text
+${#request.getContextPath()}
+```
+
+获取request中的属性：
+
+```text
+${#request.getAttribute("attr")}
+```
+
+**#session**
+
+获取session中的属性：
+
+```text
+${#session.getAttribute("attr")}
+```
+
+获取session的id：
+
+```
+${#session.id}
+```
+
+##### Thymeleaf表达式功能对象
+
+Thymeleaf模板引擎提供的一组功能性内置对象，可以在模板中直接使用这些对象提供的功能方法，内置功能对象以“#”开头。
+
+- #dates
+- #calendars
+- #numbers
+- #objects
+- #bools
+- #arrays
+- #lists
+- #sets
+- #maps
+- #aggregates
+
+### Spring Boot Actuator
+
+在生产环境中，需要实时或顶起监控服务的可用性，Spring Boot的Actuator提供了很多监控所需的接口。Actuator可以对应用系统进行配置查看、健康检查等。
+
+在使用时我们首先要加入依赖：
+
+```xml
+<!-- https://mvnrepository.com/artifact/org.springframework.boot/spring-boot-starter-actuator -->
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-actuator</artifactId>
+</dependency>
+```
+
+然后进行配置：
+
+```yaml
+management:
+  server:
+    port: 9091 # 监控端口
+    servlet:
+      context-path: /13-springboot-actuator # 配置上下文
+  endpoints:
+    web:
+      exposure:
+        include: "*" # 开启所有web入口端点
+```
+
+完整配置：
+
+```yaml
+server:
+  port: 9090
+
+management:
+  server:
+    port: 9091 # 监控端口
+    servlet:
+      context-path: /13-springboot-actuator # 配置上下文
+  endpoints:
+    web:
+      exposure:
+        include: "*" # 开启所有web入口端点
+
+spring:
+  datasource: # 数据库连接四要素
+    driver-class-name: com.mysql.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/test?useUnicode=true&characterEncoding=UTF-8&useSSL=true
+    username: root
+    password: mysql
+```
+
+这里我们的应用运行在9090端口上，没有应用上下文；监控服务运行在9091端口上，上下文为“/13-springboot-actuator”。
+
+程序启动后会出现如下信息：
+
+```text
+2018-10-03 20:10:58.098  INFO 17772 --- [           main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 14 endpoint(s) beneath base path '/actuator'
+2018-10-03 20:10:58.108  INFO 17772 --- [           main] s.b.a.e.w.s.WebMvcEndpointHandlerMapping : Mapped "{[/actuator/auditevents],methods=[GET],produces=[application/vnd.spring-boot.actuator.v2+json || application/json]}" onto public java.lang.Object org.springframework.boot.actuate.endpoint.web.servlet.AbstractWebMvcEndpointHandlerMapping$OperationHandler.handle(javax.servlet.http.HttpServletRequest,java.util.Map<java.lang.String, java.lang.String>)
+2018-10-03 20:10:58.109  INFO 17772 --- [           main] s.b.a.e.w.s.WebMvcEndpointHandlerMapping : Mapped "{[/actuator/beans],methods=[GET],produces=[application/vnd.spring-boot.actuator.v2+json || application/json]}" onto public java.lang.Object org.springframework.boot.actuate.endpoint.web.servlet.AbstractWebMvcEndpointHandlerMapping$OperationHandler.handle(javax.servlet.http.HttpServletRequest,java.util.Map<java.lang.String, java.lang.String>)
+2018-10-03 20:10:58.109  INFO 17772 --- [           main] s.b.a.e.w.s.WebMvcEndpointHandlerMapping : Mapped "{[/actuator/health],methods=[GET],produces=[application/vnd.spring-boot.actuator.v2+json || application/json]}" onto public java.lang.Object org.springframework.boot.actuate.endpoint.web.servlet.AbstractWebMvcEndpointHandlerMapping$OperationHandler.handle(javax.servlet.http.HttpServletRequest,java.util.Map<java.lang.String, java.lang.String>)
+2018-10-03 20:10:58.109  INFO 17772 --- [           main] s.b.a.e.w.s.WebMvcEndpointHandlerMapping : Mapped "{[/actuator/conditions],methods=[GET],produces=[application/vnd.spring-boot.actuator.v2+json || application/json]}" onto public java.lang.Object org.springframework.boot.actuate.endpoint.web.servlet.AbstractWebMvcEndpointHandlerMapping$OperationHandler.handle(javax.servlet.http.HttpServletRequest,java.util.Map<java.lang.String, java.lang.String>)
+2018-10-03 20:10:58.109  INFO 17772 --- [           main] s.b.a.e.w.s.WebMvcEndpointHandlerMapping : Mapped "{[/actuator/configprops],methods=[GET],produces=[application/vnd.spring-boot.actuator.v2+json || application/json]}" onto public java.lang.Object org.springframework.boot.actuate.endpoint.web.servlet.AbstractWebMvcEndpointHandlerMapping$OperationHandler.handle(javax.servlet.http.HttpServletRequest,java.util.Map<java.lang.String, java.lang.String>)
+2018-10-03 20:10:58.109  INFO 17772 --- [           main] s.b.a.e.w.s.WebMvcEndpointHandlerMapping : Mapped "{[/actuator/env],methods=[GET],produces=[application/vnd.spring-boot.actuator.v2+json || application/json]}" onto public java.lang.Object org.springframework.boot.actuate.endpoint.web.servlet.AbstractWebMvcEndpointHandlerMapping$OperationHandler.handle(javax.servlet.http.HttpServletRequest,java.util.Map<java.lang.String, java.lang.String>)
+2018-10-03 20:10:58.109  INFO 17772 --- [           main] s.b.a.e.w.s.WebMvcEndpointHandlerMapping : Mapped "{[/actuator/env/{toMatch}],methods=[GET],produces=[application/vnd.spring-boot.actuator.v2+json || application/json]}" onto public java.lang.Object org.springframework.boot.actuate.endpoint.web.servlet.AbstractWebMvcEndpointHandlerMapping$OperationHandler.handle(javax.servlet.http.HttpServletRequest,java.util.Map<java.lang.String, java.lang.String>)
+2018-10-03 20:10:58.110  INFO 17772 --- [           main] s.b.a.e.w.s.WebMvcEndpointHandlerMapping : Mapped "{[/actuator/info],methods=[GET],produces=[application/vnd.spring-boot.actuator.v2+json || application/json]}" onto public java.lang.Object org.springframework.boot.actuate.endpoint.web.servlet.AbstractWebMvcEndpointHandlerMapping$OperationHandler.handle(javax.servlet.http.HttpServletRequest,java.util.Map<java.lang.String, java.lang.String>)
+2018-10-03 20:10:58.110  INFO 17772 --- [           main] s.b.a.e.w.s.WebMvcEndpointHandlerMapping : Mapped "{[/actuator/loggers],methods=[GET],produces=[application/vnd.spring-boot.actuator.v2+json || application/json]}" onto public java.lang.Object org.springframework.boot.actuate.endpoint.web.servlet.AbstractWebMvcEndpointHandlerMapping$OperationHandler.handle(javax.servlet.http.HttpServletRequest,java.util.Map<java.lang.String, java.lang.String>)
+2018-10-03 20:10:58.110  INFO 17772 --- [           main] s.b.a.e.w.s.WebMvcEndpointHandlerMapping : Mapped "{[/actuator/loggers/{name}],methods=[GET],produces=[application/vnd.spring-boot.actuator.v2+json || application/json]}" onto public java.lang.Object org.springframework.boot.actuate.endpoint.web.servlet.AbstractWebMvcEndpointHandlerMapping$OperationHandler.handle(javax.servlet.http.HttpServletRequest,java.util.Map<java.lang.String, java.lang.String>)
+2018-10-03 20:10:58.111  INFO 17772 --- [           main] s.b.a.e.w.s.WebMvcEndpointHandlerMapping : Mapped "{[/actuator/loggers/{name}],methods=[POST],consumes=[application/vnd.spring-boot.actuator.v2+json || application/json]}" onto public java.lang.Object org.springframework.boot.actuate.endpoint.web.servlet.AbstractWebMvcEndpointHandlerMapping$OperationHandler.handle(javax.servlet.http.HttpServletRequest,java.util.Map<java.lang.String, java.lang.String>)
+2018-10-03 20:10:58.111  INFO 17772 --- [           main] s.b.a.e.w.s.WebMvcEndpointHandlerMapping : Mapped "{[/actuator/heapdump],methods=[GET],produces=[application/octet-stream]}" onto public java.lang.Object org.springframework.boot.actuate.endpoint.web.servlet.AbstractWebMvcEndpointHandlerMapping$OperationHandler.handle(javax.servlet.http.HttpServletRequest,java.util.Map<java.lang.String, java.lang.String>)
+2018-10-03 20:10:58.111  INFO 17772 --- [           main] s.b.a.e.w.s.WebMvcEndpointHandlerMapping : Mapped "{[/actuator/threaddump],methods=[GET],produces=[application/vnd.spring-boot.actuator.v2+json || application/json]}" onto public java.lang.Object org.springframework.boot.actuate.endpoint.web.servlet.AbstractWebMvcEndpointHandlerMapping$OperationHandler.handle(javax.servlet.http.HttpServletRequest,java.util.Map<java.lang.String, java.lang.String>)
+2018-10-03 20:10:58.112  INFO 17772 --- [           main] s.b.a.e.w.s.WebMvcEndpointHandlerMapping : Mapped "{[/actuator/metrics],methods=[GET],produces=[application/vnd.spring-boot.actuator.v2+json || application/json]}" onto public java.lang.Object org.springframework.boot.actuate.endpoint.web.servlet.AbstractWebMvcEndpointHandlerMapping$OperationHandler.handle(javax.servlet.http.HttpServletRequest,java.util.Map<java.lang.String, java.lang.String>)
+2018-10-03 20:10:58.112  INFO 17772 --- [           main] s.b.a.e.w.s.WebMvcEndpointHandlerMapping : Mapped "{[/actuator/metrics/{requiredMetricName}],methods=[GET],produces=[application/vnd.spring-boot.actuator.v2+json || application/json]}" onto public java.lang.Object org.springframework.boot.actuate.endpoint.web.servlet.AbstractWebMvcEndpointHandlerMapping$OperationHandler.handle(javax.servlet.http.HttpServletRequest,java.util.Map<java.lang.String, java.lang.String>)
+2018-10-03 20:10:58.112  INFO 17772 --- [           main] s.b.a.e.w.s.WebMvcEndpointHandlerMapping : Mapped "{[/actuator/scheduledtasks],methods=[GET],produces=[application/vnd.spring-boot.actuator.v2+json || application/json]}" onto public java.lang.Object org.springframework.boot.actuate.endpoint.web.servlet.AbstractWebMvcEndpointHandlerMapping$OperationHandler.handle(javax.servlet.http.HttpServletRequest,java.util.Map<java.lang.String, java.lang.String>)
+2018-10-03 20:10:58.112  INFO 17772 --- [           main] s.b.a.e.w.s.WebMvcEndpointHandlerMapping : Mapped "{[/actuator/httptrace],methods=[GET],produces=[application/vnd.spring-boot.actuator.v2+json || application/json]}" onto public java.lang.Object org.springframework.boot.actuate.endpoint.web.servlet.AbstractWebMvcEndpointHandlerMapping$OperationHandler.handle(javax.servlet.http.HttpServletRequest,java.util.Map<java.lang.String, java.lang.String>)
+2018-10-03 20:10:58.113  INFO 17772 --- [           main] s.b.a.e.w.s.WebMvcEndpointHandlerMapping : Mapped "{[/actuator/mappings],methods=[GET],produces=[application/vnd.spring-boot.actuator.v2+json || application/json]}" onto public java.lang.Object org.springframework.boot.actuate.endpoint.web.servlet.AbstractWebMvcEndpointHandlerMapping$OperationHandler.handle(javax.servlet.http.HttpServletRequest,java.util.Map<java.lang.String, java.lang.String>)
+2018-10-03 20:10:58.113  INFO 17772 --- [           main] s.b.a.e.w.s.WebMvcEndpointHandlerMapping : Mapped "{[/actuator],methods=[GET],produces=[application/vnd.spring-boot.actuator.v2+json || application/json]}" onto protected java.util.Map<java.lang.String, java.util.Map<java.lang.String, org.springframework.boot.actuate.endpoint.web.Link>> org.springframework.boot.actuate.endpoint.web.servlet.WebMvcEndpointHandlerMapping.links(javax.servlet.http.HttpServletRequest,javax.servlet.http.HttpServletResponse)
+2018-10-03 20:10:58.132  INFO 17772 --- [           main] s.w.s.m.m.a.RequestMappingHandlerMapping : Mapped "{[/error]}" onto public java.util.Map<java.lang.String, java.lang.Object> org.springframework.boot.actuate.autoconfigure.web.servlet.ManagementErrorEndpoint.invoke(org.springframework.web.context.request.ServletWebRequest)
+2018-10-03 20:10:58.137  INFO 17772 --- [           main] o.s.w.s.handler.SimpleUrlHandlerMapping  : Mapped URL path [/webjars/**] onto handler of type [class org.springframework.web.servlet.resource.ResourceHttpRequestHandler]
+2018-10-03 20:10:58.137  INFO 17772 --- [           main] o.s.w.s.handler.SimpleUrlHandlerMapping  : Mapped URL path [/**] onto handler of type [class org.springframework.web.servlet.resource.ResourceHttpRequestHandler]
+2018-10-03 20:10:58.148  INFO 17772 --- [           main] s.w.s.m.m.a.RequestMappingHandlerAdapter : Looking for @ControllerAdvice: org.springframework.boot.web.servlet.context.AnnotationConfigServletWebServerApplicationContext@29f85fe1: startup date [Wed Oct 03 20:10:57 CST 2018]; parent: org.springframework.boot.web.servlet.context.AnnotationConfigServletWebServerApplicationContext@6ca8564a
+2018-10-03 20:10:58.192  INFO 17772 --- [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port(s): 9091 (http) with context path '/13-springboot-actuator'
+2018-10-03 20:10:58.205  INFO 17772 --- [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port(s): 9090 (http) with context path ''
+```
+
+此时访问“http://localhost:9091/13-springboot-actuator/actuator/health” 会出现以下信息：
+
+```text
+{"status":"UP"}
+```
+
