@@ -2412,16 +2412,16 @@ ${#session.id}
 
 Thymeleaf模板引擎提供的一组功能性内置对象，可以在模板中直接使用这些对象提供的功能方法，内置功能对象以“#”开头。
 
-- #dates
-- #calendars
-- #numbers
-- #objects
-- #bools
-- #arrays
-- #lists
-- #sets
-- #maps
-- #aggregates
+- \#dates
+- \#calendars
+- \#numbers
+- \#objects
+- \#bools
+- \#arrays
+- \#lists
+- \#sets
+- \#maps
+- \#aggregates
 
 ### Spring Boot Actuator
 
