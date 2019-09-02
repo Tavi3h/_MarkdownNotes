@@ -734,7 +734,7 @@ execute finally2
 */
 ```
 
-此外，由于在一个方法内部定义的变量都存储在栈中，当这个函数结束后，其对应的栈就会被回收，此时在其方法体中定义的变量就不存在了，因此`return`在返回时不是直接返回变量的值，而是复制一份，然后返回。因此，对于基本类型的数据，在`finally`块中改变要返回的值对返回值没有任何影响（不在`finally`块中进行`return`），而对引用类型的数据会有印象。
+此外，由于在一个方法内部定义的变量都存储在栈中，当这个函数结束后，其对应的栈就会被回收，此时在其方法体中定义的变量就不存在了，因此`return`在返回时不是直接返回变量的值，而是复制一份，然后返回。因此，对于基本类型的数据，在`finally`块中改变要返回的值对返回值没有任何影响（不在`finally`块中进行`return`），而对引用类型的数据会有影响。
 
 ```java
 public class TestClass {
@@ -2899,6 +2899,275 @@ Java提供的线程安全的`Queue`中非阻塞队列的典型例子就是`Concu
 
 `CopyOnWriteArraySet`与`CopyOnWriteArrayList`同理，它基于`CopyOnWriteArrayList`实现，是线程安全的无序不可重复集合。
 
+### 2.6 设计模式
+
+#### 2.6.1 单例模式
+
+单例模式的几种实现：
+
+（1）饿汉式：线程安全，不能延时加载
+
+```java
+class Singleton {
+    private static Singleton instance = new Singleton();
+    private Singleton() {}
+    public static Singleton getInstance() {
+        return instance;
+    }
+}
+```
+
+（2）懒汉式I：线程不安全，可以延时加载
+
+```java
+class Singleton {
+    private static Singleton instance;
+    private Singleton() {}
+    public static Singleton getInstance() {
+        if (instance == null) {
+            instance = new Singleton();
+        }
+        return instance;
+    }
+}
+```
+
+（3）懒汉式II：线程安全，效率较低
+
+```java
+class Singleton {
+    private static Singleton instance;
+    private Singleton() {}
+    public static synchronized Singleton getInstance() {
+        if (instance == null) {
+            instance = new Singleton();
+        }
+        return instance;
+    }
+}
+```
+
+（4）懒汉式III：双重锁判断机制，不推荐，可能会出问题
+
+```java
+class Singleton {
+    private volatile static Singleton instance;
+    private Singleton() {}
+    public static Singleton getInstance() {
+        if (instance == null) {
+            synchronized (Singleton.class) {
+                if (instance == null) {
+                    instance = new Singleton();
+                }
+            }
+        }
+        return instance;
+    }
+}
+```
+
+（5）静态内部类实现：线程安全，可以延时加载
+
+```java
+class Singleton {
+    private static class SingletonInnerClass {
+        private static final Singleton instance = new Singleton();
+    }
+    
+    private Singleton() {}
+
+    public static Singleton getInstance() {
+        return SingletonInnerClass.instance;
+    }
+}
+```
+
+（6）枚举实现：线程安全，不能延时加载，可以防止反射和反序列化不一致
+
+```java
+enum Singleton {
+    INSTANCE;
+    public Singleton getInstance() {
+        return INSTANCE;
+    }
+}
+```
+
+#### 2.6.2 适配器模式
+
+示例：
+
+`Enumeration`是java中比较早提供的遍历稽核接口，`Iterator`是新的遍历接口。现在要使一个实现`Enumeration`的类可以通过`Iterator`进行遍历，这就需要适配器来完成。
+
+步骤：
+
+- 新增适配器类，这里要适配Enumeration，增加类`EnumerationAdapter`
+- 适配器类实现目标接口，这里需要实现`Iterator`
+- 适配器类持有被适配类的引用
+
+```java
+class EnumerationAdapter<T> implements Iterator<T> {
+
+    private Enumeration<T> enumeration;
+
+    public EnumerationAdapter(Enumeration<T> enumeration) {
+        this.enumeration = enumeration;
+    }
+
+    @Override
+    public boolean hasNext() {
+        return enumeration.hasMoreElements();
+    }
+
+    @Override
+    public T next() {
+        return enumeration.nextElement();
+    }
+
+    @Override
+    public void remove() {
+        throw new UnsupportedOperationException();
+    }
+}
+```
+
+Java的IO流体系使用了适配器模式，例如将字节流转为字符流：
+
+```java
+File file = new File("hello.txt");   
+FileInputStream in = new FileInputStream(file); 
+InputStreamReader inReader = new InputStreamReader(in); // 将字节流适配为字符流
+```
+
+#### 2.6.3 装饰者模式
+
+动态地给一个对象添加一些额外的职责。就增加功能来说，装饰器模式相比生成子类更为灵活。
+
+Java的IO体系使用了该模式。
+
+示例：
+
+```java
+File file = new File("hello.txt");   
+FileInputStream in = new FileInputStream(file); 
+InputStreamReader inReader = new InputStreamReader(in); 
+BufferedReader bufReader = new BufferedReader(inReader); // 将字符流装饰为带有缓冲区的字符流
+```
+
+#### 2.6.4 观察者模式
+
+又称为订阅-发布模式。
+
+示例:
+
+```java
+// 被观察对象
+class Subject {
+
+    private int state;
+
+    // 观察者列表
+    private List<Observer> observerList;
+
+    public Subject() {
+        observerList = new ArrayList<>();
+    }
+
+    public int getState() {
+        return state;
+    }
+
+    // 被观察对象状态改变，通知所有观察者
+    public void setState(int state) {
+        if (this.state != state) {
+            this.state = state;
+            notifyAllObservers();
+        }
+    }
+
+    // 注册观察者
+    public void attach(Observer o) {
+        observerList.add(o);
+    }
+
+    // 解除观察者
+    public void detach(Observer o) {
+        observerList.remove(o);
+    }
+
+    // 通知所有观察者
+    public void notifyAllObservers() {
+        for (Observer observer : observerList) {
+            observer.update();
+        }
+    }
+}
+
+interface Observer {
+    public abstract void update();
+}
+
+// 观察者1
+class BinaryObserver implements Observer {
+
+    private Subject subject;
+
+    public BinaryObserver(Subject subject) {
+        this.subject = subject;
+        subject.attach(this);
+    }
+
+    @Override
+    public void update() {
+        System.out.println("Binary String: " + Integer.toBinaryString(subject.getState()));
+    }
+}
+
+// 观察者2
+class OctalObserver implements Observer {
+
+    private Subject subject;
+
+    public OctalObserver(Subject subject) {
+        this.subject = subject;
+        subject.attach(this);
+    }
+
+    @Override
+    public void update() {
+        System.out.println("Octal String: " + Integer.toOctalString(subject.getState()));
+    }
+}
+
+public class TestClass {
+
+    @Test
+    public void testCase() {
+        Subject sub = new Subject();
+        Observer binaryObserver = new BinaryObserver(sub);
+        Observer octalObserver = new OctalObserver(sub);
+        sub.setState(10);
+        sub.detach(binaryObserver);
+        sub.setState(11);
+    }
+}
+/*
+Binary String: 1010
+Octal String: 12
+Octal String: 13
+*/
+```
+
+#### 2.6.5 原型模式
+
+#### 2.6.6 工厂模式
+
+#### 2.6.7 享元模式
+
+#### 2.6.8 模板方法模式
+
+
+
 ## 第三章 高级数据结构
 
 ### 3.1 树
@@ -4278,7 +4547,7 @@ public class Trie<Value> {
 
 #### 3.1.5 BTree --- B树与B+树
 
-##### 3.1.6 B树
+##### 3.1.5.1 B树
 
 B树是对二叉查找树的改进。它的设计思想是，将相关数据尽量集中在一起，以便一次读取多个数据，减少硬盘操作次数。B树为系统最优化大块数据的读和写操作。B树算法减少定位记录时所经历的中间过程，从而加快存取速度。普遍运用在数据库和文件系统。
 
@@ -4304,7 +4573,7 @@ B树与磁盘IO：
 
 磁盘IO相对于内存来说是很慢的。数据库索引是存储在磁盘上的，当数据量大时，就不能把整个索引全部加载到内存了，只能逐一加载每一个磁盘页（对应索引树的节点）。所以我们要减少IO次数，对于树来说，IO次数就是树的高度，而“矮胖”就是b树的特征之一。B树在查询时的比较次数并不比二叉树少，尤其是节点中的数非常多时，但是内存中的比较速度是非常快的，耗时可以忽略，所以只要树的高度低，IO少，就可以提高查询性能，这是B树的优势之一。
 
-##### 3.1.7 B+树
+##### 3.1.5.2 B+树
 
 B+树是B树的一种变体，查询性能更好。
 
@@ -4324,13 +4593,1495 @@ B+树相比于B树的查询优势：
 
 ### 3.2 图
 
+// TODO
+
 #### 3.1 无向图
 
 #### 3.2 有向图
 
 ### 3.3 堆
 
-## 第四章 算法
+// TODO
+
+## 第四章 基础算法
+
+### 4.1 排序
+
+排序算法复杂度总结：
+
+![排序总结](images\排序总结.png)
+
+- n： 数据规模
+- k：“桶”的个数
+- In-place： 占用常数内存，不占用额外内存
+- Out-place： 占用额外内存
+
+#### 4.1.1 冒泡排序
+
+思想：
+
+- 比较相邻的元素。如果第一个比第二个大，就交换他们两个。
+- 对每一对相邻元素做同样的工作，从开始第一对到结尾的最后一对。在这一点，最后的元素应该会是最大的数。
+- 针对所有的元素重复以上的步骤，除了最后一个。
+- 持续每次对越来越少的元素重复上面的步骤，直到没有任何一对数字需要比较。
+
+实现：
+
+```java
+public class Bubble {
+    public static <T extends Comparable<? super T>> void sort(T[] arr) {
+
+        if (arr == null || arr.length < 2) {
+            return;
+        }
+
+        for (int i = 0; i < arr.length - 1; i++) {
+            for (int j = 0; j < arr.length - 1 - i; j++) {
+                if (less(arr[j + 1], arr[j])) {
+                    swap(arr, j + 1, j);
+                }
+            }
+        }
+    }
+
+    private static <T> void swap(T[] arr, int i, int j) {
+        T tmp = arr[i];
+        arr[i] = arr[j];
+        arr[j] = tmp;
+    }
+
+    private static <T extends Comparable<? super T>> boolean less(T v, T w) {
+        return v.compareTo(w) < 0;
+    }
+}
+```
+
+#### 4.1.2 选择排序
+
+思想：
+
+第一次从待排序的数据元素中选出最小（或最大）的一个元素，存放在序列的起始位置，然后再从剩余的未排序元素中寻找到最小（大）元素，然后放到已排序的序列的末尾。以此类推，直到全部待排序的数据元素的个数为零。
+
+实现：
+
+```java
+public class Selection {
+    public static <T extends Comparable<? super T>> void sort(T[] arr) {
+
+        if (arr == null || arr.length < 2) {
+            return;
+        }
+
+        for (int i = 0; i < arr.length; i++) {
+            int min = i;
+            for (int j = i + 1; j < arr.length; j++) {
+                if (less(arr[j], arr[min])) {
+                    min = j;
+                }
+            }
+            swap(arr, min, i);
+        }
+    }
+
+    private static <T> void swap(T[] arr, int i, int j) {
+        T tmp = arr[i];
+        arr[i] = arr[j];
+        arr[j] = tmp;
+    }
+
+    private static <T extends Comparable<? super T>> boolean less(T v, T w) {
+        return v.compareTo(w) < 0;
+    }
+}
+```
+
+#### 4.1.3 插入排序
+
+思想：
+
+把n个待排序的元素看成为一个有序表和一个无序表。开始时有序表中只包含1个元素，无序表中包含有n-1个元素，排序过程中每次从无序表中取出第一个元素，将它插入到有序表中的适当位置，使之成为新的有序表，重复n-1次可完成排序过程。
+
+实现：
+
+```java
+public class Insertion {
+    public static <T extends Comparable<? super T>> void sort(T[] arr) {
+
+        if (arr == null || arr.length < 2) {
+            return;
+        }
+
+        for (int i = 1; i < arr.length; i++) {
+            for (int j = i; j > 0 && less(arr[j], arr[j - 1]); j--) {
+                swap(arr, j, j - 1);
+            }
+        }
+    }
+
+    private static <T> void swap(T[] arr, int i, int j) {
+        T tmp = arr[i];
+        arr[i] = arr[j];
+        arr[j] = tmp;
+    }
+
+    private static <T extends Comparable<? super T>> boolean less(T v, T w) {
+        return v.compareTo(w) < 0;
+    }
+}
+```
+
+#### 4.1.4 希尔排序
+
+希尔排序也是一种插入排序，它是简单插入排序经过改进之后的一个更高效的版本，也称为缩小增量排序，同时该算法是冲破$O(n^2)$的第一批算法之一。它与插入排序的不同之处在于，它会优先比较距离较远的元素。
+
+实现：
+
+```java
+public class Shell {
+
+    public static <T extends Comparable<? super T>> void sort(T[] arr) {
+
+        if (arr == null || arr.length < 2) {
+            return;
+        }
+
+        int h = 1;
+        while (h < arr.length / 3) {
+            h = 3 * h + 1;
+        }
+        while (h >= 1) {
+            for (int i = h; i < arr.length; i++) {
+                for (int j = i; j >= h && less(arr[j], arr[j - h]); j -= h) {
+                    swap(arr, j, j - h);
+                }
+            }
+            h /= 3;
+        }
+    }
+
+    private static <T> void swap(T[] arr, int i, int j) {
+        T tmp = arr[i];
+        arr[i] = arr[j];
+        arr[j] = tmp;
+    }
+
+    private static <T extends Comparable<? super T>> boolean less(T v, T w) {
+        return v.compareTo(w) < 0;
+    }
+}
+```
+
+#### 4.1.5 归并排序
+
+思路：
+
+是利用递归与分治的技术将数据序列划分为越来越小的半子表,再对半子表排序,最后再用递归方法将排好序的半子表合并成越来越大的有序序列。
+
+实现：
+
+```java
+public class Merge {
+    
+    public static <T extends Comparable<? super T>> void sort(T[] arr) {
+
+        if (arr == null || arr.length < 2) {
+            return;
+        }
+
+        T[] aux = (T[]) Array.newInstance(arr.getClass().getComponentType(), arr.length);
+        sort(arr, aux, 0, arr.length - 1);
+    }
+
+    private static <T extends Comparable<? super T>> void sort(T[] arr, T[] aux, int lo, int hi) {
+        if (lo >= hi) {
+            return;
+        }
+        int mid = lo + (hi - lo >>> 1);
+        sort(arr, aux, lo, mid);
+        sort(arr, aux, mid + 1, hi);
+        merge(arr, aux, lo, mid, hi);
+    }
+
+    private static <T extends Comparable<? super T>> void merge(T[] arr, T[] aux, int lo, int mid, int hi) {
+
+        int i = lo, j = mid + 1;
+
+        System.arraycopy(arr, lo, aux, lo, hi - lo + 1);
+        
+        for (int k = lo; k <= hi; k++) {
+            if (i > mid) {
+                arr[k] = aux[j++];
+            } else if (j > hi) {
+                arr[k] = aux[i++];
+            } else if (less(aux[j], aux[i])) {
+                arr[k] = aux[j++];
+            } else {
+                arr[k] = aux[i++];
+            }
+        }
+    }
+
+    private static <T extends Comparable<? super T>> boolean less(T v, T w) {
+        return v.compareTo(w) < 0;
+    }
+}
+```
+
+#### 4.1.6 快速排序
+
+思想：
+
+通过一趟排序将要排序的数据分割成独立的两部分，其中一部分的所有数据都比另外一部分的所有数据都要小，然后再按此方法对这两部分数据分别进行快速排序，整个排序过程可以递归进行，以此达到整个数据变成有序序列。
+
+实现：
+
+```java
+public class Quick {
+    public static <T extends Comparable<? super T>> void sort(T[] arr) {
+
+        if (arr == null || arr.length < 2) {
+            return;
+        }
+        sort(arr, 0, arr.length - 1);
+    }
+
+    private static <T extends Comparable<? super T>> void sort(T[] arr, int lo, int hi) {
+        if (lo >= hi) {
+            return;
+        }
+        int pivot = partition(arr, lo, hi);
+        sort(arr, lo, pivot - 1);
+        sort(arr, pivot + 1, hi);
+    }
+
+    private static <T extends Comparable<? super T>> int partition(T[] arr, int lo, int hi) {
+        int i = lo, j = hi + 1; // 左右扫描指针
+        T v = arr[lo]; // 切分元素
+        while (true) {
+
+            // 从数组左端开始向右扫描，直到找到一个>=切分元素的元素
+            while (less(arr[++i], v)) {
+                if (i == hi) {
+                    break;
+                }
+            }
+
+            // 从数组右端开始向右扫描，直到找到一个<=切分元素的元素
+            while(less(v, arr[--j])) {
+                if (j == lo) {
+                    break;
+                }
+            }
+
+            // 指针相遇，退出循环
+            if (i >= j) {
+                break;
+            }
+
+            // 交换位置
+            swap(arr, i, j);
+        }
+        swap(arr, lo, j); // 将v放入到正确的位置
+        return j; // 此时arr[lo...j-1] <= arr[j] <= arr[j+1...hi]
+    }
+
+    private static <T> void swap(T[] arr, int i, int j) {
+        T tmp = arr[i];
+        arr[i] = arr[j];
+        arr[j] = tmp;
+    }
+
+    private static <T extends Comparable<? super T>> boolean less(T v, T w) {
+        return v.compareTo(w) < 0;
+    }
+}
+```
+
+#### 4.1.7 堆排序
+
+堆排序是利用堆这种数据结构而设计的一种排序算法。
+
+大顶堆：arr[i] >= arr[2i+1] && arr[i] >= arr[2i+2]
+小顶堆：arr[i] <= arr[2i+1] && arr[i] <= arr[2i+2] 
+
+思想：
+
+建立大顶堆，将堆顶元素与末尾元素进行交换，使末尾元素最大。然后继续调整堆，再将堆顶元素与末尾元素交换，得到第二大元素。如此反复进行交换、重建、交换。
+
+```java
+public class Heap {
+
+    public static <T extends Comparable<? super T>> void sort(T[] arr) {
+        if (arr == null || arr.length < 2) {
+            return;
+        }
+
+        for (int i = 0; i < arr.length; i++) {
+            // 建堆
+            createHeap(arr, arr.length - i - 1);
+            swap(arr, 0, arr.length - i - 1);
+        }
+    }
+
+    private static <T extends Comparable<? super T>> void createHeap(T[] arr, int hi) {
+        for (int i = arr.length / 2 - 1; i >= 0; i--) {
+            int t = i, b = 2 * i + 1;
+            while (b <= hi) {
+                if (b < hi) {
+                    if (less(arr[b], arr[b + 1])) {
+                        b++;
+                    }
+                }
+                if (less(arr[t], arr[b])) {
+                    swap(arr, t, b);
+                    t = b;
+                } else {
+                    break;
+                }
+            }
+        }
+    }
+
+    private static <T> void swap(T[] arr, int i, int j) {
+        T tmp = arr[i];
+        arr[i] = arr[j];
+        arr[j] = tmp;
+    }
+
+    private static <T extends Comparable<? super T>> boolean less(T v, T w) {
+        return v.compareTo(w) < 0;
+    }
+}
+```
+
+### 4.2 链表
+
+链表数据结构：
+
+```java
+public class ListNode {
+    public int val;
+    public ListNode next;
+
+    public ListNode(int x) {
+        val = x;
+    }
+
+    @Override
+    public String toString() {
+        return next != null ? val + "->" + next.toString() : val + "";
+    }
+
+    public static ListNode buildList(int... vals) {
+        ListNode dummy = new ListNode(-1), curr = dummy;
+        for (int i : vals) {
+            curr.next = new ListNode(i);
+            curr = curr.next;
+        }
+        return dummy.next;
+    }
+}
+```
+
+#### 4.2.1 反转链表
+
+```java
+public static ListNode reverse(ListNode head) {
+    if (head == null || head.next == null) {
+        return head;
+    }
+    
+    ListNode p = head.next;
+    head.next = null;
+    ListNode q = reverse(p);
+    p.next = head;
+    return q;
+}
+```
+
+#### 4.2.2 合并两个有序链表
+
+```java
+public static ListNode merge(ListNode l1, ListNode l2) {
+    ListNode dummy = new ListNode(-1), curr = dummy;
+    while (l1 != null && l2 != null) {
+        if (l1.val <= l2.val) {
+            curr.next = l1;
+            l1 = l1.next;
+        } else {
+            curr.next = l2;
+            l2 = l2.next;
+        }
+        curr = curr.next;
+    }
+    curr.next = l1 == null ? l2 : l1;
+    return dummy.next;
+}
+```
+
+#### 4.2.3 判断两个链表是否相交
+
+两个相交的链表有共同的尾节点。
+
+```java
+public static static boolean isIntersected(ListNode headA, ListNode headB) {
+    if (headA == null || headB == null) {
+        return false;
+    }
+    ListNode tailA = headA, tailB = headB;
+    while (tailA.next != null) {
+        tailA = tailA.next;
+    }
+    while (tailB.next != null) {
+        tailB = tailB.next;
+    }
+    return tailA == tailB;
+}
+```
+
+#### 4.2.4 找出两个链表相交的位置
+
+```java
+public static ListNode getIntersectionNode(ListNode headA, ListNode headB) {
+    if (headA == null || headB == null) {
+        return null;
+    }
+    ListNode a = headA, b = headB;
+    while (a != b) {
+        a = a != null ? a.next : headB;
+        b = b != null ? b.next : headA;
+    }
+    return a;
+}
+```
+
+#### 4.2.5 找出链表倒数第K个节点
+
+```java
+public ListNode kthFromEnd(ListNode head, int k) {
+    ListNode fast = head, slow = head;
+    for (int i = 0; i < k - 1; i++) {
+        fast = fast.next;
+    }
+    while (fast.next != null) {
+        fast = fast.next;
+        slow = slow.next;
+    }
+    return slow;
+}
+```
+
+#### 4.2.6 判断链表是否有环
+
+```java
+public static boolean hasCycle(ListNode head) {
+    ListNode slow = head, fast = head;
+    while (fast != null && fast.next != null) {
+        slow = slow.next;
+        fast = fast.next.next;
+        if (slow == fast) {
+            return true;
+        }
+    }
+    return false;
+}
+```
+
+#### 4.2.7 找出有环链表环的入口
+
+```java
+public static ListNode getCycleEntrance(ListNode head) {
+    ListNode fast = head, slow = head;
+    while (true) {
+        fast = fast.next.next;
+        slow = slow.next;
+        if (slow == fast) {
+            break;
+        }
+    }
+    fast = head;
+    while (slow != fast) {
+        fast = fast.next;
+        slow = slow.next;
+    }
+    return slow;
+}
+```
+
+### 4.3 数组
+
+#### 4.3.1 最大子序列和
+
+```java
+public int maxSubArray(int[] nums) {
+    if (nums == null || nums.length == 0) {
+        return 0;
+    }
+    int local = nums[0], global = nums[0];
+    for (int i = 1; i < nums.length; i++) {
+        local = Math.max(nums[i], local + nums[i]);
+        global = Math.max(local, global);
+    }
+    return global;
+}
+```
+
+#### 4.3.2 最大子序列积
+
+```java
+public int maxProduct(int[] nums) {
+    int max = nums[0], min = nums[0], res = Integer.MIN_VALUE;
+    for (int i = 1; i < nums.length; i++) {
+        int mx = max, mn = min;
+        max = Math.max(Math.max(nums[i], mx * nums[i]), mn * nums[i]);
+        min = Math.min(Math.min(nums[i], mx * nums[i]), mn * nums[i]);
+        res = Math.max(res, max);
+    }
+    return res;
+}
+```
+
+// TODO
+
+### 4.4 DFS/Backtracking
+
+#### 4.4.1 Letter Combinations of a Phone Number
+
+具体参见[LeetCode17](https://leetcode.com/problems/letter-combinations-of-a-phone-number/description/){:target="_blank"}.
+
+```java
+private static String[] TABLE = {"", "", "abc", "def", "ghi", "jkl", "mno", "pqrs", "tuv", "wxyz"};
+
+public List<String> letterCombinations(String digits) {
+    List<String> res = new ArrayList<>();
+    if (digits != null && !digits.isEmpty()) {
+        letterCombinations(digits, res, "", 0);
+    }
+    return res;
+}
+
+private void letterCombinations(String digits, List<String> res, String s, int idx) {
+    if (idx == digits.length()) {
+        res.add(s);
+    } else {
+        String letters = TABLE[digits.charAt(idx) - '0'];
+        for (int i = 0; i < letters.length(); i++) {
+            letterCombinations(digits, res, s + letters.charAt(i), idx + 1);
+        }
+    }
+}
+```
+
+#### 4.4.2 Sudoku Solver
+
+具体参见[LeetCode37](https://leetcode.com/problems/sudoku-solver/description/){:target="_blank"}.
+
+```java
+public void solveSudoku(char[][] board) {
+    solve(board);
+}
+
+private boolean solve(char[][] board) {
+    for (int i = 0; i < 9; i++) {
+        for (int j = 0; j < 9; j++) {
+            if (board[i][j] == '.') {
+                for (char c = '1'; c <= '9'; c++) {
+                    if (isValid(board, i, j, c)) {
+                        board[i][j] = c;
+                        if (solve(board)) {
+                            return true;
+                        }
+                        board[i][j] = '.';
+                    }
+                }
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+private boolean isValid(char[][] board, int i, int j, char c) {
+    for (int row = 0; row < 9; row++) {
+        if (board[row][j] == c) {
+            return false;
+        }
+    }
+    for (int col = 0; col < 9; col++) {
+        if (board[i][col] == c) {
+            return false;
+        }
+    }
+    for (int row = i / 3 * 3; row < i / 3 * 3 + 3; row++) {
+        for (int col = j / 3 * 3; col < j / 3 * 3 + 3; col++) {
+            if (board[row][col] == c) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+```
+
+#### 4.4.3 Combination Sum
+
+具体参见[LeetCode39](https://leetcode.com/problems/combination-sum/description/){:target="_blank"}.
+
+```java
+public List<List<Integer>> combinationSum(int[] candidates, int target) {
+    List<List<Integer>> res = new ArrayList<>();
+    if (candidates != null && candidates.length != 0) {
+        combinationSum(candidates, target, res, new ArrayList<>(), 0);
+    }
+    return res;
+}
+
+private void combinationSum(int[] candidates, int target, List<List<Integer>> res, List<Integer> list, int idx) {
+    if (target < 0) {
+        return;
+    } else if (target == 0) {
+        res.add(new ArrayList<>(list));
+    } else {
+        for (int i = idx; i < candidates.length; i++) {
+            list.add(candidates[i]);
+            combinationSum(candidates, target - candidates[i], res, list, i);
+            list.remove(list.size() - 1);
+        }
+    }
+}
+```
+
+#### 4.4.4 Combination SumII
+
+具体参见[LeetCode40](https://leetcode.com/problems/combination-sum-ii/description/){:target="_blank"}.
+
+```java
+public List<List<Integer>> combinationSum2(int[] candidates, int target) {
+    List<List<Integer>> res = new ArrayList<>();
+    if (candidates != null && candidates.length != 0) {
+        Arrays.sort(candidates);
+        combinationSum2(candidates, target, res, new ArrayList<>(), 0);
+    }
+    return res;
+}
+
+private void combinationSum2(int[] candidates, int target, List<List<Integer>> res, List<Integer> list, int idx) {
+    if (target < 0) {
+        return;
+    } else if (target == 0) {
+        res.add(new ArrayList<>(list));
+    } else {
+        for (int i = idx; i < candidates.length; i++) {
+            if (i > idx && candidates[i] == candidates[i - 1]) {
+                continue;
+            }
+            list.add(candidates[i]);
+            combinationSum2(candidates, target - candidates[i], res, list, i + 1);
+            list.remove(list.size() - 1);
+        }
+    }
+}
+```
+
+#### 4.4.5 Combination SumIII
+
+具体参见[LeetCode216](https://leetcode.com/problems/combination-sum-iii/description/){:target="_blank"}.
+
+```java
+public List<List<Integer>> combinationSum3(int k, int n) {
+    List<List<Integer>> res = new ArrayList<>();
+    combinationSum3(res, new ArrayList<>(), k, n, 1);
+    return res;
+}
+
+private void combinationSum3(List<List<Integer>> res, List<Integer> list, int k, int n, int idx) {
+    if (n < 0 || list.size() > k) {
+        return;
+    } else if (n == 0 && list.size() == k) {
+        res.add(new ArrayList<>(list));
+    } else {
+        for (int i = idx; i < 10; i++) {
+            list.add(i);
+            combinationSum3(res, list, k, n - i, i + 1);
+            list.remove(list.size() - 1);
+        }
+    }
+}
+```
+
+#### 4.4.6 Permutations
+
+具体参见[LeetCode46](https://leetcode.com/problems/permutations/description/){:target="_blank"}.
+
+```java
+public List<List<Integer>> permute(int[] nums) {
+    List<List<Integer>> res = new ArrayList<>();
+    if (nums != null && nums.length != 0) {
+        permute(res, new ArrayList<>(), new boolean[nums.length], nums);
+    }
+    return res;
+}
+
+private void permute(List<List<Integer>> res, List<Integer> list, boolean[] visited, int[] nums) {
+    if (list.size() == nums.length) {
+        res.add(new ArrayList<>(list));
+    } else {
+        for (int i = 0; i < nums.length; i++) {
+            if (!visited[i]) {
+                visited[i] = true;
+                list.add(nums[i]);
+                permute(res, list, visited, nums);
+                list.remove(list.size() - 1);
+                visited[i] = false;
+            }
+        }
+    }
+}
+```
+
+#### 4.4.7 Permutations II
+
+具体参见[LeetCode47](https://leetcode.com/problems/permutations-ii/description/){:target="_blank"}.
+
+```java
+public List<List<Integer>> permuteUnique(int[] nums) {
+    List<List<Integer>> res = new ArrayList<>();
+    if (nums != null && nums.length != 0) {
+        Arrays.sort(nums);
+        permute(res, new ArrayList<>(), new boolean[nums.length], nums);
+    }
+    return res;
+}
+
+private void permute(List<List<Integer>> res, List<Integer> list, boolean[] visited, int[] nums) {
+    if (list.size() == nums.length) {
+        res.add(new ArrayList<>(list));
+    } else {
+        for (int i = 0; i < nums.length; i++) {
+            if (i > 0 && !visited[i - 1] && nums[i] == nums[i - 1]) {
+                continue;
+            }
+            if (!visited[i]) {
+                visited[i] = true;
+                list.add(nums[i]);
+                permute(res, list, visited, nums);
+                list.remove(list.size() - 1);
+                visited[i] = false;
+            }
+        }
+    }
+}
+```
+
+#### 4.4.8 N-Queens
+
+具体参见[LeetCode51](https://leetcode.com/problems/n-queens/description/){:target="_blank"}.
+
+```java
+public List<List<String>> solveNQueens(int n) {
+    char[][] board = new char[n][n];
+    for (char[] chars : board) {
+        Arrays.fill(chars, '.');
+    }
+    List<List<String>> res = new ArrayList<>();
+    solveNQueens(res, board, 0);
+    return res;
+}
+
+private void solveNQueens(List<List<String>> res, char[][] board, int row) {
+    if (row == board.length) {
+        List<String> list = new ArrayList<>();
+        for (char[] chars : board) {
+            list.add(String.valueOf(chars));
+        }
+        res.add(new ArrayList<>(list));
+    } else {
+        for (int col = 0; col < board.length; col++) {
+            if (isValid(board, row, col)) {
+                board[row][col] = 'Q';
+                solveNQueens(res, board, row + 1);
+                board[row][col] = '.';
+            }
+        }
+    }
+}
+
+private boolean isValid(char[][] board, int row, int col) {
+    for (int i = row - 1; i >= 0; i--) {
+        if (board[i][col] == 'Q') {
+            return false;
+        }
+    }
+
+    for (int i = row - 1, j = col - 1; i >= 0 && j >= 0; i--, j--) {
+        if (board[i][j] == 'Q') {
+            return false;
+        }
+    }
+
+    for (int i = row - 1, j = col + 1; i >= 0 && j < board.length; i--, j++) {
+        if (board[i][j] == 'Q') {
+            return false;
+        }
+    }
+    
+    return true;
+}
+```
+
+#### 4.4.9 Combinations
+
+具体参见[LeetCode77](https://leetcode.com/problems/combinations/description/){:target="_blank"}.
+
+```java
+public List<List<Integer>> combine(int n, int k) {
+    List<List<Integer>> res = new ArrayList<>();
+    combine(res, new ArrayList<>(), n, k, 1);
+    return res;
+}
+
+private void combine(List<List<Integer>> res, List<Integer> list, int n, int k, int idx) {
+    if (list.size() == k) {
+        res.add(new ArrayList<>(list));
+    } else {
+        for (int i = idx; i <= n; i++) {
+            list.add(i);
+            combine(res, list, n, k, i + 1);
+            list.remove(list.size() - 1);
+        }
+    }
+}
+```
+
+#### 4.4.10 Subsets
+
+具体参见[LeetCode77](https://leetcode.com/problems/subsets/description/){:target="_blank"}.
+
+```java
+public List<List<Integer>> subsets(int[] nums) {
+    List<List<Integer>> res = new ArrayList<>();
+    if (nums != null && nums.length != 0) {
+        subsets(res, new ArrayList<>(), nums, 0);
+    }
+    return res;
+}
+
+private void subsets(List<List<Integer>> res, List<Integer> list, int[] nums, int level) {
+    res.add(new ArrayList<>(list));
+    for (int i = level; i < nums.length; i++) {
+        list.add(nums[i]);
+        subsets(res, list, nums, i + 1);
+        list.remove(list.size() - 1);
+    }
+}
+```
+
+#### 4.4.11 SubsetsII
+
+具体参见[LeetCode90](https://leetcode.com/problems/subsets-ii/description/){:target="_blank"}.
+
+```java
+public List<List<Integer>> subsetsWithDup(int[] nums) {
+    List<List<Integer>> res = new ArrayList<>();
+    if (nums != null && nums.length != 0) {
+        Arrays.sort(nums);
+        subsetsWithDup(res, new ArrayList<>(), nums, 0);
+    }
+    return res;
+}
+
+private void subsetsWithDup(List<List<Integer>> res, List<Integer> list, int[] nums, int level) {
+    res.add(new ArrayList<>(list));
+    for (int i = level; i < nums.length; i++) {
+        if (i > level && nums[i] == nums[i - 1]) {
+            continue;
+        }
+        list.add(nums[i]);
+        subsetsWithDup(res, list, nums, i + 1);
+        list.remove(list.size() - 1);
+    }
+}
+```
+
+#### 4.4.12 Word Search
+
+具体参见[LeetCode79](https://leetcode.com/problems/word-search/description/){:target="_blank"}.
+
+```java
+public boolean exist(char[][] board, String word) {
+
+    for (int i = 0; i < board.length; i++) {
+        for (int j = 0; j < board[0].length; j++) {
+            if (search(board, word, i, j, 0)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+private boolean search(char[][] board, String word, int i, int j, int idx) {
+
+    if (idx == word.length()) {
+        return true;
+    }
+
+    if (i < 0 || j < 0 || i >= board.length || j >= board[0].length || board[i][j] != word.charAt(idx)) {
+        return false;
+    }
+
+    char c = board[i][j];
+    board[i][j] = '#';
+    boolean res = search(board, word, i - 1, j, idx + 1)
+            || search(board, word, i + 1, j, idx + 1)
+            || search(board, word, i, j - 1, idx + 1)
+            || search(board, word, i, j + 1, idx + 1);
+    board[i][j] = c;
+    return res;
+}
+```
+
+#### 4.4.13 Palindrome Partitioning
+
+具体参见[LeetCode131](https://leetcode.com/problems/palindrome-partitioning/description/){:target="_blank"}.
+
+```java
+public List<List<String>> partition(String s) {
+    List<List<String>> res = new ArrayList<>();
+    if (s != null && !s.isEmpty()) {
+        partition(res, new ArrayList<>(), s, 0);
+    }
+    return res;
+}
+
+private void partition(List<List<String>> res, List<String> list, String s, int start) {
+    if (start == s.length()) {
+        res.add(new ArrayList<>(list));
+    } else {
+        for (int i = start; i < s.length(); i++) {
+            String sub = s.substring(start, i + 1);
+            if (isPalindrome(sub)) {
+                list.add(sub);
+                partition(res, list, s, i + 1);
+                list.remove(list.size() - 1);
+            }
+        }
+    }
+}
+
+private boolean isPalindrome(String s) {
+    int i = 0, j = s.length() - 1;
+    while (i < j) {
+        if (s.charAt(i++) != s.charAt(j--)) {
+            return false;
+        }
+    }
+    return true;
+}
+```
+
+#### 4.4.14 Word BreakII
+
+具体参见[LeetCode140](https://leetcode.com/problems/word-break-ii/description/){:target="_blank"}.
+
+```java
+public List<String> wordBreak(String s, List<String> wordDict) {
+    List<String> res = new ArrayList<>();
+    Set<String> wordSet = new HashSet<>(wordDict);
+    if (wordBreak(s, new HashSet<>(wordSet))) {
+        dfs(s, wordSet, res, "");
+    }
+    return res;
+}
+
+public void dfs(String s, Set<String> wordSet, List<String> res, String word) {
+
+    if (s.isEmpty()) {
+        res.add(word.substring(0, word.length() - 1));
+    } else {
+        for (int i = 0; i < s.length(); i++) {
+            String sub = s.substring(0, i + 1);
+            if (wordSet.contains(sub)) {
+                dfs(s.substring(i + 1), wordSet, res, word + sub + " ");
+            }
+        }
+    }
+}
+
+public boolean wordBreak(String s, Set<String> wordDict) {
+    Set<String> hs = new HashSet<>(wordDict);
+    boolean[] dp = new boolean[s.length() + 1];
+    dp[0] = true;
+    for (int i = 0; i < dp.length; ++i) {
+        for (int j = 0; j < i; ++j) {
+            if (dp[j] && hs.contains(s.substring(j, i))) {
+                dp[i] = true;
+                break;
+            }
+        }
+    }
+    return dp[dp.length - 1];
+}
+```
+
+### 4.5 树
+
+TreeNode：
+
+```java
+public class TreeNode {
+    public int val;
+    public TreeNode left, right;
+
+    public TreeNode(int x) {
+        val = x;
+    }
+}
+```
+
+#### 4.5.1 Traversal
+
+##### 4.5.1.1 中序遍历（Inorder）
+
+具体参见[LeetCode94](https://leetcode.com/problems/binary-tree-inorder-traversal/description/){:target="_blank"}.
+
+中序遍历顺序：左->中->右
+
+递归实现：
+
+```java
+public List<Integer> inorderTraversal(TreeNode root) {
+    List<Integer> res = new ArrayList<>();
+    inorderTraversal(res, root);
+    return res;
+}
+
+private void inorderTraversal(List<Integer> res, TreeNode root) {
+    if (root == null) {
+        return;
+    } 
+    inorderTraversal(res, root.left);
+    res.add(root.val);
+    inorderTraversal(res, root.right);
+}
+```
+
+非递归实现：
+
+```java
+public List<Integer> inorderTraversal(TreeNode root) {
+
+    List<Integer> res = new LinkedList<>();
+    LinkedList<TreeNode> stack = new LinkedList<>();
+    TreeNode curr = root;
+    while (!stack.isEmpty() || curr != null) {
+        while (curr != null) {
+            stack.push(curr);
+            curr = curr.left;
+        }
+        curr = stack.pop();
+        res.add(curr.val);
+        curr = curr.right;
+    }
+    return res;
+}
+```
+
+##### 4.5.1.2 前序遍历（Preorder）
+
+具体参见[LeetCode144](https://leetcode.com/problems/binary-tree-preorder-traversal/description/){:target="_blank"}.
+
+前序遍历：中->左->右
+
+递归实现：
+
+```java
+public List<Integer> preorderTraversal(TreeNode root) {
+    List<Integer> res = new ArrayList<>();
+    preorderTraversal(root, res);
+    return res;
+}
+
+private void preorderTraversal(TreeNode node, List<Integer> res) {
+    if (node == null) {
+        return;
+    }
+    res.add(node.val);
+    preorderTraversal(node.left, res);
+    preorderTraversal(node.right, res);
+}
+```
+
+非递归实现：
+
+```java
+public List<Integer> preorderTraversal(TreeNode root) {
+    List<Integer> res = new ArrayList<>();
+    if (root != null) {
+        LinkedList<TreeNode> stack = new LinkedList<>();
+        stack.push(root);
+        while (!stack.isEmpty()) {
+            TreeNode node = stack.pop();
+            res.add(node.val);
+            if (node.right != null) {
+                stack.push(node.right);
+            }
+            if (node.left != null) {
+                stack.push(node.left);
+            }
+        }
+    }
+    return res;
+}
+```
+
+##### 4.5.1.3 后序遍历（Postorder）
+
+具体参见[LeetCode145](https://leetcode.com/problems/binary-tree-postorder-traversal/description/){:target="_blank"}.
+
+后序遍历：左->右->中
+
+递归实现：
+
+```java
+public List<Integer> postorderTraversal(TreeNode root) {
+    List<Integer> res = new ArrayList<>();
+    postorderTraversal(root, res);
+    return res;
+}
+
+private void postorderTraversal(TreeNode node, List<Integer> res) {
+    if (node == null) {
+        return;
+    }
+    postorderTraversal(node.left, res);
+    postorderTraversal(node.right, res);
+    res.add(node.val);
+}
+```
+
+非递归实现：
+
+```java
+public List<Integer> postorderTraversal(TreeNode root) {
+    List<Integer> res = new ArrayList<>();
+    LinkedList<TreeNode> stack = new LinkedList<>();
+    if (root != null) {
+        stack.push(root);
+        while (!stack.isEmpty()) {
+            TreeNode node = stack.pop();
+            res.add(0, node.val);
+            if (node.left != null) {
+                stack.push(node.left);
+            }
+            if (node.right != null) {
+                stack.push(node.right);
+            }
+        }
+    }
+    return res;
+}
+```
+
+##### 4.5.1.4 层级遍历（Levelorder）
+
+具体参见[LeetCode102](https://leetcode.com/problems/binary-tree-level-order-traversal/description/){:target="_blank"}.
+
+```java
+public List<List<Integer>> levelOrder(TreeNode root) {
+    List<List<Integer>> res = new ArrayList<>();
+    if (root != null) {
+        Queue<TreeNode> queue = new LinkedList<>();
+        queue.add(root);
+        while (!queue.isEmpty()) {
+            int size = queue.size();
+            List<Integer> list = new ArrayList<>();
+            for (int i = 0; i < size; i++) {
+                TreeNode node = queue.poll();
+                list.add(node.val);
+                if (node.left != null) {
+                    queue.add(node.left);
+                }
+                if (node.right != null) {
+                    queue.add(node.right);
+                }
+            }
+            res.add(list);
+        }
+    }
+    return res;
+}
+```
+
+##### 4.5.1.5 逆序层级遍历（ReverseLevelorder）
+
+具体参见[LeetCode107](https://leetcode.com/problems/binary-tree-level-order-traversal-ii/description/){:target="_blank"}.
+
+```java
+public List<List<Integer>> levelOrderBottom(TreeNode root) {
+    List<List<Integer>> res = new ArrayList<>();
+    if (root != null) {
+        Queue<TreeNode> queue = new LinkedList<>();
+        queue.add(root);
+        while (!queue.isEmpty()) {
+            int size = queue.size();
+            List<Integer> list = new ArrayList<>();
+            for (int i = 0; i < size; i++) {
+                TreeNode node = queue.poll();
+                list.add(node.val);
+                if (node.left != null) {
+                    queue.add(node.left);
+                }
+                if (node.right != null) {
+                    queue.add(node.right);
+                }
+            }
+            res.add(0, list);
+        }
+    }
+    return res;
+}
+```
+
+#### 4.5.2 Validate Binary Search Tree
+
+具体参见[LeetCode98](https://leetcode.com/problems/validate-binary-search-tree/description/){:target="_blank"}.
+
+```java
+public boolean isValidBST(TreeNode root) {
+    return root == null || isValidBST(root.left, Long.MIN_VALUE, root.val) && isValidBST(root.right, root.val, Long.MAX_VALUE);
+}
+
+private boolean isValidBST(TreeNode node, long min, long max) {
+    return node == null || node.val > min && node.val < max && isValidBST(node.left, min, node.val) && isValidBST(node.right, node.val, max);
+}
+```
+
+#### 4.5.3 Same Tree
+
+具体参见[LeetCode100](https://leetcode.com/problems/same-tree/description/){:target="_blank"}.
+
+```java
+public boolean isSameTree(TreeNode p, TreeNode q) {
+    if (p == null && q == null) {
+        return true;
+    } else if (p == null || q == null) {
+        return false;
+    } else {
+        return p.val == q.val && isSameTree(p.left, q.left) && isSameTree(p.right, q.right);
+    }
+}
+```
+
+#### 4.5.4 Symmetric Tree
+
+具体参见[LeetCode101](https://leetcode.com/problems/symmetric-tree/description/){:target="_blank"}.
+
+```java
+public boolean isSymmetric(TreeNode root) {
+    return root == null || isSymmetric(root.left, root.right);
+}
+
+private boolean isSymmetric(TreeNode p, TreeNode q) {
+    if (p == null && q == null) {
+        return true;
+    } else if (p == null || q == null) {
+        return false;
+    } else if (p.val != q.val) {
+        return false;
+    } else {
+        return isSymmetric(p.left, q.right) && isSymmetric(p.right, q.left);
+    }
+}
+```
+
+#### 4.5.5 Maximum Depth of Binary Tree
+
+具体参见[LeetCode104](https://leetcode.com/problems/maximum-depth-of-binary-tree/description/){:target="_blank"}.
+
+```java
+public int maxDepth(TreeNode root) {
+    return root == null ? 0 : 1 + Math.max(maxDepth(root.left), maxDepth(root.right));
+}
+```
+
+#### 4.5.6 Convert Sorted Array to Binary Search Tree
+
+具体参见[LeetCode108](https://leetcode.com/problems/convert-sorted-array-to-binary-search-tree/description/){:target="_blank"}.
+
+```java
+public TreeNode sortedArrayToBST(int[] nums) {
+    if (nums == null || nums.length == 0) {
+        return null;
+    }
+    return sortedArrayToBST(nums, 0, nums.length - 1);
+}
+
+private TreeNode sortedArrayToBST(int[] nums, int lo, int hi) {
+    if (lo > hi) {
+        return null;
+    }
+
+    int mid = lo + (hi - lo >>> 1);
+    TreeNode root = new TreeNode(nums[mid]);
+    root.left = sortedArrayToBST(nums, lo, mid - 1);
+    root.right = sortedArrayToBST(nums, mid + 1, hi);
+    return root;
+}
+```
+
+#### 4.5.7 Balanced Binary Tree
+
+具体参见[LeetCode110](https://leetcode.com/problems/balanced-binary-tree/description/){:target="_blank"}.
+
+```java
+public boolean isBalanced(TreeNode root) {
+    if (root == null) {
+        return true;
+    } else {
+        int l = maxDepth(root.left), r = maxDepth(root.right);
+        return Math.abs(l - r) <= 1 && isBalanced(root.left) && isBalanced(root.right);
+    }
+}
+
+public int maxDepth(TreeNode root) {
+    return root == null ? 0 : 1 + Math.max(maxDepth(root.left), maxDepth(root.right));
+}
+```
+
+#### 4.5.8 Minimum Depth of Binary Tree
+
+具体参见[LeetCode111](https://leetcode.com/problems/minimum-depth-of-binary-tree/description/){:target="_blank"}.
+
+```java
+public int minDepth(TreeNode root) {
+    if (root == null) {
+        return 0;
+    }
+    int l = minDepth(root.left), r = minDepth(root.right);
+    return l == 0 || r == 0 ? 1 + l + r : 1 + Math.min(l, r);
+}
+```
+
+#### 4.5.9 Invert Binary Tree
+
+具体参见[LeetCode226](https://leetcode.com/problems/invert-binary-tree/description/){:target="_blank"}.
+
+```java
+public TreeNode invertTree(TreeNode root) {
+    if (root == null) {
+        return null;
+    }
+    root.left = invertTree(root.left);
+    root.right = invertTree(root.right);
+    return root;
+}
+```
+
+#### 4.5.10 Binary Tree Paths
+
+具体参见[LeetCode257](https://leetcode.com/problems/binary-tree-paths/description/){:target="_blank"}.
+
+```java
+public List<String> binaryTreePaths(TreeNode root) {
+    List<String> res = new ArrayList<>();
+    binaryTreePaths(root, res, "");
+    return res;
+}
+
+private void binaryTreePaths(TreeNode node, List<String> res, String s) {
+
+    if (node == null) {
+        return;
+    } else if (node.left == null && node.right == null) {
+        res.add(s + node.val);
+    } else {
+        s += node.val + "->";
+        binaryTreePaths(node.left, res, s);
+        binaryTreePaths(node.right, res, s);
+    }
+}
+```
+
+#### 4.5.11 Path Sum
+
+具体参见[LeetCode112](https://leetcode.com/problems/path-sum/description/){:target="_blank"}.
+
+```java
+public boolean hasPathSum(TreeNode root, int sum) {
+
+    if (root == null) {
+        return false;
+    }
+
+    if (sum == root.val && root.left == null && root.right == null) {
+        return true;
+    }
+
+    return hasPathSum(root.left, sum - root.val) || hasPathSum(root.right, sum - root.val);
+}
+```
+
+#### 4.5.11 Path Sum II
+
+具体参见[LeetCode113](https://leetcode.com/problems/path-sum-ii/description/){:target="_blank"}.
+
+```java
+public List<List<Integer>> pathSum(TreeNode root, int sum) {
+    List<List<Integer>> res = new ArrayList<>();
+    if (root != null) {
+        pathSum(res, new ArrayList<>(), root, sum);
+    }
+    return res;
+}
+
+private void pathSum(List<List<Integer>> res, ArrayList<Integer> list, TreeNode node, int sum) {
+    if (node != null) {
+        list.add(node.val);
+        if (sum == node.val && node.left == null && node.right == null) {
+            res.add(new ArrayList<>(list));
+            return;
+        }
+        pathSum(res, list, node.left, sum - node.val);
+        pathSum(res, list, node.right, sum - node.val);
+        list.remove(list.size() - 1);
+    }
+}
+```
+
+#### 4.5.12 Lowest Common Ancestor of a Binary Search Tree
+
+具体参见[LeetCode235](https://leetcode.com/problems/lowest-common-ancestor-of-a-binary-search-tree/description/){:target="_blank"}.
+
+```java
+public TreeNode lowestCommonAncestor(TreeNode root, TreeNode p, TreeNode q) {
+    if (p.val > root.val && q.val > root.val) {
+        return lowestCommonAncestor(root.right, p, q);
+    } else if (p.val < root.val && q.val < root.val) {
+        return lowestCommonAncestor(root.left, p, q);
+    } else {
+        return root;
+    }
+}
+```
+
+#### 4.5.13 Lowest Common Ancestor of a Binary Tree
+
+具体参见[LeetCode236](https://leetcode.com/problems/lowest-common-ancestor-of-a-binary-tree/description/){:target="_blank"}.
+
+```java
+public TreeNode lowestCommonAncestor(TreeNode root, TreeNode p, TreeNode q) {
+    if (root == null || p == root || q == root) {
+        return root;
+    }
+    TreeNode left = lowestCommonAncestor(root.left, p, q);
+    TreeNode right = lowestCommonAncestor(root.right, p, q);
+    if (left != null && right != null) {
+        return root;
+    }
+    return left != null ? left : right;
+}
+```
 
 ## 第五章 框架
 
