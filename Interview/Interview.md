@@ -180,7 +180,6 @@ ArrayLis和Vector`都是基于Object[]实现的，它们会在内存中开辟一
 *28. **数组和ArrayList有何区别？**
 
 - 数组可以容纳基本类型和对象，而ArrayList只能容纳对象。 
-- 数组是指定大小的，而ArrayList大小是固定的。 
 - 数组没有提供ArrayList那么多功能，比如addAll、removeAll和iterator等。
 - 数组是定长的，不能扩充的，而ArrayList的空间可以动态增长。
 
@@ -284,7 +283,7 @@ Java中的Iterator功能比较简单，通常只能单向移动：
 
 *41. **sleep()和wait()有什么区别？**
 
-sleep()方法是Thread的静态方法，让调用的线程进入指定时间睡眠状态，使得当前线程进入阻塞状态，告诉系统至少在指定时间内不需要为线程调度器为该线程分配执行时间片，给执行机会给其他线程（实际上，调用sleep()方法时并不要求持有任何锁，即sleep()可在任何地方使用。），但是监控状态依然保持，到时后会自动恢复。
+sleep()方法是Thread的静态方法，让调用的线程进入指定时间睡眠状态，使得当前线程进入阻塞状态，告诉系统至少在指定时间内不需要为线程调度器为该线程分配执行时间片，把执行机会给其他线程（实际上，调用sleep()方法时并不要求持有任何锁，即sleep()可在任何地方使用。），但是监控状态依然保持，到时后会自动恢复。
 
 当线程处于上锁时，sleep()方法不会释放对象锁，即睡眠时也持有对象锁。只会让出CPU执行时间片，并不会释放同步资源锁。
 
@@ -323,7 +322,7 @@ run()方法是在本线程里的，只是线程里的一个函数,而不是多�
 
 - ThreadPoolExecutor：
     + newCachedThreadPool：创建一个可缓存线程池，如果线程池长度超过处理需要，可灵活回收空闲线程。而当需求增加时，则可以自动添加新线程，线程池的规模不存在任何限制。
-    + newFiexedThreadPool：创建一个可重用固定线程数的线程池，采用无界的阻塞队列，所以实际线程数量永远不会变化，适用于可以预测线程数量的业务中。
+    + newFixedThreadPool：创建一个可重用固定线程数的线程池，采用无界的阻塞队列，所以实际线程数量永远不会变化，适用于可以预测线程数量的业务中。
     + newScheduledThreadPool：创建一个定长线程池，支持定时及周期性任务执行，可以延时启动，定时启动的线程池，适用于需要多个后台线程执行周期任务的场景。
     + newSingleThreadExecutor：创建一个单线程化的线程池，它只会用唯一的工作线程来执行任务，保证所有任务按照指定顺序（FIFO，LIFO，优先级）执行。
 - ForkJoinPool：
@@ -616,7 +615,7 @@ public class TestClass {
 
 *64. **JSP与Servlet有什么区别？**
 
-- JSP经编译后会称为Servlet。
+- JSP经编译后会成为Servlet。
 - JSP更擅长页面显示，Servlet更擅长逻辑控制。
 - Servlet中没有内置对象，JSP具有内置对象。
 
@@ -624,8 +623,8 @@ public class TestClass {
 
 内置对象 | 类型 | 说明 | 作用域
 ----- | ----- | ----- | -----
-request | javax.servlet.ServletRequest | 请求对象——在一次请求/个Request请求周期 中传递数据，请求结束后，数据不可访问，用于页面之间的值的传递 | 用户请求期
-response |javax.servlet.SrvletResponse |响应对象——用来响应客户端请求并向客户端输出信息|页面执行期
+request | javax.servlet.ServletRequest | 请求对象——在一次Request请求周期 中传递数据，请求结束后，数据不可访问，用于页面之间的值的传递 | 用户请求期
+response |javax.servlet.ServletResponse |响应对象——用来响应客户端请求并向客户端输出信息|页面执行期
 out | javax.servlet.jsp.JspWriter|输出对象——表示输出流，该流将作为请求的响应发送到客户端 |页面执行期
 session |javax.servlet.http.HttpSession |会话对象——在一个session会话周期中，用于存储有关用户会话的所有信息 |会话周期
 application |javax.servlet.ServletContext |应用程序对象——用于实现用户之间的数据共享，负责提供应用程序在服务器中运行时的一些全局信息 |整个程序运行期
@@ -653,7 +652,7 @@ Session是在服务端保存的一个数据结构，用来跟踪用户的状态�
 
 session是一个存在服务器上的类似于一个散列表格的文件。里面存有我们需要的信息，在我们需要用的时候可以从里面取出来。其与Map类似，内部为存储键值对。Session通过sessionId进行标识。
 
-*69. **如果客户端禁止cookie能实现session还能用吗？**
+*69. **如果客户端禁止cookie那么session还能用吗？**
 
 通过URL重写或者隐藏表单来传递sessionId。
 
@@ -841,7 +840,7 @@ tcp 和 udp 是 OSI 模型中的传输层中的协议。tcp 提供可靠的通�
 - 框架轻量。
 - 非侵入性。
 
-*91. **解释以下什么是aop？**
+*91. **解释一下什么是aop？**
 
 aop 是面向切面编程，通过预编译方式和运行期动态代理实现程序功能的统一维护的一种技术。简单来说就是统一处理某一“切面”（类）的问题的编程思想，比如统一处理日志、异常等。
 
@@ -855,7 +854,7 @@ IoC（控制反转），是spring的核心，对于 spring 框架来讲，就是
 
 Spring由20多个模块组成，它们可以分为数据访问/集成（Data Access/Integration）、Web、面向切面编程（AOP, Aspect Oriented Programming）、应用服务器设备管理（Instrumentation）、消息发送（Messaging）、核心容器（Core Container）和测试（Test）。
 
-*94. **spring看常用的诸如方式有哪些？**
+*94. **spring中常用的注入方式有哪些？**
 
 - setter属性注入
 - 构造方法注入
@@ -870,7 +869,7 @@ spring 中的 bean 默认是单例模式，spring 框架并没有对单例 bean 
 *96. **spring 支持几种 bean 的作用域？**
 
 - singleton：spring ioc 容器中只存在一个 bean 实例，bean 以单例模式存在，是系统默认值；
-- prototype：每次从容器调用 bean 时都会创建一个新的示例，既每次 getBean()相当于执行 new Bean()操作；
+- prototype：每次从容器调用 bean 时都会创建一个新的示例，即每次 getBean()相当于执行 new Bean()操作；
 - Web环境下：
     + request：每次 http 请求都会创建一个 bean；
     + session：同一个 http session 共享一个 bean 实例；
@@ -898,6 +897,8 @@ spring 有五大隔离级别，默认值为 ISOLATION_DEFAULT（使用数据库�
 - 已提交读 （read commited）：避免脏读。但是不可重复读和虚读有可能发生 
 - 可重复读 （repeatable read）：避免脏读和不可重复读.但是虚读有可能发生. 
 - 串行化的 （serializable）：避免以上所有读问题. 
+
+脏读、不可重复读、虚读：
 
 - 脏读 ：表示一个事务能够读取另一个事务中还未提交的数据。比如，某个事务尝试插入记录 A，此时该事务还未提交，然后另一个事务尝试读取到了记录 A。
 - 不可重复读 ：一个事务读到了另一个事务已经提交的update的数据导致多次查询结果不一致.。
@@ -998,7 +999,7 @@ spring cloud 是一系列框架的有序集合。它利用 spring boot 的开发
 - hibernate 是对 jdbc 的封装，大大简化了数据访问层的繁琐的重复性代码。
 - hibernate 是一个优秀的 ORM 实现，很多程度上简化了 DAO 层的编码功能。
 - 可以很方便的进行数据库的移植工作。
-- 提供了缓存机制，是程序执行更改的高效。
+- 提供了缓存机制，使程序执行更改的高效。
 
 *114. **什么是 ORM 框架？**
 
@@ -1089,7 +1090,7 @@ getCurrentSession ，从字面上可以看得出来，是获取当前上下文�
 
 - \#{}是预编译处理，${}是字符串替换；
 - Mybatis在处理#{}时，会将sql中的#{}替换为?号，调用PreparedStatement的set方法来赋值；
-- Mybatis在处理${}时，就是把${}替换成变量的值；
+- Mybatis在处理\${}时，就是把\${}替换成变量的值；
 - 使用#{}可以有效的防止SQL注入，提高系统安全性。
 
 *126. **mybatis 有几种分页方式？**
@@ -1222,7 +1223,7 @@ vhost：每个 RabbitMQ 都能创建很多 vhost，我们称之为虚拟主机�
 
 *143. **RabbitMQ 持久化有什么缺点？**
 
-持久化的缺地就是降低了服务器的吞吐量，因为使用的是磁盘而非内存存储，从而降低了吞吐量。可尽量使用 ssd 硬盘来缓解吞吐量的问题。
+持久化的缺点就是降低了服务器的吞吐量，因为使用的是磁盘而非内存存储，从而降低了吞吐量。可尽量使用 ssd 硬盘来缓解吞吐量的问题。
 
 *144. **RabbitMQ 有几种广播类型？**
 
@@ -1458,7 +1459,7 @@ Redis 使用场景：
 - 支持事务
 - 支持消息队列
 
-*181. Redis 和 memcache 有什么区别？**
+*181. **Redis 和 memcache 有什么区别？**
 
 - 存储方式不同：memcache 把数据全部存在内存之中，断电后会挂掉，数据不能超过内存大小；Redis 有部份存在硬盘上，这样能保证数据的持久性。
 - 数据支持类型：memcache 对数据类型支持相对简单；Redis 有复杂的数据类型。
@@ -1550,7 +1551,7 @@ Java 虚拟机规范规定的区域分为以下 5 个部分：
 - 程序计数器（Program Counter Register）：当前线程所执行的字节码的行号指示器，字节码解析器的工作是通过改变这个计数器的值，来选取下一条需要执行的字节码指令，分支、循环、跳转、异常处理、线程恢复等基础功能，都需要依赖这个计数器来完成；
 - Java 虚拟机栈（Java Virtual Machine Stacks）：用于存储局部变量表、操作数栈、动态链接、方法出口等信息；
 - 本地方法栈（Native Method Stack）：与虚拟机栈的作用是一样的，只不过虚拟机栈是服务 Java 方法的，而本地方法栈是为虚拟机调用 Native 方法服务的；
-- ava 堆（Java Heap）：Java 虚拟机中内存最大的一块，是被所有线程共享的，几乎所有的对象实例都在这里分配内存；
+- Java 堆（Java Heap）：Java 虚拟机中内存最大的一块，是被所有线程共享的，几乎所有的对象实例都在这里分配内存；
 - 方法区（Methed Area）：用于存储已被虚拟机加载的类信息、常量、静态变量、即时编译后的代码等数据。
 
 *196. **说一下堆栈的区别？**
@@ -1682,3 +1683,9 @@ System.out.println(list.size());
 
 结果输出是1。因为test的类型为int[]，则此时得到的List的类型为List<int[]>，即整个数组被当作了一个元素。
 
+*4. **execute，executeQuery，executeUpdate的区别是什么？ **
+
+- Statement的execute(String query)方法用来执行任意的SQL查询，如果查询的结果是一个ResultSet，这个方法就返回true。如果结果不是ResultSet，比如insert或者update查询，它就会返回false。我们可以通过它的getResultSet方法来获取ResultSet，或者通过getUpdateCount()方法来获取更新的记录条数。 
+- Statement的executeQuery(String query)接口用来执行select查询，并且返回ResultSet。即使查询不到记录返回的ResultSet也不会为null。我们通常使用executeQuery来执行查询语句，这样的话如果传进来的是insert或者update语句的话，它会抛出错误信息为 “executeQuery method can not be used for update”的java.util.SQLException。
+- Statement的executeUpdate(String query)方法用来执行insert或者update/delete（DML）语句，或者 什么也不返回，对于DDL语句，返回值是int类型，如果是DML语句的话，它就是更新的条数，如果是DDL的话，就返回0。 
+只有当你不确定是什么语句的时候才应该使用execute()方法，否则应该使用executeQuery或者executeUpdate方法。

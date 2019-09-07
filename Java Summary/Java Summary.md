@@ -2987,7 +2987,7 @@ class Singleton {
 ```java
 enum Singleton {
     INSTANCE;
-    public Singleton getInstance() {
+    public static Singleton getInstance() {
         return INSTANCE;
     }
 }
@@ -3160,13 +3160,451 @@ Octal String: 13
 
 #### 2.6.5 原型模式
 
+该模式用于创建重复的对象，同时又能保证性能。
+
+简单来说当我们需要创建一个指定的对象时，我们刚好有一个这样的对象，但是又不能直接使用，那么此时就使用`clone()`方法来复制一个一摸一样的对象来使用。
+
+原型模式的本质就是`clone()`，可以解决构建复杂对象的资源消耗问题，能再某些场景中提升构建对象的效率；还有一个重要的用途就是保护性拷贝，可以通过返回一个拷贝对象的形式，实现只读的限制。
+
 #### 2.6.6 工厂模式
+
+##### 2.6.6.1 简单工厂
+
+在工厂模式中，我们在创建对象时不会对客户端暴露创建逻辑，而是通过使用一个共同的接口来指向新创建的对象。
+
+示例:
+
+```java
+// 产品接口
+interface Shape {
+    void draw();
+}
+
+// 实体类
+class Rectangle implements Shape {
+
+    @Override
+    public void draw() {
+        System.out.println("Inside Rectangle::draw() method.");
+    }
+}
+
+// 实体类
+class Square implements Shape {
+
+    @Override
+    public void draw() {
+        System.out.println("Inside Square::draw() method.");
+    }
+}
+
+// 实体类
+class Circle implements Shape {
+
+    @Override
+    public void draw() {
+        System.out.println("Inside Circle::draw() method.");
+    }
+}
+
+// 工厂类
+class ShapeFactory {
+    public static Shape getShape(String shapeType) {
+        if (shapeType == null || shapeType.isEmpty()) {
+            return null;
+        }
+        if (shapeType.equalsIgnoreCase("CIRCLE")) {
+            return new Circle();
+        } else if (shapeType.equalsIgnoreCase("RECTANGLE")) {
+            return new Rectangle();
+        } else if (shapeType.equalsIgnoreCase("SQUARE")) {
+            return new Square();
+        } else {
+            return null;
+        }
+    }
+}
+```
+
+##### 2.6.6.2 工厂方法
+
+简单工厂模式的缺点在于如果需要生产新的产品，那么就需要修改工厂类的方法逻辑，这违背了开闭原则。
+
+这个问题可以使用工厂方法模式解决。
+
+示例:
+
+```java
+interface Shape {
+    void draw();
+}
+
+class Rectangle implements Shape {
+
+    @Override
+    public void draw() {
+        System.out.println("Inside Rectangle::draw() method.");
+    }
+
+}
+
+class Square implements Shape {
+
+    @Override
+    public void draw() {
+        System.out.println("Inside Square::draw() method.");
+    }
+
+}
+
+class Circle implements Shape {
+
+    @Override
+    public void draw() {
+        System.out.println("Inside Circle::draw() method.");
+    }
+}
+
+interface Factory {
+    Shape produce();
+}
+
+class RectangleFactory implements Factory {
+    @Override
+    public Shape produce() {
+        return new Rectangle();
+    }
+}
+
+class SquareFactory implements Factory {
+    @Override
+    public Shape produce() {
+        return new Square();
+    }
+}
+
+class CircleFactory implements Factory {
+    @Override
+    public Shape produce() {
+        return new Circle();
+    }
+}
+
+public class TestClass {
+
+    @Test
+    public void testCase() {
+        Factory factory = new CircleFactory();
+        factory.produce().draw(); // Inside Circle::draw() method.
+    }
+}
+```
+
+这样以来，如果我们有新的商品需要生产，例如`Triangle`，则我们只需要定义`Triangle`和`TriangleFactory`即可，无需更改原有代码。
+
+##### 2.6.6.3 抽象工厂
+
+抽象工厂模式是围绕一个超级工厂创建其他工厂。
+
+示例:
+
+```java
+interface Shape {
+    void draw();
+}
+
+class Rectangle implements Shape {
+
+    @Override
+    public void draw() {
+        System.out.println("Inside Rectangle::draw() method.");
+    }
+
+}
+
+class Square implements Shape {
+
+    @Override
+    public void draw() {
+        System.out.println("Inside Square::draw() method.");
+    }
+
+}
+
+class Circle implements Shape {
+
+    @Override
+    public void draw() {
+        System.out.println("Inside Circle::draw() method.");
+    }
+}
+
+interface Color {
+    void fill();
+}
+
+class Red implements Color {
+    @Override
+    public void fill() {
+        System.out.println("Inside Red::fill() method.");
+    }
+}
+
+class Green implements Color {
+    @Override
+    public void fill() {
+        System.out.println("Inside Green::fill() method.");
+    }
+}
+
+class Blue implements Color {
+    @Override
+    public void fill() {
+        System.out.println("Inside Blue::fill() method.");
+    }
+}
+
+// 抽象工厂
+interface Factory {
+    Color getColor(String color);
+    Shape getShape(String shape);
+}
+
+// 形状工厂
+class ShapeFactory implements Factory {
+    @Override
+    public Shape getShape(String shapeType) {
+        if (shapeType == null || shapeType.isEmpty()) {
+            return null;
+        }
+        if (shapeType.equalsIgnoreCase("CIRCLE")) {
+            return new Circle();
+        } else if (shapeType.equalsIgnoreCase("RECTANGLE")) {
+            return new Rectangle();
+        } else if (shapeType.equalsIgnoreCase("SQUARE")) {
+            return new Square();
+        }
+        return null;
+    }
+
+    @Override
+    public Color getColor(String color) {
+        return null;
+    }
+}
+
+// 颜色工厂
+class ColorFactory implements Factory {
+
+    @Override
+    public Shape getShape(String shapeType) {
+        return null;
+    }
+
+    @Override
+    public Color getColor(String color) {
+        if (color == null || color.isEmpty()) {
+            return null;
+        }
+        if (color.equalsIgnoreCase("RED")) {
+            return new Red();
+        } else if (color.equalsIgnoreCase("GREEN")) {
+            return new Green();
+        } else if (color.equalsIgnoreCase("BLUE")) {
+            return new Blue();
+        }
+        return null;
+    }
+}
+
+// 生成工厂
+class FactoryProducer {
+    public static Factory getFactory(String choice) {
+        if (choice.equalsIgnoreCase("SHAPE")) {
+            return new ShapeFactory();
+        } else if (choice.equalsIgnoreCase("COLOR")) {
+            return new ColorFactory();
+        }
+        return null;
+    }
+}
+```
 
 #### 2.6.7 享元模式
 
+该模式主要用于减少创建对象的数量，以减少内存占用和提高性能。
+
+在JAVA语言中，String类型就是使用了享元模式。String对象是final类型，对象一旦创建就不可改变。在JAVA中字符串常量都是存在常量池中的，Java会确保一个字符串常量在常量池中只有一个拷贝。
+
+```java
+abstract class Flyweight {
+    public abstract void operation();
+}
+
+class ConcreteFlyweight extends Flyweight {
+
+    private String str;
+
+    public ConcreteFlyweight(String str) {
+        this.str = str;
+    }
+
+    @Override
+    public void operation() {
+        System.out.println("Concrete---Flyweight: " + str);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        ConcreteFlyweight that = (ConcreteFlyweight) o;
+        return Objects.equals(str, that.str);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(str);
+    }
+}
+
+class FlyweightFactory {
+    private Map<String, Flyweight> map = new HashMap<>();
+
+    public Flyweight getFlyweight(String str) {
+        Flyweight fw = map.get(str);
+        if (fw == null) {
+            fw = new ConcreteFlyweight(str);
+            map.put(str, fw);
+        }
+        return fw;
+    }
+
+    public int getfwMapSize() {
+        return map.size();
+    }
+}
+
+public class TestClass {
+
+    @Test
+    public void testCase() {
+        FlyweightFactory fwfactory = new FlyweightFactory();
+        Flyweight fw1 = fwfactory.getFlyweight("Google");
+        Flyweight fw2 = fwfactory.getFlyweight("Google");
+        Flyweight fw3 = fwfactory.getFlyweight("Google");
+        Flyweight fw4 = fwfactory.getFlyweight("Bing");
+        Flyweight fw5 = fwfactory.getFlyweight("Bing");
+        Flyweight fw6 = fwfactory.getFlyweight("Bing");
+        Flyweight fw7 = fwfactory.getFlyweight("Bing");
+        Flyweight fw8 = fwfactory.getFlyweight("Baidu");
+        Flyweight fw9 = fwfactory.getFlyweight("Baidu");
+        fw1.operation();
+        fw2.operation();
+        fw3.operation();
+        fw4.operation();
+        fw5.operation();
+        fw6.operation();
+        fw7.operation();
+        fw8.operation();
+        fw9.operation();
+        System.out.println(fwfactory.getfwMapSize());
+    }
+}
+/*
+Concrete---Flyweight: Google
+Concrete---Flyweight: Google
+Concrete---Flyweight: Google
+Concrete---Flyweight: Bing
+Concrete---Flyweight: Bing
+Concrete---Flyweight: Bing
+Concrete---Flyweight: Bing
+Concrete---Flyweight: Baidu
+Concrete---Flyweight: Baidu
+3
+*/
+```
+
+可以看到，我们的9个对象背后实际上是3个对象在支持。
+
 #### 2.6.8 模板方法模式
 
+在该模式中，一个抽象类公开定义了执行它的方法的方式/模板。它的子类可以按需要重写方法实现，但调用将以抽象类中定义的方式进行。
 
+示例：
+
+```java
+abstract class Game {
+    abstract void init();
+    abstract void start();
+    abstract void end();
+
+    // 模板
+    public final void play() {
+        init();
+        start();
+        end();
+    }
+}
+
+class Cricket extends Game {
+
+    @Override
+    void init() {
+        System.out.println("Cricket Game Initialized! Start playing.");
+    }
+
+    @Override
+    void start() {
+        System.out.println("Cricket Game Started. Enjoy the game!");
+    }
+
+    @Override
+    void end() {
+        System.out.println("Cricket Game Finished!");
+    }
+}
+
+class Football extends Game {
+
+    @Override
+    void init() {
+        System.out.println("Football Game Initialized! Start playing.");
+    }
+
+    @Override
+    void start() {
+        System.out.println("Football Game Started. Enjoy the game!");
+    }
+
+    @Override
+    void end() {
+        System.out.println("Football Game Finished!");
+    }
+}
+
+public class TestClass {
+
+    @Test
+    public void testCase() {
+        Game game = new Cricket();
+        game.play();
+        System.out.println();
+        game = new Football();
+        game.play();
+    }
+}
+
+/*
+Cricket Game Initialized! Start playing.
+Cricket Game Started. Enjoy the game!
+Cricket Game Finished!
+
+Football Game Initialized! Start playing.
+Football Game Started. Enjoy the game!
+Football Game Finished!
+*/
+```
 
 ## 第三章 高级数据结构
 
