@@ -30,7 +30,7 @@ Spring由20多个模块组成，它们可以分为数据访问/集成（Data Acc
 - **非侵入式：**所谓非侵入式指的是，Spring框架的API不会在业务逻辑上出现，即业务逻辑是POJO。由于业务逻辑中没有Spring的API，所以业务逻辑可以从Spring框架快速移植到其他框架，即与环境无关。
 - **容器：**Spring作为一个容器，可以管理对象的生命周期、对象与对象之间的依赖关系。可以通过配置文件，来定义对象，以及设置与其他对象的依赖关系。
 - **IoC：**控制反转（Inversion of Control），即创建被调用者的实例不是由调用者完成，而是由Spring容器完成，并注入调用者。当应用了IoC，一个对象依赖的其它对象会通过被动的方式传递进来，而不是这个对象自己创建或者查找依赖对象。即，不是对象从容器中查找依赖，而是容器在对象初始化时不等对象请求就主动将依赖传递给它。
-- **AOP：**面向切面编程（AOP，Aspect Orient Programming），是一种编程思想，是面向对象编程OOP的补充。很多框架都实现了对AOP编程思想的实现。Spring也提供了面向切面编程的丰富支持，允许通过分离应用的业务逻辑与系统级服务（例如日志和事务管理）进行开发。应用对象只实现它们应该做的——完成业务逻辑——仅此而已。它们并不负责其它的系统级关注点，例如日志或事务支持。我们可以把日志、安全、事务管理等服务理解成一个“切面”，那么以前这些服务一直是直接写在业务逻辑的代码当中的，这有两点不好：首先业务逻辑不纯净；其次这些服务被很多业务逻辑反复使用，完全可以剥离出来做到复用。那么AOP就是这些问题的解决方案，可以把这些服务剥离出来形成一个“切面”，以期复用，然后将“切面”动态的“织入”到业务逻辑中，让业务逻辑能够享受到此“切面”的服务。
+- **AOP：**面向切面编程（AOP，Aspect Orient Programming），是一种编程思想，是面向对象编程OOP的补充。很多框架都实现了对AOP编程思想的实现。Spring也提供了面向切面编程的丰富支持，允许通过分离应用的业务逻辑与系统级服务（例如日志和事务管理）进行开发。应用对象只实现它们应该做的——完成业务逻辑仅此而已。它们并不负责其它的系统级关注点，例如日志或事务支持。我们可以把日志、安全、事务管理等服务理解成一个“切面”，那么以前这些服务一直是直接写在业务逻辑的代码当中的，这有两点不好：首先业务逻辑不纯净；其次这些服务被很多业务逻辑反复使用，完全可以剥离出来做到复用。那么AOP就是这些问题的解决方案，可以把这些服务剥离出来形成一个“切面”，以期复用，然后将“切面”动态的“织入”到业务逻辑中，让业务逻辑能够享受到此“切面”的服务。
 
 ## 第二章 Spring与IoC
 
@@ -74,16 +74,16 @@ log4j2：
 
 applicationContext.xml：
 
-    <?xml version="1.0" encoding="UTF-8"?>
-    <beans
-        xmlns="http://www.springframework.org/schema/beans"
-        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xsi:schemaLocation="
-            http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
-
-        <!-- bean definitions here -->
-
-    </beans>
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans
+    xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="
+        http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+    <!-- bean definitions here -->
+</beans>
+```
 
 #### 2.1.3 创建测试程序
 
@@ -91,114 +91,132 @@ applicationContext.xml：
 
 定义服务接口，ISomeService.java：
 
-    package tavish.bit.service;
+```java
+package tavish.bit.service;
 
-    public interface ISomeService {
-        
-        public String doFirst();
-        
-        public void doSecond();
-    }
+public interface ISomeService {
+    
+    public String doFirst();
+    
+    public void doSecond();
+}
+```
 
 定义服务实现类SomeServiceImpl.java：
 
-    package tavish.bit.service;
+```java
+package tavish.bit.service;
 
-    public class SomeServiceImpl implements ISomeService {
+public class SomeServiceImpl implements ISomeService {
 
-        @Override
-        public String doFirst() {
-            System.out.println("执行doFirst()方法");
-            return "abcde";
-        }
-
-        @Override
-        public void doSecond() {
-            System.out.println("执行doSecond()方法");
-        }
+    @Override
+    public String doFirst() {
+        System.out.println("执行doFirst()方法");
+        return "abcde";
     }
+
+    @Override
+    public void doSecond() {
+        System.out.println("执行doSecond()方法");
+    }
+}
+```
 
 不使用Spring进行测试，测试方法：
 
-    @Test
-    public void test01() {
-        ISomeService service = new SomeServiceImpl();
-        service.doFirst();
-        service.doSecond();
-    }
+```java
+@Test
+public void test01() {
+    ISomeService service = new SomeServiceImpl();
+    service.doFirst();
+    service.doSecond();
+}
+```
 
 输出：
 
-    执行doFirst()方法
-    执行doSecond()方法
+```text
+执行doFirst()方法
+执行doSecond()方法
+```
 
 使用Spring：
 
 添加配置文件applicationContext.xml：
 
-    <?xml version="1.0" encoding="UTF-8"?>
-    <beans
-        xmlns="http://www.springframework.org/schema/beans"
-        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xsi:schemaLocation="
-            http://www.springframework.org/schema/beans 
-            http://www.springframework.org/schema/beans/spring-beans.xsd">
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans
+    xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="
+        http://www.springframework.org/schema/beans 
+        http://www.springframework.org/schema/beans/spring-beans.xsd">
 
-        <!-- 注册Service对象 -->
-        <bean id="someService" class="tavish.bit.service.SomeServiceImpl" />
-    </beans>
+    <!-- 注册Service对象 -->
+    <bean id="someService" class="tavish.bit.service.SomeServiceImpl" />
+</beans>
+```
 
-**
-&lt;bean /&gt;：用于定义一个实例对象。一个实例对应一个bean元素。
+**&lt;bean /&gt;：用于定义一个实例对象。一个实例对应一个bean元素。
 id：该属性是Bean实例的唯一标识，程序通过id属性访问Bean，Bean与Bean间的依赖关系也是通过id属性关联的。
-class：指定该Bean所属的类，注意这里只能是类，不能是接口。
-**
+class：指定该Bean所属的类，注意这里只能是类，不能是接口。**
 
 使用Spring进行测试，测试方法：
 
-    @Test
-    public void test02() {
-        
-        // 1.加载Spring配置文件，创建Spring容器对象。
-        @SuppressWarnings("resource")
-        ApplicationContext ac = new ClassPathXmlApplicationContext("applicationContext.xml");
-        
-        // 2.从容器中获取指定Bean对象
-        ISomeService service = (ISomeService) ac.getBean("someService");
-        
-        service.doFirst();
-        service.doSecond();
-        
-    }
+```java
+@Test
+public void test02() {
+    
+    // 1.加载Spring配置文件，创建Spring容器对象。
+    @SuppressWarnings("resource")
+    ApplicationContext ac = new ClassPathXmlApplicationContext("applicationContext.xml");
+    
+    // 2.从容器中获取指定Bean对象
+    ISomeService service = (ISomeService) ac.getBean("someService");
+    
+    service.doFirst();
+    service.doSecond();
+    
+}
+```
 
 输出：
 
-    执行doFirst()方法
-    执行doSecond()方法
+```text
+执行doFirst()方法
+执行doSecond()方法
+```
 
 #### 2.1.4 接口容器
 
 ##### 2.1.4.1 ApplicationContext接口容器
 
-ApplicationContext用于加载Spring的配置文件，在程序中充当“容器”的角色。其实现类有两个：
+ApplicationContext用于加载Spring的配置文件，在程序中充当“容器”的角色。
+
+其实现类有两个：
 
 - ClassPathXmlApplicationContext：若Spring配置文件存放在项目的类路径下，则使用ClassPathXmlApplicationContext实现类进行加载。
 - FileSystemXmlApplicationContext：若Spring配置文件存放在本地磁盘目录中，则使用FileSystemXmlApplicationContext实现类进行加载。
 
 例如：
 
-    // 使用ClassPathXmlApplicationContext
-    ApplicationContext ac = new ClassPathXmlApplicationContext("applicationContext.xml");
+```java
+// 使用ClassPathXmlApplicationContext
+ApplicationContext ac = new ClassPathXmlApplicationContext("applicationContext.xml");
 
-    // 使用FileSystemXmlApplicationContext
-    ApplicationContext ac = new FileSystemXmlApplicationContext("D:/applicationContext.xml");
+// 使用FileSystemXmlApplicationContext
+ApplicationContext ac = new FileSystemXmlApplicationContext("D:/applicationContext.xml");
+```
 
 若配置文件在项目根路径（与src文件夹同级）下，同样使用FileSystemXmlApplicationContext实现类进行加载。
 
 例如：
 
-    // 使用FileSystemXmlApplicationContext
-    ApplicationContext ac = new FileSystemXmlApplicationContext("applicationContext.xml");
+```java
+// 使用FileSystemXmlApplicationContext
+ApplicationContext ac = new FileSystemXmlApplicationContext("applicationContext.xml");
+```
 
 ##### 2.1.4.2 BeanFactory接口容器
 
@@ -217,39 +235,41 @@ BeanFactory接口对象也可作为Spring容器出现。BeanFactory接口是Appl
 
 例如：
 
-    // 使用BeanFactory和ClassPathResource，获取类路径下配置文件
-    BeanFactory factory = new XmlBeanFactory(new ClassPathResource("appliactionContext.xml"));
+```java
+// 使用BeanFactory和ClassPathResource，获取类路径下配置文件
+BeanFactory factory = new XmlBeanFactory(new ClassPathResource("appliactionContext.xml"));
 
-    // 使用BeanFactory和ClassPathResource，获取当前项目跟路径下配置文件
-    BeanFactory factory = new XmlBeanFactory(new FileSystemResource("appliactionContext.xml"));
+// 使用BeanFactory和ClassPathResource，获取当前项目跟路径下配置文件
+BeanFactory factory = new XmlBeanFactory(new FileSystemResource("appliactionContext.xml"));
+```
 
 ##### 2.1.4.3 两个接口容器的区别
 
 虽然这两个接口容器所要加载的Spring配置文件是同一个文件，但在代码中的这两个容器对象却不是同一个对象，即不是同一个容器：它们对于容器内对象的装配（创建）时机是不同的。
 
-**
-ApplicationContext容器中对象的装配时机：
-**
+**ApplicationContext容器中对象的装配时机：**
 
 ApplicationContext容器，会在容器对象初始化时，将其中的所有对象一次性全部装配好。以后代码中若要使用到这些对象，只需从内存中直接获取即可。执行效率较高。但占用内存。
 
 例如：
 
-    // 获取容器，此时容器中所有对象均已装配完毕
-    ApplicationContext context = new ClassPathXmlAppliactionContext("applicationContext.xml");
+```java
+// 获取容器，此时容器中所有对象均已装配完毕
+ApplicationContext context = new ClassPathXmlAppliactionContext("applicationContext.xml");
+```
 
-**
-BeanFactory容器中对象的装配时机：
-**
+**BeanFactory容器中对象的装配时机：**
 
 BeanFactory容器，对容器中对象的装配与加载采用延迟加载策略，即在第一次调用getBean()时，才真正装配该对象。
 
 例如：
 
-    // 获取容器：此时容器中的对象均未进行装配
-    BeanFactory factory = new XmlBeanFactory(new ClassPathResource("applicationContext.xml"));
-    // 执行下面语句时，才会对该对象进行装配
-    IStudentService service = (IStudentService) factory.getBean("studentService");
+```java
+// 获取容器：此时容器中的对象均未进行装配
+BeanFactory factory = new XmlBeanFactory(new ClassPathResource("applicationContext.xml"));
+// 执行下面语句时，才会对该对象进行装配
+IStudentService service = (IStudentService) factory.getBean("studentService");
+```
 
 ### 2.2 Bean的装配
 
@@ -263,7 +283,9 @@ Bean的装配，即Bean对象的创建。容器根据代码要求创建Bean对�
 
 如果Bean类没有无参构造器，则会报错。
 
+```text
 org.springframework.beans.factory.BeanCreationException: Error creating bean with name 'someService' defined in class path resource [tavish/bit/beanAssemble/defaultmode/applicationContext.xml]: Instantiation of bean failed; nested exception is org.springframework.beans.BeanInstantiationException: Failed to instantiate [tavish.bit.beanAssemble.defaultmode.SomeServiceImpl]: No default constructor found; nested exception is java.lang.NoSuchMethodException: tavish.bit.beanAssemble.defaultmode.SomeServiceImpl.<init>()
+```
 
 #### 2.2.2 动态工厂Bean
 
@@ -277,57 +299,65 @@ Spring提供了专门的使用动态工厂的装配Bean的方式。此时配置�
 
 定义工厂类，ServiceFactory.java：
 
-    package tavish.bit.beanAssemble.dynamicFactoryMode;
+```java
+package tavish.bit.beanAssemble.dynamicFactoryMode;
 
-    public class ServiceFactory {
-        
-        public ISomeService getSomeService() {
-            return new SomeServiceImpl();
-        }
+public class ServiceFactory {
+    
+    public ISomeService getSomeService() {
+        return new SomeServiceImpl();
     }
+}
+```
 
 在配置文件中配置工厂及工厂生成的类：
 
-    <?xml version="1.0" encoding="UTF-8"?>
-    <beans
-        xmlns="http://www.springframework.org/schema/beans"
-        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xsi:schemaLocation="
-            http://www.springframework.org/schema/beans 
-            http://www.springframework.org/schema/beans/spring-beans.xsd">
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans
+    xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="
+        http://www.springframework.org/schema/beans 
+        http://www.springframework.org/schema/beans/spring-beans.xsd">
 
-        <!-- 容器负责创建工厂 -->
-        <bean
-            id="serviceFactory"
-            class="tavish.bit.beanAssemble.dynamicFactoryMode.ServiceFactory" />
+    <!-- 容器负责创建工厂 -->
+    <bean
+        id="serviceFactory"
+        class="tavish.bit.beanAssemble.dynamicFactoryMode.ServiceFactory" />
 
-        <!-- 设置由工厂创建的Bean： someservice对应的bean是由serviceFactory对应的工厂类调用名为getSomeService方法创建的。 -->
-        <bean
-            id="someService"
-            factory-bean="serviceFactory"
-            factory-method="getSomeService" />
-    </beans>
+    <!-- 设置由工厂创建的Bean： someservice对应的bean是由serviceFactory对应的工厂类调用名为getSomeService方法创建的。 -->
+    <bean
+        id="someService"
+        factory-bean="serviceFactory"
+        factory-method="getSomeService" />
+</beans>
+```
 
 测试方法：
 
-    @Test
-    public void test01() {
-        String configLocation = "tavish/bit/beanAssemble/dynamicFactoryMode/applicationContext.xml";
-        
-        @SuppressWarnings("resource")
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
-        
-        // 使用动态工厂创建Bean
-        ISomeService service = (ISomeService) context.getBean("someService");
-        service.doFirst();
-        service.doSecond();
-    }
+```java
+@Test
+public void test01() {
+    String configLocation = "tavish/bit/beanAssemble/dynamicFactoryMode/applicationContext.xml";
+    
+    @SuppressWarnings("resource")
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
+    
+    // 使用动态工厂创建Bean
+    ISomeService service = (ISomeService) context.getBean("someService");
+    service.doFirst();
+    service.doSecond();
+}
+```
 
 输出：
 
-    Constructor Run
-    执行doFirst()方法
-    执行doSecond()方法
+```text
+Constructor Run
+执行doFirst()方法
+执行doSecond()方法
+```
 
 #### 2.2.3 静态工厂Bean
 
@@ -339,51 +369,59 @@ Spring提供了专门的使用动态工厂的装配Bean的方式。此时配置�
 
 创建静态工厂类，ServiceFactory.java：
 
-    package tavish.bit.beanAssemble.staticFactoryMode;
+```java
+package tavish.bit.beanAssemble.staticFactoryMode;
 
-    public class ServiceFactory {
-        
-        public static ISomeService getSomeService() {
-            return new SomeServiceImpl();
-        }
+public class ServiceFactory {
+    
+    public static ISomeService getSomeService() {
+        return new SomeServiceImpl();
     }
+}
+```
 
 修改配置文件，静态工厂不用配置工厂Bean：
 
-    <?xml version="1.0" encoding="UTF-8"?>
-    <beans
-        xmlns="http://www.springframework.org/schema/beans"
-        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xsi:schemaLocation="
-            http://www.springframework.org/schema/beans 
-            http://www.springframework.org/schema/beans/spring-beans.xsd">
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans
+    xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="
+        http://www.springframework.org/schema/beans 
+        http://www.springframework.org/schema/beans/spring-beans.xsd">
 
-        <!-- 指定Bean时，需要指定创建这个Bean所用的静态工厂类，以及具体的创建方法 -->
-        <bean
-            id="someService"
-            class="tavish.bit.beanAssemble.staticFactoryMode.ServiceFactory"
-            factory-method="getSomeService" />
-    </beans>
+    <!-- 指定Bean时，需要指定创建这个Bean所用的静态工厂类，以及具体的创建方法 -->
+    <bean
+        id="someService"
+        class="tavish.bit.beanAssemble.staticFactoryMode.ServiceFactory"
+        factory-method="getSomeService" />
+</beans>
+```
 
 测试方法：
 
-    @Test
-    public void test01() {
-        String configLocation = "tavish/bit/beanAssemble/staticFactoryMode/applicationContext.xml";
-        
-        @SuppressWarnings("resource")
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
-        
-        ISomeService service = (ISomeService) context.getBean("someService");
-        service.doFirst();
-        service.doSecond();
-    }
+```java
+@Test
+public void test01() {
+    String configLocation = "tavish/bit/beanAssemble/staticFactoryMode/applicationContext.xml";
+    
+    @SuppressWarnings("resource")
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
+    
+    ISomeService service = (ISomeService) context.getBean("someService");
+    service.doFirst();
+    service.doSecond();
+}
+```
 
 输出：
 
-    Constructor Run
-    执行doFirst()方法
-    执行doSecond()方法
+```text
+Constructor Run
+执行doFirst()方法
+执行doSecond()方法
+```
 
 #### 2.2.4 容器中Bean的作用域
 
@@ -407,34 +445,38 @@ Spring支持5种作用域：
 
 配置文件：applicationContext_scopePrototype.xml
 
-    <?xml version="1.0" encoding="UTF-8"?>
-    <beans
-        xmlns="http://www.springframework.org/schema/beans"
-        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xsi:schemaLocation="
-            http://www.springframework.org/schema/beans 
-            http://www.springframework.org/schema/beans/spring-beans.xsd">
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans
+    xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="
+        http://www.springframework.org/schema/beans 
+        http://www.springframework.org/schema/beans/spring-beans.xsd">
 
-        <bean
-            id="someService"
-            class="tavish.bit.beanAssemble.beanScope.SomeServiceImpl"
-            scope="prototype" />
-    </beans>
+    <bean
+        id="someService"
+        class="tavish.bit.beanAssemble.beanScope.SomeServiceImpl"
+        scope="prototype" />
+</beans>
+```
 
 测试方法：
 
-    @Test
-    public void test01() {
-        String configLocation = "tavish/bit/beanAssemble/beanScope/applicationContext_scopePrototype.xml";
-        
-        @SuppressWarnings("resource")
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
-        
-        ISomeService service1 = (ISomeService) context.getBean("someService");
-        ISomeService service2 = (ISomeService) context.getBean("someService");
-        
-        System.out.println(service1 == service2);
-    }
+```java
+@Test
+public void test01() {
+    String configLocation = "tavish/bit/beanAssemble/beanScope/applicationContext_scopePrototype.xml";
+    
+    @SuppressWarnings("resource")
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
+    
+    ISomeService service1 = (ISomeService) context.getBean("someService");
+    ISomeService service2 = (ISomeService) context.getBean("someService");
+    
+    System.out.println(service1 == service2);
+}
+```
 
 在获取容器（context）行加入断点，使用debug模式进行分析：
 
@@ -442,9 +484,11 @@ Spring支持5种作用域：
 
 程序执行完毕，共输出：
 
-    Constructor Run
-    Constructor Run
-    false
+```text
+Constructor Run
+Constructor Run
+false
+```
 
 这意味着，一共创建了两个不同的service对象。即每次使用getBean方法获取的同一个&l;tbean /&gt;的实例都是一个新的实例。
 
@@ -452,33 +496,37 @@ Spring支持5种作用域：
 
 配置文件，applicationContext_scopeDefault.xml：
 
-    <?xml version="1.0" encoding="UTF-8"?>
-    <beans
-        xmlns="http://www.springframework.org/schema/beans"
-        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xsi:schemaLocation="
-            http://www.springframework.org/schema/beans 
-            http://www.springframework.org/schema/beans/spring-beans.xsd">
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans
+    xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="
+        http://www.springframework.org/schema/beans 
+        http://www.springframework.org/schema/beans/spring-beans.xsd">
 
-        <bean
-            id="someService"
-            class="tavish.bit.beanAssemble.beanScope.SomeServiceImpl" />
-    </beans>
+    <bean
+        id="someService"
+        class="tavish.bit.beanAssemble.beanScope.SomeServiceImpl" />
+</beans>
+```
 
 测试方法：
 
-    @Test
-    public void test02() {
-        String configLocation = "tavish/bit/beanAssemble/beanScope/applicationContext_scopeDefault.xml";
-        
-        @SuppressWarnings("resource")
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
-        
-        ISomeService service1 = (ISomeService) context.getBean("someService");
-        ISomeService service2 = (ISomeService) context.getBean("someService");
-        
-        System.out.println(service1 == service2);
-    }
+```java
+@Test
+public void test02() {
+    String configLocation = "tavish/bit/beanAssemble/beanScope/applicationContext_scopeDefault.xml";
+    
+    @SuppressWarnings("resource")
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
+    
+    ISomeService service1 = (ISomeService) context.getBean("someService");
+    ISomeService service2 = (ISomeService) context.getBean("someService");
+    
+    System.out.println(service1 == service2);
+}
+```
 
 在获取容器（context）行加入断点，使用debug模式进行分析：
 
@@ -486,8 +534,10 @@ Spring支持5种作用域：
 
 程序执行完毕，共输出：
 
-    Constructor Run
-    true
+```text
+Constructor Run
+true
+```
 
 这意味着，程序一共创建了一个service对象，即两次使用getBean方法获取的是同一个对象。
 
@@ -499,13 +549,17 @@ Bean后处理器是一种**特殊的Bean**，容器中所有的Bean在初始化�
 
 代码中需要自定义Bean后处理器类。该类就是实现了接口BeanPostProcessor的类。该接口中包含两个方法，分别在其它Bean初始化之前之后执行。它们的返回值为：功能被扩展或增强后的Bean对象。
 
-*Bean的初始化完毕有一个标志：一个方法将会被执行。即当该方法被执行时，表示该Bean被初始化完毕。所以Bean后处理器中的两个方法的执行，实在这个方法之前之后执行。这个方法在后面会讲到。*
+*Bean的初始化完毕有一个标志：一个方法将会被执行。即当该方法被执行时，表示该Bean被初始化完毕。所以Bean后处理器中的两个方法的执行，是在这个方法之前之后执行。这个方法在后面会讲到。*
 
-    public Object postProcessBeforeInitialization(Object bean, String beanId)throws BeansException
+```java
+public Object postProcessBeforeInitialization(Object bean, String beanId) throws BeansException
+```
 
 该方法会在目标**Bean初始化完毕之前**由容器自动调用。
 
-    public Object postProcessAfterInitialization(Object bean, String beanId) throws BeansException
+```java
+public Object postProcessAfterInitialization(Object bean, String beanId) throws BeansException
+```
 
 该方法会在目标**Bean初始化完毕之后**由容器自动调用。
 
@@ -515,145 +569,161 @@ Bean后处理器是一种**特殊的Bean**，容器中所有的Bean在初始化�
 
 定义Bean后处理器类，MyBeanPostProcessor：
 
-    package tavish.bit.beanAssemble.postProcess;
+```java
+package tavish.bit.beanAssemble.postProcess;
 
-    import org.springframework.beans.BeansException;
-    import org.springframework.beans.factory.config.BeanPostProcessor;
+import org.springframework.beans.BeansException;
+import org.springframework.beans.factory.config.BeanPostProcessor;
 
-    // Bean后处理器
-    public class MyBeanPostProcessor implements BeanPostProcessor {
-        @Override
-        public Object postProcessBeforeInitialization(Object bean, String beanName) throws BeansException {
-            System.out.println("执行***Before()***");
-            return bean;
-        }
-
-        @Override
-        public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
-            System.out.println("执行***After()***");
-            return bean;
-        }
+// Bean后处理器
+public class MyBeanPostProcessor implements BeanPostProcessor {
+    @Override
+    public Object postProcessBeforeInitialization(Object bean, String beanName) throws BeansException {
+        System.out.println("执行***Before()***");
+        return bean;
     }
+
+    @Override
+    public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
+        System.out.println("执行***After()***");
+        return bean;
+    }
+}
+```
 
 在配置文件中注册后处理器：
 
-    <!-- 注册Bean后处理器 -->
-    <bean class="tavish.bit.beanAssemble.postProcess.MyBeanPostProcessor" />
+```xml
+<!-- 注册Bean后处理器 -->
+<bean class="tavish.bit.beanAssemble.postProcess.MyBeanPostProcessor" />
+```
 
 测试方法：
 
-    @Test
-    public void test01() {
-        String configLocation = "tavish/bit/beanAssemble/postProcess/applicationContext.xml";
-        
-        @SuppressWarnings("resource")
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
-        
-        ISomeService service = (ISomeService) context.getBean("someService");
-        service.doFirst();
-        service.doSecond();
-    }
+```java
+@Test
+public void test01() {
+    String configLocation = "tavish/bit/beanAssemble/postProcess/applicationContext.xml";
+    
+    @SuppressWarnings("resource")
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
+    
+    ISomeService service = (ISomeService) context.getBean("someService");
+    service.doFirst();
+    service.doSecond();
+}
+```
 
 输出：
 
-    Constructor Run
-    执行***Before()***
-    执行***After()***
-    执行doFirst()方法
-    执行doSecond()方法
+```text
+Constructor Run
+执行***Before()***
+执行***After()***
+执行doFirst()方法
+执行doSecond()方法
+```
 
 **Bean后处理器应用：**
 
 需求1：将doFirst()方法的返回值调整为全大写，但不能改变源码。
-需求1：只对id为someService1的Bean类的doFirst()方法进行增强。
+需求2：只对id为someService1的Bean类的doFirst()方法进行增强。
 
 定义Bean后处理器：
 
-    package tavish.bit.beanAssemble.postProcessApp;
+```java
+package tavish.bit.beanAssemble.postProcessApp;
 
-    import java.lang.reflect.InvocationHandler;
-    import java.lang.reflect.Method;
-    import java.lang.reflect.Proxy;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 
-    import org.springframework.beans.BeansException;
-    import org.springframework.beans.factory.config.BeanPostProcessor;
+import org.springframework.beans.BeansException;
+import org.springframework.beans.factory.config.BeanPostProcessor;
 
-    // Bean后处理器
-    public class MyBeanPostProcessor implements BeanPostProcessor {
+// Bean后处理器
+public class MyBeanPostProcessor implements BeanPostProcessor {
 
-        // bean：当前调用执行Bean后处理器的对象。
-        // beanName：当前调用执行Bean后处理器的对象的id。
-        // 返回值为调用执行Bean后处理器的对象。
-        
-        @Override
-        public Object postProcessBeforeInitialization(Object bean, String beanName) throws BeansException {
-            System.out.println("执行***Before()***");
-            return bean;
-        }
-
-        // 业务需求1，使用代理。
-        @Override
-        public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
-            System.out.println("执行***After()***");
-            
-            Object proxy = null;
-            // 业务需求2，判断beanName
-            if ("someService1".equals(beanName)) {
-                proxy = Proxy.newProxyInstance(bean.getClass().getClassLoader(), bean.getClass().getInterfaces(),
-                        new InvocationHandler() {
-                            @Override
-                            public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-                                Object result = method.invoke(bean, args);
-                                return result != null ? ((String) result).toUpperCase() : result;
-                            }
-                        });
-                return proxy;
-            }
-            return bean;
-        }
+    // bean：当前调用执行Bean后处理器的对象。
+    // beanName：当前调用执行Bean后处理器的对象的id。
+    // 返回值为调用执行Bean后处理器的对象。
+    
+    @Override
+    public Object postProcessBeforeInitialization(Object bean, String beanName) throws BeansException {
+        System.out.println("执行***Before()***");
+        return bean;
     }
+
+    // 业务需求1，使用代理。
+    @Override
+    public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
+        System.out.println("执行***After()***");
+        
+        Object proxy = null;
+        // 业务需求2，判断beanName
+        if ("someService1".equals(beanName)) {
+            proxy = Proxy.newProxyInstance(bean.getClass().getClassLoader(), bean.getClass().getInterfaces(),
+                    new InvocationHandler() {
+                        @Override
+                        public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+                            Object result = method.invoke(bean, args);
+                            return result != null ? ((String) result).toUpperCase() : result;
+                        }
+                    });
+            return proxy;
+        }
+        return bean;
+    }
+}
+```
 
 配置文件，注册两个Bean类以及后处理器：
 
-    <bean
-        id="someService1"
-        class="tavish.bit.beanAssemble.postProcessApp.SomeServiceImpl" />
-    <bean
-        id="someService2"
-        class="tavish.bit.beanAssemble.postProcessApp.SomeServiceImpl" />
+```xml
+<bean
+    id="someService1"
+    class="tavish.bit.beanAssemble.postProcessApp.SomeServiceImpl" />
+<bean
+    id="someService2"
+    class="tavish.bit.beanAssemble.postProcessApp.SomeServiceImpl" />
 
-    <!-- 注册Bean后处理器 -->
-    <bean class="tavish.bit.beanAssemble.postProcessApp.MyBeanPostProcessor" />
+<!-- 注册Bean后处理器 -->
+<bean class="tavish.bit.beanAssemble.postProcessApp.MyBeanPostProcessor" />
+```
 
 测试方法：
 
-    @Test
-    public void test01() {
-        String configLocation = "tavish/bit/beanAssemble/postProcessApp/applicationContext.xml";
-        
-        @SuppressWarnings("resource")
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
-        
-        ISomeService service1 = (ISomeService) context.getBean("someService1");
-        System.out.println(service1.doFirst());
-        System.out.println("==============================");
-        ISomeService service2 = (ISomeService) context.getBean("someService2");
-        System.out.println(service2.doFirst());
-    }
+```java
+@Test
+public void test01() {
+    String configLocation = "tavish/bit/beanAssemble/postProcessApp/applicationContext.xml";
+    
+    @SuppressWarnings("resource")
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
+    
+    ISomeService service1 = (ISomeService) context.getBean("someService1");
+    System.out.println(service1.doFirst());
+    System.out.println("==============================");
+    ISomeService service2 = (ISomeService) context.getBean("someService2");
+    System.out.println(service2.doFirst());
+}
+```
 
 输出：
 
-    Constructor Run
-    执行***Before()***
-    执行***After()***
-    Constructor Run
-    执行***Before()***
-    执行***After()***
-    执行doFirst()方法
-    ABCDE
-    ==============================
-    执行doFirst()方法
-    abcde
+```text
+Constructor Run
+执行***Before()***
+执行***After()***
+Constructor Run
+执行***Before()***
+执行***After()***
+执行doFirst()方法
+ABCDE
+==============================
+执行doFirst()方法
+abcde
+```
 
 #### 2.2.6 定制Bean的生命始末
 
@@ -665,63 +735,71 @@ Bean后处理器是一种**特殊的Bean**，容器中所有的Bean在初始化�
 
 给实体类增加方法：
 
-    package tavish.bit.beanAssemble.afterInitbeforeDestory;
+```java
+package tavish.bit.beanAssemble.afterInitbeforeDestory;
 
-    public class SomeServiceImpl implements ISomeService {
-        
-        public SomeServiceImpl() {
-            System.out.println("Constructor Run");
-        }
-
-        @Override
-        public String doFirst() {
-            System.out.println("执行doFirst()方法");
-            return "abcde";
-        }
-
-        @Override
-        public void doSecond() {
-            System.out.println("执行doSecond()方法");
-        }
-
-        public void afterInit() {
-            System.out.println("初始化之后");
-        }
-        
-        public void beforeDestory() {
-            System.out.println("销毁之前");
-        }
+public class SomeServiceImpl implements ISomeService {
+    
+    public SomeServiceImpl() {
+        System.out.println("Constructor Run");
     }
+
+    @Override
+    public String doFirst() {
+        System.out.println("执行doFirst()方法");
+        return "abcde";
+    }
+
+    @Override
+    public void doSecond() {
+        System.out.println("执行doSecond()方法");
+    }
+
+    public void afterInit() {
+        System.out.println("初始化之后");
+    }
+    
+    public void beforeDestory() {
+        System.out.println("销毁之前");
+    }
+}
+```
 
 在配置文件中注册这两个方法：
 
-    <bean
-        id="someService"
-        class="tavish.bit.beanAssemble.afterInitbeforeDestory.SomeServiceImpl"
-        init-method="afterInit" 
-        destroy-method="beforeDestory"/>
+```xml
+<bean
+    id="someService"
+    class="tavish.bit.beanAssemble.afterInitbeforeDestory.SomeServiceImpl"
+    init-method="afterInit" 
+    destroy-method="beforeDestory"/>
+```
 
 测试方法：
 
-    @Test
-    public void test01() {
-        String configLocation = "tavish/bit/beanAssemble/afterInitbeforeDestory/applicationContext.xml";
-        
-        @SuppressWarnings("resource")
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
-        
-        ISomeService service = (ISomeService) context.getBean("someService");
-        
-        service.doFirst();
-        service.doSecond();
-    }
+```java
+@Test
+public void test01() {
+    String configLocation = "tavish/bit/beanAssemble/afterInitbeforeDestory/applicationContext.xml";
+    
+    @SuppressWarnings("resource")
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
+    
+    ISomeService service = (ISomeService) context.getBean("someService");
+    
+    service.doFirst();
+    service.doSecond();
+}
+```
 
 输出：
 
-    Constructor Run
-    初始化之后
-    执行doFirst()方法
-    执行doSecond()方法
+```text
+Constructor Run
+初始化之后
+执行doFirst()方法
+执行doSecond()方法
+```
 
 destroy-method的执行有两个要求：
 
@@ -730,15 +808,19 @@ destroy-method的执行有两个要求：
 
 修改测试方法，加入：
 
-    ((ClassPathXmlApplicationContext)context).close();
+```java
+((ClassPathXmlApplicationContext)context).close();
+```
 
 输出：
 
-    Constructor Run
-    初始化之后
-    执行doFirst()方法
-    执行doSecond()方法
-    销毁之前
+```text
+Constructor Run
+初始化之后
+执行doFirst()方法
+执行doSecond()方法
+销毁之前
+```
 
 #### 2.2.7 Bean的生命周期
 
@@ -754,119 +836,128 @@ Bean实例从创建到最后销毁，需要经过很多过程，执行很多生�
 8. 若定义并注册了Bean后处理器BeanPostProcessor，则执行接口方法postProcessAfterInitialization()。
 9. 执行业务方法。
 10. 若Bean实现了DisposableBean接口，则执行接口方法destroy()。
-    - destroy()方法的执行同样需要singleton以及容器的显式关闭。
+    - destroy()方法的执行需要scope为singleton。
+    - 容器的显式关闭。
 11. 若设置了destroy-method方法，则执行。
 
 示例：
 
 定义Bean类：
 
-    package tavish.bit.beanAssemble.lifeCycle;
+```java
+package tavish.bit.beanAssemble.lifeCycle;
 
-    import org.springframework.beans.BeansException;
-    import org.springframework.beans.factory.BeanFactory;
-    import org.springframework.beans.factory.BeanFactoryAware;
-    import org.springframework.beans.factory.BeanNameAware;
-    import org.springframework.beans.factory.DisposableBean;
-    import org.springframework.beans.factory.InitializingBean;
+import org.springframework.beans.BeansException;
+import org.springframework.beans.factory.BeanFactory;
+import org.springframework.beans.factory.BeanFactoryAware;
+import org.springframework.beans.factory.BeanNameAware;
+import org.springframework.beans.factory.DisposableBean;
+import org.springframework.beans.factory.InitializingBean;
 
-    public class SomeServiceImpl
-            implements ISomeService, BeanNameAware, BeanFactoryAware, InitializingBean, DisposableBean {
+public class SomeServiceImpl
+        implements ISomeService, BeanNameAware, BeanFactoryAware, InitializingBean, DisposableBean {
 
-        @SuppressWarnings("unused")
-        private String adao;
+    @SuppressWarnings("unused")
+    private String adao;
 
-        public void setAdao(String adao) {
-            System.out.println("Step2：执行setter方法");
-            this.adao = adao;
-        }
-
-        public SomeServiceImpl() {
-            System.out.println("Step1：对象的创建");
-        }
-
-        @Override
-        public String doFirst() {
-            System.out.println("Step9：执行业务方法");
-            return "abcde";
-        }
-
-        @Override
-        public void doSecond() {
-            System.out.println("执行doSecond()方法");
-        }
-
-        public void afterInit() {
-            System.out.println("Step7：初始化之后执行init-method");
-        }
-
-        public void beforeDestory() {
-            System.out.println("Step11：销毁之前执行destroy-method");
-        }
-
-        @Override
-        public void setBeanName(String name) {
-            System.out.println("Step3：beanName = " + name);
-        }
-
-        @Override
-        public void setBeanFactory(BeanFactory beanFactory) throws BeansException {
-            System.out.println("Step4：获取到BeanFactory容器");
-        }
-
-        @Override
-        public void afterPropertiesSet() throws Exception {
-            System.out.println("Step6：该方法的完成标志Bean的初始化工作完毕");
-        }
-
-        @Override
-        public void destroy() throws Exception {
-            System.out.println("Step10：准备销毁工作，进入销毁的流程");
-        }
-
+    public void setAdao(String adao) {
+        System.out.println("Step2：执行setter方法");
+        this.adao = adao;
     }
+
+    public SomeServiceImpl() {
+        System.out.println("Step1：对象的创建");
+    }
+
+    @Override
+    public String doFirst() {
+        System.out.println("Step9：执行业务方法");
+        return "abcde";
+    }
+
+    @Override
+    public void doSecond() {
+        System.out.println("执行doSecond()方法");
+    }
+
+    public void afterInit() {
+        System.out.println("Step7：初始化之后执行init-method");
+    }
+
+    public void beforeDestory() {
+        System.out.println("Step11：销毁之前执行destroy-method");
+    }
+
+    @Override
+    public void setBeanName(String name) {
+        System.out.println("Step3：beanName = " + name);
+    }
+
+    @Override
+    public void setBeanFactory(BeanFactory beanFactory) throws BeansException {
+        System.out.println("Step4：获取到BeanFactory容器");
+    }
+
+    @Override
+    public void afterPropertiesSet() throws Exception {
+        System.out.println("Step6：该方法的完成标志Bean的初始化工作完毕");
+    }
+
+    @Override
+    public void destroy() throws Exception {
+        System.out.println("Step10：准备销毁工作，进入销毁的流程");
+    }
+
+}
+```
 
 配置文件：
 
-    <bean
-        id="someService"
-        class="tavish.bit.beanAssemble.lifeCycle.SomeServiceImpl"
-        init-method="afterInit"
-        destroy-method="beforeDestory">
-        <!-- 属性注入 -->
-        <property
-            name="adao"
-            value="AAA" />
-    </bean>
+```xml
+<bean
+    id="someService"
+    class="tavish.bit.beanAssemble.lifeCycle.SomeServiceImpl"
+    init-method="afterInit"
+    destroy-method="beforeDestory">
+    <!-- 属性注入 -->
+    <property
+        name="adao"
+        value="AAA" />
+</bean>
 
-    <bean class="tavish.bit.beanAssemble.lifeCycle.MyBeanPostProcessor" />
+<bean class="tavish.bit.beanAssemble.lifeCycle.MyBeanPostProcessor" />
+```
 
 测试方法：
 
-    @Test
-    public void test01() {
-        String configLocation = "tavish/bit/beanAssemble/lifeCycle/applicationContext.xml";
-        
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
-        
-        ISomeService service = (ISomeService) context.getBean("someService");
-        service.doFirst();
-        ((ClassPathXmlApplicationContext)context).close();
-    }
+```java
+@Test
+public void test01() {
+    String configLocation = "tavish/bit/beanAssemble/lifeCycle/applicationContext.xml";
+    
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
+    
+    ISomeService service = (ISomeService) context.getBean("someService");
+    service.doFirst();
+    ((ClassPathXmlApplicationContext)context).close();
+}
+```
 
 输出：
 
-    Step1：对象的创建
-    Step2：执行setter方法
-    Step3：beanName = someService
-    Step4：获取到BeanFactory容器
-    Step5：执行Bean后处理器的Before方法
-    Step6：该方法的完成标志Bean的初始化工作完毕
-    Step7：初始化之后执行init-method
-    Step8：执行After后处理器的Before方法
-    Step9：执行业务方法
-    Step10：准备销毁工作，进入销毁的流程
-    Step11：销毁之前执行destroy-method
+```text
+Step1：对象的创建
+Step2：执行setter方法
+Step3：beanName = someService
+Step4：获取到BeanFactory容器
+Step5：执行Bean后处理器的Before方法
+Step6：该方法的完成标志Bean的初始化工作完毕
+Step7：初始化之后执行init-method
+Step8：执行After后处理器的Before方法
+Step9：执行业务方法
+Step10：准备销毁工作，进入销毁的流程
+Step11：销毁之前执行destroy-method
+```
 
 #### 2.2.8 &lt;bean/&gt;的id属性与name属性
 
@@ -882,8 +973,13 @@ name则可以包含各种字符，且对名称没有唯一性要求。若名称�
 
 #### 2.3.1 注入分类
 
-Bean实例在调用无参构造器创建了空值对象后，就要对Bean对象的属性进行初始化。初始化是由容器自动完成的，称为注入。根据注入方式的不同，常用的有两类：设值注入、构造注入
-。
+Bean实例在调用无参构造器创建了空值对象后，就要对Bean对象的属性进行初始化。初始化是由容器自动完成的，称为注入。
+
+根据注入方式的不同，常用的有两类：
+
+- 设值注入
+- 构造注入
+
 还有另外一种，实现特定接口注入。由于这种方式采用侵入式编程，污染了代码，所以几乎不用。
 
 ##### 2.3.1.1 设值注入
@@ -894,88 +990,100 @@ Bean实例在调用无参构造器创建了空值对象后，就要对Bean对象
 
 定义Bean类，School.java：
 
-    package tavish.bit.di.setterInjection;
+```java
+package tavish.bit.di.setterInjection;
 
-    public class School {
-        private String sname;
+public class School {
+    private String sname;
 
-        public void setSname(String sname) {
-            this.sname = sname;
-        }
-
-        @Override
-        public String toString() {
-            return "School [sname=" + sname + "]";
-        }
+    public void setSname(String sname) {
+        this.sname = sname;
     }
+
+    @Override
+    public String toString() {
+        return "School [sname=" + sname + "]";
+    }
+}
+```
 
 定义Bean类，Student.java：
 
+```java
 package tavish.bit.di.setterInjection;
 
-    public class Student {
-        private String name;
-        private int age;
-        private School school; // 域属性
+public class Student {
+    private String name;
+    private int age;
+    private School school; // 域属性
 
-        public void setName(String name) {
-            this.name = name;
-        }
-
-        public void setAge(int age) {
-            this.age = age;
-        }
-
-        public void setSchool(School school) {
-            this.school = school;
-        }
-
-        @Override
-        public String toString() {
-            return "Student [name=" + name + ", age=" + age + ", school=" + school + "]";
-        }
+    public void setName(String name) {
+        this.name = name;
     }
+
+    public void setAge(int age) {
+        this.age = age;
+    }
+
+    public void setSchool(School school) {
+        this.school = school;
+    }
+
+    @Override
+    public String toString() {
+        return "Student [name=" + name + ", age=" + age + ", school=" + school + "]";
+    }
+}
+```
 
 在配置文件中进行设值注入：
 
 当指定bean的某属性值为另一bean的实例时，通过ref指定它们间的引用关系。ref的值必须为某bean的id值。
 
-    <bean
-        id="mySchool"
-        class="tavish.bit.di.setterInjection.School">
-        <property name="sname" value="清华大学" />
-    </bean>
-    <bean
-        id="myStudent"
-        class="tavish.bit.di.setterInjection.Student">
-        <property name="name" value="张三" />
-        <property name="age" value="23" />
-        <property name="school" ref="mySchool" />
-    </bean>
+```xml
+<bean
+    id="mySchool"
+    class="tavish.bit.di.setterInjection.School">
+    <property name="sname" value="清华大学" />
+</bean>
+<bean
+    id="myStudent"
+    class="tavish.bit.di.setterInjection.Student">
+    <property name="name" value="张三" />
+    <property name="age" value="23" />
+    <property name="school" ref="mySchool" />
+</bean>
+```
 
 对于其它Bean对象的引用，除了&lt;bean/&gt;标签的ref属性外，还可以使用&lt;ref/&gt;标签。
 
-    <property name="school">
-        <ref bean="mySchool" />
-    </property>
+```xml
+<property name="school">
+    <ref bean="mySchool" />
+</property>
+```
 
 测试方法：
 
-    @Test
-    public void test01() {
-        String configLocation = "tavish/bit/di/setterInjection/applicationContext.xml";
-        
-        @SuppressWarnings("resource")
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
-        
-        Student student = (Student) context.getBean("myStudent");
-        
-        System.out.println(student);
-    }
+```java
+@Test
+public void test01() {
+    String configLocation = "tavish/bit/di/setterInjection/applicationContext.xml";
+    
+    @SuppressWarnings("resource")
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
+    
+    Student student = (Student) context.getBean("myStudent");
+    
+    System.out.println(student);
+}
+```
 
 输出：
 
-    Student [name=张三, age=23, school=School [sname=清华大学]]
+```text
+Student [name=张三, age=23, school=School [sname=清华大学]]
+```
 
 ##### 2.3.1.2 构造注入
 
@@ -989,85 +1097,96 @@ package tavish.bit.di.setterInjection;
 
 修改Student类，去掉Setter方法，加入两个构造器。
 
-    package tavish.bit.di.constructorInjection;
+```java
+package tavish.bit.di.constructorInjection;
 
-    public class Student {
-        private String name;
-        private int age;
-        private School school; // 域属性
-        
-        public Student() {
-            super();
-        }
-
-        public Student(String name, int age, School school) {
-            super();
-            this.name = name;
-            this.age = age;
-            this.school = school;
-        }
-
-        @Override
-        public String toString() {
-            return "Student [name=" + name + ", age=" + age + ", school=" + school + "]";
-        }
+public class Student {
+    private String name;
+    private int age;
+    private School school; // 域属性
+    
+    public Student() {
+        super();
     }
+
+    public Student(String name, int age, School school) {
+        super();
+        this.name = name;
+        this.age = age;
+        this.school = school;
+    }
+
+    @Override
+    public String toString() {
+        return "Student [name=" + name + ", age=" + age + ", school=" + school + "]";
+    }
+}
+```
 
 修改配置文件，去掉property标签，使用constructor-arg标签：
 
 使用index索引指示参数：
 
-    <bean
-        id="mySchool"
-        class="tavish.bit.di.constructorInjection.School">
-        <property name="sname" value="清华大学" />
-    </bean>
-    <bean
-        id="myStudent"
-        class="tavish.bit.di.constructorInjection.Student">
-        <constructor-arg index="0" value="李四" />
-        <constructor-arg index="1" value="24" />
-        <constructor-arg index="2" ref="mySchool" />
-    </bean>
+```xml
+<bean
+    id="mySchool"
+    class="tavish.bit.di.constructorInjection.School">
+    <property name="sname" value="清华大学" />
+</bean>
+<bean
+    id="myStudent"
+    class="tavish.bit.di.constructorInjection.Student">
+    <constructor-arg index="0" value="李四" />
+    <constructor-arg index="1" value="24" />
+    <constructor-arg index="2" ref="mySchool" />
+</bean>
+```
 
 使用name属性指示参数：
 
-    <bean
-        id="myStudent"
-        class="tavish.bit.di.constructorInjection.Student">
-        <constructor-arg name="name" value="李四" />
-        <constructor-arg name="age" value="24" />
-        <constructor-arg name="school" ref="mySchool" />
-    </bean>
+```xml
+<bean
+    id="myStudent"
+    class="tavish.bit.di.constructorInjection.Student">
+    <constructor-arg name="name" value="李四" />
+    <constructor-arg name="age" value="24" />
+    <constructor-arg name="school" ref="mySchool" />
+</bean>
+```
 
 不使用index、name属性：此时要保证标签的顺序与构造器参数列表顺序一致。
 
-    <bean
-        id="myStudent"
-        class="tavish.bit.di.constructorInjection.Student">
-        <constructor-arg value="李四" />
-        <constructor-arg value="24" />
-        <constructor-arg ref="mySchool" />
-    </bean>
-
+```xml
+<bean
+    id="myStudent"
+    class="tavish.bit.di.constructorInjection.Student">
+    <constructor-arg value="李四" />
+    <constructor-arg value="24" />
+    <constructor-arg ref="mySchool" />
+</bean>
+```
 
 测试方法：
 
-    @Test
-    public void test01() {
-        String configLocation = "tavish/bit/di/constructorInjection/applicationContext.xml";
-        
-        @SuppressWarnings("resource")
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
-        
-        Student student = (Student) context.getBean("myStudent");
-        
-        System.out.println(student);
-    }
+```java
+@Test
+public void test01() {
+    String configLocation = "tavish/bit/di/constructorInjection/applicationContext.xml";
+    
+    @SuppressWarnings("resource")
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
+    
+    Student student = (Student) context.getBean("myStudent");
+    
+    System.out.println(student);
+}
+```
 
 输出：
 
-    Student [name=李四, age=24, school=School [sname=清华大学]]
+```text
+Student [name=李四, age=24, school=School [sname=清华大学]]
+```
 
 #### 2.3.2 命名空间注入
 
@@ -1080,71 +1199,87 @@ package tavish.bit.di.setterInjection;
 
 步骤一：修改配置文件头，添加相应约束，在其中声明p命名空间。
 
-    xmlns:p="http://www.springframework.org/schema/p"
+```xml
+xmlns:p="http://www.springframework.org/schema/p"
+```
 
 步骤二：去掉property标签，使用p:属性。
 
-    <bean
-        id="mySchool"
-        class="tavish.bit.di.pnameSpace.setterInjection.School"
-        p:sname="北京大学" />
-    <bean
-        id="myStudent"
-        class="tavish.bit.di.pnameSpace.setterInjection.Student"
-        p:name="王五"
-        p:age="25"
-        p:school-ref="mySchool" />
+```xml
+<bean
+    id="mySchool"
+    class="tavish.bit.di.pnameSpace.setterInjection.School"
+    p:sname="北京大学" />
+<bean
+    id="myStudent"
+    class="tavish.bit.di.pnameSpace.setterInjection.Student"
+    p:name="王五"
+    p:age="25"
+    p:school-ref="mySchool" />
+```
 
 测试方法：
 
-    @Test
-    public void test01() {
-        String configLocation = "tavish/bit/di/pnameSpace/setterInjection/applicationContext.xml";
-        
-        @SuppressWarnings("resource")
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
-        
-        Student student = (Student) context.getBean("myStudent");
-        
-        System.out.println(student);
-    }
+```java
+@Test
+public void test01() {
+    String configLocation = "tavish/bit/di/pnameSpace/setterInjection/applicationContext.xml";
+    
+    @SuppressWarnings("resource")
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
+    
+    Student student = (Student) context.getBean("myStudent");
+    
+    System.out.println(student);
+}
+```
 
 输出：
 
-    Student [name=王五, age=25, school=School [sname=北京大学]]
+```text
+Student [name=王五, age=25, school=School [sname=北京大学]]
+```
 
 ##### 2.3.2.2 c命名空间注入- - -构造注入
 
 步骤一：修改配置文件头，添加相应约束，在其中声明c命名空间。
 
-    xmlns:c="http://www.springframework.org/schema/c"
+```xml
+xmlns:c="http://www.springframework.org/schema/c"
+```
 
 步骤二：去掉constructor标签，使用c:属性。
 
-    <bean
-        id="myStudent"
-        class="tavish.bit.di.cnameSpace.constructorInjection.Student"
-        c:name="赵六"
-        c:age="26"
-        c:school-ref="mySchool" />
+```xml
+<bean
+    id="myStudent"
+    class="tavish.bit.di.cnameSpace.constructorInjection.Student"
+    c:name="赵六"
+    c:age="26"
+    c:school-ref="mySchool" />
+```
 
 测试方法：
 
-    @Test
-    public void test01() {
-        String configLocation = "tavish/bit/di/cnameSpace/constructorInjection/applicationContext.xml";
-        
-        @SuppressWarnings("resource")
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
-        
-        Student student = (Student) context.getBean("myStudent");
-        
-        System.out.println(student);
-    }
+```java
+@Test
+public void test01() {
+    String configLocation = "tavish/bit/di/cnameSpace/constructorInjection/applicationContext.xml";
+    
+    @SuppressWarnings("resource")
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
+    
+    Student student = (Student) context.getBean("myStudent");
+    
+    System.out.println(student);
+}
+```
 
 输出：
 
-    Student [name=赵六, age=26, school=School [sname=清华大学]]
+```text
+Student [name=赵六, age=26, school=School [sname=清华大学]]
+```
 
 #### 2.3.3 集合属性注入
 
@@ -1152,185 +1287,199 @@ package tavish.bit.di.setterInjection;
 
 定义Bean类，Some.java：
 
-    package tavish.bit.di.setInjection;
+```java
+package tavish.bit.di.setInjection;
 
-    import java.util.Arrays;
-    import java.util.List;
-    import java.util.Map;
-    import java.util.Properties;
-    import java.util.Set;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
 
-    public class Some {
-        private School[] schools;
-        private List<String> myList;
-        private Set<String> mySet;
-        private Map<String, Object> myMap;
-        private Properties myPros;
+public class Some {
+    private School[] schools;
+    private List<String> myList;
+    private Set<String> mySet;
+    private Map<String, Object> myMap;
+    private Properties myPros;
 
-        public void setSchools(School[] schools) {
-            this.schools = schools;
-        }
-
-        public void setMyList(List<String> myList) {
-            this.myList = myList;
-        }
-
-        public void setMySet(Set<String> mySet) {
-            this.mySet = mySet;
-        }
-
-        public void setMyMap(Map<String, Object> myMap) {
-            this.myMap = myMap;
-        }
-
-        public void setMyPros(Properties myPros) {
-            this.myPros = myPros;
-        }
-
-        @Override
-        public String toString() {
-            return "Some [schools=" + Arrays.toString(schools) + ", myList=" + myList + ", mySet=" + mySet + ", myMap="
-                    + myMap + ", myPros=" + myPros + "]";
-        }
+    public void setSchools(School[] schools) {
+        this.schools = schools;
     }
+
+    public void setMyList(List<String> myList) {
+        this.myList = myList;
+    }
+
+    public void setMySet(Set<String> mySet) {
+        this.mySet = mySet;
+    }
+
+    public void setMyMap(Map<String, Object> myMap) {
+        this.myMap = myMap;
+    }
+
+    public void setMyPros(Properties myPros) {
+        this.myPros = myPros;
+    }
+
+    @Override
+    public String toString() {
+        return "Some [schools=" + Arrays.toString(schools) + ", myList=" + myList + ", mySet=" + mySet + ", myMap="
+                + myMap + ", myPros=" + myPros + "]";
+    }
+}
+```
 
 定义Bean类，School.java：
 
-    package tavish.bit.di.setInjection;
+```java
+package tavish.bit.di.setInjection;
 
-    public class School {
-        private String name;
+public class School {
+    private String name;
 
-        public void setName(String name) {
-            this.name = name;
-        }
-
-        @Override
-        public String toString() {
-            return "School [name=" + name + "]";
-        }
+    public void setName(String name) {
+        this.name = name;
     }
+
+    @Override
+    public String toString() {
+        return "School [name=" + name + "]";
+    }
+}
+```
 
 配置文件：
 
-    <?xml version="1.0" encoding="UTF-8"?>
-    <beans
-        xmlns="http://www.springframework.org/schema/beans"
-        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xsi:schemaLocation="
-            http://www.springframework.org/schema/beans 
-            http://www.springframework.org/schema/beans/spring-beans.xsd">
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans
+    xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="
+        http://www.springframework.org/schema/beans 
+        http://www.springframework.org/schema/beans/spring-beans.xsd">
 
-        <bean
-            id="school1"
-            class="tavish.bit.di.setInjection.School">
-            <property
-                name="name"
-                value="清华大学" />
-        </bean>
-        <bean
-            id="school2"
-            class="tavish.bit.di.setInjection.School">
-            <property
-                name="name"
-                value="北京大学" />
-        </bean>
+    <bean
+        id="school1"
+        class="tavish.bit.di.setInjection.School">
+        <property
+            name="name"
+            value="清华大学" />
+    </bean>
+    <bean
+        id="school2"
+        class="tavish.bit.di.setInjection.School">
+        <property
+            name="name"
+            value="北京大学" />
+    </bean>
 
-        <!-- 集合属性注入 -->
-        <bean
-            id="some"
-            class="tavish.bit.di.setInjection.Some">
-            <!-- 为数组注入的值 -->
-            <property name="schools">
-                <array>
-                    <ref bean="school1" />
-                    <ref bean="school2" />
-                </array>
-            </property>
+    <!-- 集合属性注入 -->
+    <bean
+        id="some"
+        class="tavish.bit.di.setInjection.Some">
+        <!-- 为数组注入的值 -->
+        <property name="schools">
+            <array>
+                <ref bean="school1" />
+                <ref bean="school2" />
+            </array>
+        </property>
 
-            <!-- 为List注入值 -->
-            <property name="myList">
-                <list>
-                    <value>张三</value>
-                    <value>李四</value>
-                </list>
-            </property>
+        <!-- 为List注入值 -->
+        <property name="myList">
+            <list>
+                <value>张三</value>
+                <value>李四</value>
+            </list>
+        </property>
 
-            <!-- 为Set注入值 -->
-            <property name="mySet">
-                <set>
-                    <value>中国北京</value>
-                    <value>大兴亦庄</value>
-                </set>
-            </property>
+        <!-- 为Set注入值 -->
+        <property name="mySet">
+            <set>
+                <value>中国北京</value>
+                <value>大兴亦庄</value>
+            </set>
+        </property>
 
-            <!-- 为Map注入值 -->
-            <property name="myMap">
-                <map>
-                    <entry
-                        key="QQ"
-                        value="7654321" />
-                    <entry
-                        key="WeiXin"
-                        value="1234567" />
-                </map>
-            </property>
+        <!-- 为Map注入值 -->
+        <property name="myMap">
+            <map>
+                <entry
+                    key="QQ"
+                    value="7654321" />
+                <entry
+                    key="WeiXin"
+                    value="1234567" />
+            </map>
+        </property>
 
-            <!-- 为Properties注入值 -->
-            <property name="myPros">
-                <props>
-                    <prop key="地址">房山良乡</prop>
-                    <prop key="名称">北京理工大学</prop>
-                </props>
-            </property>
-        </bean>
-    </beans>
+        <!-- 为Properties注入值 -->
+        <property name="myPros">
+            <props>
+                <prop key="地址">房山良乡</prop>
+                <prop key="名称">北京理工大学</prop>
+            </props>
+        </property>
+    </bean>
+</beans>
+```
 
 测试方法：
 
-    @Test
-    public void test01() {
-        String configLocation = "tavish/bit/di/setInjection/applicationContext.xml";
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
-        
-        Some some = (Some) context.getBean("some");
-        
-        System.out.println(some);
-        
-        ((ClassPathXmlApplicationContext)context).close();
-    }
+```java
+@Test
+public void test01() {
+    String configLocation = "tavish/bit/di/setInjection/applicationContext.xml";
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
+    
+    Some some = (Some) context.getBean("some");
+    
+    System.out.println(some);
+    
+    ((ClassPathXmlApplicationContext)context).close();
+}
+```
 
 输出：
 
-    Some [schools=[School [name=清华大学], School [name=北京大学]], myList=[张三, 李四], mySet=[中国北京, 大兴亦庄], myMap={QQ=7654321, WeiXin=1234567}, myPros={名称=北京理工大学, 地址=房山良乡}]
+```text
+Some [schools=[School [name=清华大学], School [name=北京大学]], myList=[张三, 李四], mySet=[中国北京, 大兴亦庄], myMap={QQ=7654321, WeiXin=1234567}, myPros={名称=北京理工大学, 地址=房山良乡}]
+```
 
 另一种写法，对非引用赋值简化：
 
-    <!-- 为List注入值 -->
-    <property name="myList" value="张三,李四" />
+```xml
+<!-- 为List注入值 -->
+<property name="myList" value="张三,李四" />
 
-    <!-- 为Set注入值 -->
-    <property name="mySet" value="长阳,篱笆房" />
+<!-- 为Set注入值 -->
+<property name="mySet" value="长阳,篱笆房" />
 
-    <!-- 为数组注入值 -->
-    <property name="arr" value="abc,def" />
+<!-- 为数组注入值 -->
+<property name="arr" value="abc,def" />
+```
 
 此时，这些集合内存放的都是基本类型值，而非对象的引用值。为存放对象引用值的集合赋值只能用ref。如：
 
-    <!-- 为数组注入的值 -->
-    <property name="schools">
-        <array>
-            <ref bean="school1" />
-            <ref bean="school2" />
-        </array>
-    </property>
-    <!-- 为List注入的值 -->
-    <property name="students">
-        <list>
-            <ref bean="student1" />
-            <ref bean="student2" />
-        </list>
-    </property>
+```xml
+<!-- 为数组注入的值 -->
+<property name="schools">
+    <array>
+        <ref bean="school1" />
+        <ref bean="school2" />
+    </array>
+</property>
+<!-- 为List注入的值 -->
+<property name="students">
+    <list>
+        <ref bean="student1" />
+        <ref bean="student2" />
+    </list>
+</property>
+```
 
 #### 2.3.4 对域属性的自动注入
 
@@ -1347,62 +1496,70 @@ package tavish.bit.di.setterInjection;
 
 Bean类，Student.java：具有域属性school。
 
-    package tavish.bit.di.fieldAutowire.byName;
+```java
+package tavish.bit.di.fieldAutowire.byName;
 
-    public class Student {
-        private String name;
-        private int age;
-        private School school; // 域属性
+public class Student {
+    private String name;
+    private int age;
+    private School school; // 域属性
 
-        public void setName(String name) {
-            this.name = name;
-        }
-
-        public void setAge(int age) {
-            this.age = age;
-        }
-
-        public void setSchool(School school) {
-            this.school = school;
-        }
-
-        @Override
-        public String toString() {
-            return "Student [name=" + name + ", age=" + age + ", school=" + school + "]";
-        }
+    public void setName(String name) {
+        this.name = name;
     }
+
+    public void setAge(int age) {
+        this.age = age;
+    }
+
+    public void setSchool(School school) {
+        this.school = school;
+    }
+
+    @Override
+    public String toString() {
+        return "Student [name=" + name + ", age=" + age + ", school=" + school + "]";
+    }
+}
+```
 
 配置文件：在Student的bean标签上增加属性autowire="byName"，将School的bean标签中的id改为与Student类中同名的school。
 
-    <bean
-        id="school"
-        class="tavish.bit.di.fieldAutowire.byName.School">
-        <property name="name" value="清华大学" />
-    </bean>
-    <bean
-        id="myStudent"
-        class="tavish.bit.di.fieldAutowire.byName.Student" autowire="byName">
-        <property name="name" value="张三" />
-        <property name="age" value="23" />
-    </bean>
+```xml
+<bean
+    id="school"
+    class="tavish.bit.di.fieldAutowire.byName.School">
+    <property name="name" value="清华大学" />
+</bean>
+<bean
+    id="myStudent"
+    class="tavish.bit.di.fieldAutowire.byName.Student" autowire="byName">
+    <property name="name" value="张三" />
+    <property name="age" value="23" />
+</bean>
+```
 
 测试方法：
 
-    @Test
-    public void test01() {
-        String configLocation = "tavish/bit/di/fieldAutowire/byName/applicationContext.xml";
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
-        
-        Student student = (Student) context.getBean("myStudent");
-        
-        System.out.println(student);
-        
-        ((ClassPathXmlApplicationContext)context).close();
-    }
+```java
+@Test
+public void test01() {
+    String configLocation = "tavish/bit/di/fieldAutowire/byName/applicationContext.xml";
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
+    
+    Student student = (Student) context.getBean("myStudent");
+    
+    System.out.println(student);
+    
+    ((ClassPathXmlApplicationContext)context).close();
+}
+```
 
 输出：
 
-    Student [name=张三, age=23, school=School [name=清华大学]]
+```text
+Student [name=张三, age=23, school=School [name=清华大学]]
+```
 
 ##### 2.3.4.2 byType自动注入
 
@@ -1412,57 +1569,62 @@ Bean类，Student.java：具有域属性school。
 
 配置文件：
 
-    <bean
-        id="mySchool"
-        class="tavish.bit.di.fieldAutowire.byType.School">
-        <property name="name" value="清华大学" />
-    </bean>
-    <bean
-        id="myStudent"
-        class="tavish.bit.di.fieldAutowire.byType.Student" autowire="byType">
-        <property name="name" value="张三" />
-        <property name="age" value="23" />
-    </bean>
+```xml
+<bean
+    id="mySchool"
+    class="tavish.bit.di.fieldAutowire.byType.School">
+    <property name="name" value="清华大学" />
+</bean>
+<bean
+    id="myStudent"
+    class="tavish.bit.di.fieldAutowire.byType.Student" autowire="byType">
+    <property name="name" value="张三" />
+    <property name="age" value="23" />
+</bean>
+```
 
-**
-此时，使用class="tavish.bit.di.fieldAutowire.byType.School"或该class子类的bean标签只能有一个，否则容器就不知道该使用哪个Bean了。
-**
+**此时，使用class="tavish.bit.di.fieldAutowire.byType.School"或该class子类的bean标签只能有一个，否则容器就不知道该使用哪个Bean了。**
 
 配置文件：
 
-    <bean
-        id="primarySchool"
-        class="tavish.bit.di.fieldAutowire.byType.PrimarySchool"/>
-    <bean
-        id="mySchool"
-        class="tavish.bit.di.fieldAutowire.byType.School">
-        <property name="name" value="清华大学" />
-    </bean>
-    <bean
-        id="myStudent"
-        class="tavish.bit.di.fieldAutowire.byType.Student" autowire="byType">
-        <property name="name" value="张三" />
-        <property name="age" value="23" />
-    </bean>
-
+```text
+<bean
+    id="primarySchool"
+    class="tavish.bit.di.fieldAutowire.byType.PrimarySchool"/>
+<bean
+    id="mySchool"
+    class="tavish.bit.di.fieldAutowire.byType.School">
+    <property name="name" value="清华大学" />
+</bean>
+<bean
+    id="myStudent"
+    class="tavish.bit.di.fieldAutowire.byType.Student" autowire="byType">
+    <property name="name" value="张三" />
+    <property name="age" value="23" />
+</bean>
+```
 
 测试方法：
 
-    @Test
-    public void test01() {
-        String configLocation = "tavish/bit/di/fieldAutowire/byType/applicationContext.xml";
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
-        
-        Student student = (Student) context.getBean("myStudent");
-        
-        System.out.println(student);
-        
-        ((ClassPathXmlApplicationContext)context).close();
-    }
+```java
+@Test
+public void test01() {
+    String configLocation = "tavish/bit/di/fieldAutowire/byType/applicationContext.xml";
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
+    
+    Student student = (Student) context.getBean("myStudent");
+    
+    System.out.println(student);
+    
+    ((ClassPathXmlApplicationContext)context).close();
+}
+```
 
 输出：
 
-    Student [name=张三, age=23, school=School [name=清华大学]]
+```text
+Student [name=张三, age=23, school=School [name=清华大学]]
+```
 
 #### 2.3.5 使用SpEL注入
 
@@ -1477,86 +1639,93 @@ SpEL，Spring Expression Language，即Spring EL表达式语言。即，在Sprin
 
 定义Person类：Person类需要getter方法，以及一个动态返回age的computeAge()方法。
 
-    package tavish.bit.di.spel;
+```java
+package tavish.bit.di.spel;
 
-    public class Person {
-        private String pname;
-        private int page;
+public class Person {
+    private String pname;
+    private int page;
 
-        public void setPname(String pname) {
-            this.pname = pname;
-        }
-
-        public void setPage(int page) {
-            this.page = page;
-        }
-
-        public String getPname() {
-            return pname;
-        }
-
-        public int getPage() {
-            return page;
-        }
-        
-        // 动态返回age的方法
-        public int computeAge() {
-            return page > 25 ? 25 : page;
-        }
-
-        @Override
-        public String toString() {
-            return "Person [pname=" + pname + ", page=" + page + "]";
-        }
-
+    public void setPname(String pname) {
+        this.pname = pname;
     }
+
+    public void setPage(int page) {
+        this.page = page;
+    }
+
+    public String getPname() {
+        return pname;
+    }
+
+    public int getPage() {
+        return page;
+    }
+    
+    // 动态返回age的方法
+    public int computeAge() {
+        return page > 25 ? 25 : page;
+    }
+
+    @Override
+    public String toString() {
+        return "Person [pname=" + pname + ", page=" + page + "]";
+    }
+}
+```
 
 配置文件：使用SpEL表达式。
 
-    <bean id="myPerson" class="tavish.bit.di.spel.Person">
-        <property name="pname" value="李四" />
-        <!-- 随机生成年龄 -->
-        <property name="page" value="#{T(java.lang.Math).random() * 50}" />
-    </bean>
-    <bean
-        id="myStudent"
-        class="tavish.bit.di.spel.Student">
+```xml
+<bean id="myPerson" class="tavish.bit.di.spel.Person">
+    <property name="pname" value="李四" />
+    <!-- 随机生成年龄 -->
+    <property name="page" value="#{T(java.lang.Math).random() * 50}" />
+</bean>
+<bean
+    id="myStudent"
+    class="tavish.bit.di.spel.Student">
 
-        <!-- #{myPerson['pname']}也可以写成#{myPerson.pname} -->
+    <!-- #{myPerson['pname']}也可以写成#{myPerson.pname} -->
 
-        <property name="name" value="#{myPerson['pname']}" />
-        <property name="age" value="#{myPerson.computeAge()}" />
+    <property name="name" value="#{myPerson['pname']}" />
+    <property name="age" value="#{myPerson.computeAge()}" />
 
-        <!-- 不使用Person类的方法，也可以直接使用三元表达式进行运算 -->
-        <!-- <property name="age" value="#{myPerson.page > 25 ? 25 : myPerson.page}" /> -->
-    </bean>
+    <!-- 不使用Person类的方法，也可以直接使用三元表达式进行运算 -->
+    <!-- <property name="age" value="#{myPerson.page > 25 ? 25 : myPerson.page}" /> -->
+</bean>
+```
 
 测试方法：
 
-    @Test
-    public void test01() {
-        String configLocation = "tavish/bit/di/spel/applicationContext.xml";
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
-        
-        Person person = (Person) context.getBean("myPerson");
-        Student student = (Student) context.getBean("myStudent");
-        
-        System.out.println(person);
-        System.out.println(student);
-        
-        ((ClassPathXmlApplicationContext)context).close();
-    }
+```java
+@Test
+public void test01() {
+    String configLocation = "tavish/bit/di/spel/applicationContext.xml";
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
+    
+    Person person = (Person) context.getBean("myPerson");
+    Student student = (Student) context.getBean("myStudent");
+    
+    System.out.println(person);
+    System.out.println(student);
+    
+    ((ClassPathXmlApplicationContext)context).close();
+}
+```
 
 输出：
 
-    Person [pname=李四, page=20]
-    Student [name=李四, age=20]
+```text
+Person [pname=李四, page=20]
+Student [name=李四, age=20]
 
-    Person [pname=李四, page=39]
-    Student [name=李四, age=25]
+Person [pname=李四, page=39]
+Student [name=李四, age=25]
 
-    Person [pname=李四, page=26]
-    Student [name=李四, age=25]
+Person [pname=李四, page=26]
+Student [name=李四, age=25]
+```
 
 #### 2.3.6 匿名Bean注入
 
@@ -1568,35 +1737,41 @@ SpEL，Spring Expression Language，即Spring EL表达式语言。即，在Sprin
 
 配置文件：
 
-    <!-- 匿名Bean，没有id属性。只能在byType中使用 -->
-    <bean
-        class="tavish.bit.di.annoymousBean.School">
-        <property name="name" value="清华大学" />
-    </bean>
-    <bean
-        id="myStudent"
-        class="tavish.bit.di.annoymousBean.Student" autowire="byType">
-        <property name="name" value="张三" />
-        <property name="age" value="23" />
-    </bean>
+```xml
+<!-- 匿名Bean，没有id属性。只能在byType中使用 -->
+<bean
+    class="tavish.bit.di.annoymousBean.School">
+    <property name="name" value="清华大学" />
+</bean>
+<bean
+    id="myStudent"
+    class="tavish.bit.di.annoymousBean.Student" autowire="byType">
+    <property name="name" value="张三" />
+    <property name="age" value="23" />
+</bean>
+```
 
 测试方法：
 
-    @Test
-    public void test01() {
-        String configLocation = "tavish/bit/di/annoymousBean/applicationContext.xml";
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
-        
-        Student student = (Student) context.getBean("myStudent");
-        
-        System.out.println(student);
-        
-        ((ClassPathXmlApplicationContext)context).close();
-    }
+```java
+@Test
+public void test01() {
+    String configLocation = "tavish/bit/di/annoymousBean/applicationContext.xml";
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
+    
+    Student student = (Student) context.getBean("myStudent");
+    
+    System.out.println(student);
+    
+    ((ClassPathXmlApplicationContext)context).close();
+}
+```
 
 输出：
 
-    Student [name=张三, age=23, school=School [name=清华大学]]
+```text
+Student [name=张三, age=23, school=School [name=清华大学]]
+```
 
 #### 2.3.7 内部匿名Bean注入
 
@@ -1606,39 +1781,45 @@ SpEL，Spring Expression Language，即Spring EL表达式语言。即，在Sprin
 
 配置文件：
 
-    <bean
-        id="myStudent"
-        class="tavish.bit.di.innerAnnoymousBean.Student">
-        <property name="name" value="张三" />
-        <property name="age" value="23" />
-        <property name="school">
-            <!-- 定义内部匿名Bean -->
-            <bean
-                class="tavish.bit.di.innerAnnoymousBean.School">
-                <property name="name" value="清华大学" />
-            </bean>
-        </property>
-    </bean>
+```xml
+<bean
+    id="myStudent"
+    class="tavish.bit.di.innerAnnoymousBean.Student">
+    <property name="name" value="张三" />
+    <property name="age" value="23" />
+    <property name="school">
+        <!-- 定义内部匿名Bean -->
+        <bean
+            class="tavish.bit.di.innerAnnoymousBean.School">
+            <property name="name" value="清华大学" />
+        </bean>
+    </property>
+</bean>
+```
 
 此时这个匿名Bean只是用来给school属性赋值用的，其他Bean不能访问它。
 
 测试方法：
 
-    @Test
-    public void test01() {
-        String configLocation = "tavish/bit/di/innerAnnoymousBean/applicationContext.xml";
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
-        
-        Student student = (Student) context.getBean("myStudent");
-        
-        System.out.println(student);
-        
-        ((ClassPathXmlApplicationContext)context).close();
-    }
+```java
+@Test
+public void test01() {
+    String configLocation = "tavish/bit/di/innerAnnoymousBean/applicationContext.xml";
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
+    
+    Student student = (Student) context.getBean("myStudent");
+    
+    System.out.println(student);
+    
+    ((ClassPathXmlApplicationContext)context).close();
+}
+```
 
 输出：
 
-    Student [name=张三, age=23, school=School [name=清华大学]]
+```text
+Student [name=张三, age=23, school=School [name=清华大学]]
+```
 
 #### 2.3.8 同类抽象Bean注入
 
@@ -1650,87 +1831,95 @@ SpEL，Spring Expression Language，即Spring EL表达式语言。即，在Sprin
 
 定义Bean类，Student.java：
 
-    package tavish.bit.di.abstractBean.same;
+```java
+package tavish.bit.di.abstractBean.same;
 
-    public class Student {
-        private String name;
-        private int age;
-        private String school;
-        private String department;
+public class Student {
+    private String name;
+    private int age;
+    private String school;
+    private String department;
 
-        public void setName(String name) {
-            this.name = name;
-        }
-
-        public void setAge(int age) {
-            this.age = age;
-        }
-
-        public void setSchool(String school) {
-            this.school = school;
-        }
-
-        public void setDepartment(String department) {
-            this.department = department;
-        }
-
-        @Override
-        public String toString() {
-            return "Student [name=" + name + ", age=" + age + ", school=" + school + ", department=" + department + "]";
-        }
+    public void setName(String name) {
+        this.name = name;
     }
+
+    public void setAge(int age) {
+        this.age = age;
+    }
+
+    public void setSchool(String school) {
+        this.school = school;
+    }
+
+    public void setDepartment(String department) {
+        this.department = department;
+    }
+
+    @Override
+    public String toString() {
+        return "Student [name=" + name + ", age=" + age + ", school=" + school + ", department=" + department + "]";
+    }
+}
+```
 
 配置文件：
 
-    <!-- 
-        同类抽象Bean，对公共部分进行抽取。
-        同时指定这个Bean为abstract的，即不能通过getBean获取。
-    -->
-    <bean id="baseStudent" class="tavish.bit.di.abstractBean.same.Student" abstract="true">
-        <property name="school" value="清华大学" />
-        <property name="department" value="计算机学院" />
-    </bean>
-    
-    <!-- 使用parent属性进行继承 -->
-    <bean
-        id="student1" parent="baseStudent">
-        <property name="name" value="张三" />
-        <property name="age" value="23" />
-    </bean>
-    <bean
-        id="student2" parent="baseStudent">
-        <property name="name" value="李四" />
-        <property name="age" value="24" />
-    </bean>
-    <bean
-        id="student3" parent="baseStudent">
-        <property name="name" value="王五" />
-        <property name="age" value="25" />
-    </bean>
+```xml
+<!-- 
+    同类抽象Bean，对公共部分进行抽取。
+    同时指定这个Bean为abstract的，即不能通过getBean获取。
+-->
+<bean id="baseStudent" class="tavish.bit.di.abstractBean.same.Student" abstract="true">
+    <property name="school" value="清华大学" />
+    <property name="department" value="计算机学院" />
+</bean>
+
+<!-- 使用parent属性进行继承 -->
+<bean
+    id="student1" parent="baseStudent">
+    <property name="name" value="张三" />
+    <property name="age" value="23" />
+</bean>
+<bean
+    id="student2" parent="baseStudent">
+    <property name="name" value="李四" />
+    <property name="age" value="24" />
+</bean>
+<bean
+    id="student3" parent="baseStudent">
+    <property name="name" value="王五" />
+    <property name="age" value="25" />
+</bean>
+```
 
 测试方法：
 
-    @Test
-    public void test01() {
-        String configLocation = "tavish/bit/di/abstractBean/same/applicationContext.xml";
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
-        
-        Student student1 = (Student) context.getBean("student1");
-        Student student2 = (Student) context.getBean("student2");
-        Student student3 = (Student) context.getBean("student3");
-        
-        System.out.println(student1);
-        System.out.println(student2);
-        System.out.println(student3);
-        
-        ((ClassPathXmlApplicationContext)context).close();
-    }
+```java
+@Test
+public void test01() {
+    String configLocation = "tavish/bit/di/abstractBean/same/applicationContext.xml";
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
+    
+    Student student1 = (Student) context.getBean("student1");
+    Student student2 = (Student) context.getBean("student2");
+    Student student3 = (Student) context.getBean("student3");
+    
+    System.out.println(student1);
+    System.out.println(student2);
+    System.out.println(student3);
+    
+    ((ClassPathXmlApplicationContext)context).close();
+}
+```
 
 输出：
 
-    Student [name=张三, age=23, school=清华大学, department=计算机学院]
-    Student [name=李四, age=24, school=清华大学, department=计算机学院]
-    Student [name=王五, age=25, school=清华大学, department=计算机学院]
+```text
+Student [name=张三, age=23, school=清华大学, department=计算机学院]
+Student [name=李四, age=24, school=清华大学, department=计算机学院]
+Student [name=王五, age=25, school=清华大学, department=计算机学院]
+```
 
 #### 2.3.9 异类抽象Bean注入
 
@@ -1738,89 +1927,94 @@ SpEL，Spring Expression Language，即Spring EL表达式语言。即，在Sprin
 
 定义Bean类，Teacher.java
 
-    package tavish.bit.di.abstractBean.alien;
+```java
+package tavish.bit.di.abstractBean.alien;
 
-    public class Teacher {
-        private String name;
-        private int workAge;
-        private String school;
-        private String department;
+public class Teacher {
+    private String name;
+    private int workAge;
+    private String school;
+    private String department;
 
-        public void setName(String name) {
-            this.name = name;
-        }
-
-        public void setWorkAge(int workAge) {
-            this.workAge = workAge;
-        }
-
-        public void setSchool(String school) {
-            this.school = school;
-        }
-
-        public void setDepartment(String department) {
-            this.department = department;
-        }
-
-        @Override
-        public String toString() {
-            return "Teacher [name=" + name + ", workAge=" + workAge + ", school=" + school + ", department=" + department
-                    + "]";
-        }
-
+    public void setName(String name) {
+        this.name = name;
     }
+
+    public void setWorkAge(int workAge) {
+        this.workAge = workAge;
+    }
+
+    public void setSchool(String school) {
+        this.school = school;
+    }
+
+    public void setDepartment(String department) {
+        this.department = department;
+    }
+
+    @Override
+    public String toString() {
+        return "Teacher [name=" + name + ", workAge=" + workAge + ", school=" + school + ", department=" + department
+                + "]";
+    }
+}
+```
 
 配置文件：
 
-    <!-- 
-        异类抽象Bean，必须指定为抽象的。
-        否则容器装配时会出错，因为这个Bean没有class属性。
-     -->
-    <bean id="base" abstract="true">
-        <property name="school" value="清华大学" />
-        <property name="department" value="计算机学院" />
-    </bean>
-    
-    <bean
-        id="student" 
-        class="tavish.bit.di.abstractBean.alien.Student"
-        parent="base">
-        <property name="name" value="张三" />
-        <property name="age" value="23" />
-    </bean>
+```xml
+<!-- 
+    异类抽象Bean，必须指定为抽象的。
+    否则容器装配时会出错，因为这个Bean没有class属性。
+ -->
+<bean id="base" abstract="true">
+    <property name="school" value="清华大学" />
+    <property name="department" value="计算机学院" />
+</bean>
 
-    <bean
-        id="teacher"
-        class="tavish.bit.di.abstractBean.alien.Teacher"
-        parent="base">
-        <property name="name" value="Tavish" />
-        <property name="workAge" value="5" />
-    </bean>
+<bean
+    id="student" 
+    class="tavish.bit.di.abstractBean.alien.Student"
+    parent="base">
+    <property name="name" value="张三" />
+    <property name="age" value="23" />
+</bean>
+
+<bean
+    id="teacher"
+    class="tavish.bit.di.abstractBean.alien.Teacher"
+    parent="base">
+    <property name="name" value="Tavish" />
+    <property name="workAge" value="5" />
+</bean>
+```
 
 测试方法：
 
-    @Test
-    public void test01() {
-        String configLocation = "tavish/bit/di/abstractBean/alien/applicationContext.xml";
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
-        
-        Student student = (Student) context.getBean("student");
-        Teacher teacher = (Teacher) context.getBean("teacher");
-        
-        System.out.println(student);
-        System.out.println(teacher);
-        
-        ((ClassPathXmlApplicationContext)context).close();
-    }
+```java
+@Test
+public void test01() {
+    String configLocation = "tavish/bit/di/abstractBean/alien/applicationContext.xml";
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
+    
+    Student student = (Student) context.getBean("student");
+    Teacher teacher = (Teacher) context.getBean("teacher");
+    
+    System.out.println(student);
+    System.out.println(teacher);
+    
+    ((ClassPathXmlApplicationContext)context).close();
+}
+```
 
 输出：
 
-    Student [name=张三, age=23, school=清华大学, department=计算机学院]
-    Teacher [name=Tavish, workAge=5, school=清华大学, department=计算机学院]
+```text
+Student [name=张三, age=23, school=清华大学, department=计算机学院]
+Teacher [name=Tavish, workAge=5, school=清华大学, department=计算机学院]
+```
 
-**
-同类、异类抽象Bean中abstract属性的区别：
-**
+**同类、异类抽象Bean中abstract属性的区别：**
 
 - 在同类抽象Bean中abstract属性是可选的，设置为true后，该抽象Bean就不能使用getBean方法获取。
 - 在异类抽象Bean中abstract属性是必选的，因其没有class属性，所以会导致在容器进行Bean装配时报错。
@@ -1833,7 +2027,9 @@ SpEL，Spring Expression Language，即Spring EL表达式语言。即，在Sprin
 
 将配置文件分解为地位平等的多个配置文件，并将所有配置文件的路径定义为一个String数组，将其作为容器初始化参数。其将与可变参的容器构造器匹配。
 
-    ClassPathXmlApplicationContext(String... configLocations)
+```java
+ClassPathXmlApplicationContext(String... configLocations)
+```
 
 此时各配置文件间为并列关系，不分主次。
 
@@ -1841,109 +2037,121 @@ SpEL，Spring Expression Language，即Spring EL表达式语言。即，在Sprin
 
 配置文件，applicationContext-base.xml：
 
-    <?xml version="1.0" encoding="UTF-8"?>
-    <beans
-        xmlns="http://www.springframework.org/schema/beans"
-        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xsi:schemaLocation="
-            http://www.springframework.org/schema/beans 
-            http://www.springframework.org/schema/beans/spring-beans.xsd">
-        <bean id="base" abstract="true">
-            <property name="school" value="清华大学" />
-            <property name="department" value="计算机学院" />
-        </bean>
-    </beans>
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans
+    xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="
+        http://www.springframework.org/schema/beans 
+        http://www.springframework.org/schema/beans/spring-beans.xsd">
+    <bean id="base" abstract="true">
+        <property name="school" value="清华大学" />
+        <property name="department" value="计算机学院" />
+    </bean>
+</beans>
+```
 
 配置文件，applicationContext-beans.xml：
 
-    <?xml version="1.0" encoding="UTF-8"?>
-    <beans
-        xmlns="http://www.springframework.org/schema/beans"
-        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xsi:schemaLocation="
-            http://www.springframework.org/schema/beans 
-            http://www.springframework.org/schema/beans/spring-beans.xsd">
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans
+    xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="
+        http://www.springframework.org/schema/beans 
+        http://www.springframework.org/schema/beans/spring-beans.xsd">
 
-        <bean
-            id="student" 
-            class="tavish.bit.di.multiConfig.parity.Student"
-            parent="base">
-            <property name="name" value="张三" />
-            <property name="age" value="23" />
-        </bean>
+    <bean
+        id="student" 
+        class="tavish.bit.di.multiConfig.parity.Student"
+        parent="base">
+        <property name="name" value="张三" />
+        <property name="age" value="23" />
+    </bean>
 
-        <bean
-            id="teacher"
-            class="tavish.bit.di.multiConfig.parity.Teacher"
-            parent="base">
-            <property name="name" value="Tavish" />
-            <property name="workAge" value="5" />
-        </bean>
-    </beans>
+    <bean
+        id="teacher"
+        class="tavish.bit.di.multiConfig.parity.Teacher"
+        parent="base">
+        <property name="name" value="Tavish" />
+        <property name="workAge" value="5" />
+    </bean>
+</beans>
+```
 
 测试方法1：
 
-    @Test
-    public void test01() {
-        
-        // 使用可变参数列表
-        String configLocation1 = "tavish/bit/di/multiConfig/parity/applicationContext-base.xml";
-        String configLocation2 = "tavish/bit/di/multiConfig/parity/applicationContext-beans.xml";
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation1, configLocation2);
+```java
+@Test
+public void test01() {
+    
+    // 使用可变参数列表
+    String configLocation1 = "tavish/bit/di/multiConfig/parity/applicationContext-base.xml";
+    String configLocation2 = "tavish/bit/di/multiConfig/parity/applicationContext-beans.xml";
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation1, configLocation2);
 
-        Student student = (Student) context.getBean("student");
-        Teacher teacher = (Teacher) context.getBean("teacher");
+    Student student = (Student) context.getBean("student");
+    Teacher teacher = (Teacher) context.getBean("teacher");
 
-        System.out.println(student);
-        System.out.println(teacher);
+    System.out.println(student);
+    System.out.println(teacher);
 
-        ((ClassPathXmlApplicationContext) context).close();
-    }
+    ((ClassPathXmlApplicationContext) context).close();
+}
+```
 
 测试方法2：
 
-    @Test
-    public void test02() {
-        
-        // 使用数组形式的可变参数列表
-        String configLocation1 = "tavish/bit/di/multiConfig/parity/applicationContext-base.xml";
-        String configLocation2 = "tavish/bit/di/multiConfig/parity/applicationContext-beans.xml";
-        String[] configLocations = {configLocation1, configLocation2};
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocations);
+```java
+@Test
+public void test02() {
+    
+    // 使用数组形式的可变参数列表
+    String configLocation1 = "tavish/bit/di/multiConfig/parity/applicationContext-base.xml";
+    String configLocation2 = "tavish/bit/di/multiConfig/parity/applicationContext-beans.xml";
+    String[] configLocations = {configLocation1, configLocation2};
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocations);
 
-        Student student = (Student) context.getBean("student");
-        Teacher teacher = (Teacher) context.getBean("teacher");
+    Student student = (Student) context.getBean("student");
+    Teacher teacher = (Teacher) context.getBean("teacher");
 
-        System.out.println(student);
-        System.out.println(teacher);
+    System.out.println(student);
+    System.out.println(teacher);
 
-        ((ClassPathXmlApplicationContext) context).close();
-    }
+    ((ClassPathXmlApplicationContext) context).close();
+}
+```
 
 **除了使用可变参数列表，还可以使用通配符，这也是常用方法。**
 
 测试方法3：
 
-    @Test
-    public void test03() {
-        
-        // 使用通配符
-        String configLocation = "tavish/bit/di/multiConfig/parity/applicationContext-*.xml";
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
+```java
+@Test
+public void test03() {
+    
+    // 使用通配符
+    String configLocation = "tavish/bit/di/multiConfig/parity/applicationContext-*.xml";
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
 
-        Student student = (Student) context.getBean("student");
-        Teacher teacher = (Teacher) context.getBean("teacher");
+    Student student = (Student) context.getBean("student");
+    Teacher teacher = (Teacher) context.getBean("teacher");
 
-        System.out.println(student);
-        System.out.println(teacher);
+    System.out.println(student);
+    System.out.println(teacher);
 
-        ((ClassPathXmlApplicationContext) context).close();
-    }
+    ((ClassPathXmlApplicationContext) context).close();
+}
+```
 
 输出：
 
-    Student [name=张三, age=23, school=清华大学, department=计算机学院]
-    Teacher [name=Tavish, workAge=5, school=清华大学, department=计算机学院]
+```text
+Student [name=张三, age=23, school=清华大学, department=计算机学院]
+Teacher [name=Tavish, workAge=5, school=清华大学, department=计算机学院]
+```
 
 ##### 2.3.10.2 包含关系的配置文件
 
@@ -1951,11 +2159,13 @@ SpEL，Spring Expression Language，即Spring EL表达式语言。即，在Sprin
 
 总主配置文件，applicationContext.xml：
 
-    <!--         
+```xml
+<!--         
     <import resource="applicationContext-base.xml"/>
     <import resource="applicationContext-beans.xml"/>
-     -->
-    <import resource="applicationContext-*.xml" />
+ -->
+<import resource="applicationContext-*.xml" />
+```
 
 **注意：当这里使用通配符时，切记总主配置文件不能也符合通配符的匹配模式，否则会形成递归加载配置文件，造成报错。**
 
@@ -1975,134 +2185,155 @@ SpEL，Spring Expression Language，即Spring EL表达式语言。即，在Sprin
 
 更换配置文件头，即添加相应的约束。
 
-    <?xml version="1.0" encoding="UTF-8"?>
-    <beans xmlns="http://www.springframework.org/schema/beans"
-        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xmlns:context="http://www.springframework.org/schema/context" xsi:schemaLocation="
-            http://www.springframework.org/schema/beans 
-            http://www.springframework.org/schema/beans/spring-beans.xsd
-            http://www.springframework.org/schema/context 
-            http://www.springframework.org/schema/context/spring-context.xsd"> 
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:context="http://www.springframework.org/schema/context" 
+    xsi:schemaLocation="
+        http://www.springframework.org/schema/beans 
+        http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/context 
+        http://www.springframework.org/schema/context/spring-context.xsd"> 
 
-    </beans>
+</beans>
+```
 
 步骤三：
 
 需要在Spring配置文件中配置组件扫描器，用于在指定的基本包中扫描注解。
 
-    <context:component-scan base-package="" />
+```xml
+<context:component-scan base-package="" />
+```
 
 示例：
 
 定义Bean类，School.java：
 
-    package tavish.bit.annoDi;
+```java
+package tavish.bit.annoDi;
 
-    import org.springframework.beans.factory.annotation.Value;
-    import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
-    @Component("mySchool")
-    public class School {
-        
-        @Value("清华大学")
-        private String sname;
+@Component("mySchool")
+public class School {
+    
+    @Value("清华大学")
+    private String sname;
 
-        public void setSname(String sname) {
-            this.sname = sname;
-        }
-
-        @Override
-        public String toString() {
-            return "School [sname=" + sname + "]";
-        }
+    public void setSname(String sname) {
+        this.sname = sname;
     }
+
+    @Override
+    public String toString() {
+        return "School [sname=" + sname + "]";
+    }
+}
+```
 
 定义Bean类，Student.java：
 
-    package tavish.bit.annoDi;
+```java
+package tavish.bit.annoDi;
 
-    import org.springframework.beans.factory.annotation.Autowired;
-    import org.springframework.beans.factory.annotation.Value;
-    import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
-    @Component("myStudent")
-    public class Student {
-        
-        @Value("张三")
-        private String name;
-        @Value("23")
-        private int age;
-        @Autowired // byType自动注入
-        private School school; 
+@Component("myStudent")
+public class Student {
+    
+    @Value("张三")
+    private String name;
+    @Value("23")
+    private int age;
+    @Autowired // byType自动注入
+    private School school; 
 
-        public void setName(String name) {
-            this.name = name;
-        }
-
-        public void setAge(int age) {
-            this.age = age;
-        }
-
-        public void setSchool(School school) {
-            this.school = school;
-        }
-
-        @Override
-        public String toString() {
-            return "Student [name=" + name + ", age=" + age + ", school=" + school + "]";
-        }
+    public void setName(String name) {
+        this.name = name;
     }
+
+    public void setAge(int age) {
+        this.age = age;
+    }
+
+    public void setSchool(School school) {
+        this.school = school;
+    }
+
+    @Override
+    public String toString() {
+        return "Student [name=" + name + ", age=" + age + ", school=" + school + "]";
+    }
+}
+```
 
 配置文件：
 
-    <?xml version="1.0" encoding="UTF-8"?>
-    <beans
-        xmlns="http://www.springframework.org/schema/beans"
-        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xmlns:context="http://www.springframework.org/schema/context"
-        xsi:schemaLocation="
-            http://www.springframework.org/schema/beans 
-            http://www.springframework.org/schema/beans/spring-beans.xsd
-            http://www.springframework.org/schema/context 
-            http://www.springframework.org/schema/context/spring-context.xsd">
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans
+    xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:context="http://www.springframework.org/schema/context"
+    xsi:schemaLocation="
+        http://www.springframework.org/schema/beans 
+        http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/context 
+        http://www.springframework.org/schema/context/spring-context.xsd">
 
-        <!-- 在指定的基本包中扫描注解 -->
-        <context:component-scan base-package="tavish.bit.annoDi" />
-    </beans>
+    <!-- 在指定的基本包中扫描注解 -->
+    <context:component-scan base-package="tavish.bit.annoDi" />
+</beans>
+```
 
 测试方法：
 
-    @Test
-    public void test01() {
-        String configLocation = "tavish/bit/annoDi/applicationContext.xml";
-        
-        @SuppressWarnings("resource")
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
-        
-        Student student = (Student) context.getBean("myStudent");
-        
-        System.out.println(student);
-    }
+```java
+@Test
+public void test01() {
+    String configLocation = "tavish/bit/annoDi/applicationContext.xml";
+    
+    @SuppressWarnings("resource")
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
+    
+    Student student = (Student) context.getBean("myStudent");
+    
+    System.out.println(student);
+}
+```
 
 输出：
 
-    Student [name=张三, age=23, school=School [sname=清华大学]]
+```text
+Student [name=张三, age=23, school=School [sname=清华大学]]
+```
 
 #### 2.4.1 组件扫描器的写法
 
 当有多个包时可以定义多个context:component-scan，例如：
 
-    <context:component-scan base-package="tavish.bit.annoDi1" />
-    <context:component-scan base-package="tavish.bit.annoDi2" />
-    <context:component-scan base-package="tavish.bit.annoDi3" />
+```xml
+<context:component-scan base-package="tavish.bit.annoDi1" />
+<context:component-scan base-package="tavish.bit.annoDi2" />
+<context:component-scan base-package="tavish.bit.annoDi3" />
+```
 
 通常在实际开发中，我们使用通配符写法：
 
-    <context:component-scan base-package="tavish.bit.*" />
+```xml
+<context:component-scan base-package="tavish.bit.*" />
+```
 
 或可以更加省略：
 
-    <context:component-scan base-package="tavish.bit" />
+```xml
+<context:component-scan base-package="tavish.bit" />
+```
 
 二者的区别在于：
 
@@ -2129,101 +2360,115 @@ SpEL，Spring Expression Language，即Spring EL表达式语言。即，在Sprin
 
 示例：
 
-    @Scope("prototype")
-    @Component("myStudent")
-    public class Student {...}
+```java
+@Scope("prototype")
+@Component("myStudent")
+public class Student {...}
+```
 
 测试方法：
 
-    @Test
-    public void test01() {
-        String configLocation = "tavish/bit/annoDi/applicationContext.xml";
+```java
+@Test
+public void test01() {
+    String configLocation = "tavish/bit/annoDi/applicationContext.xml";
 
-        @SuppressWarnings("resource")
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
+    @SuppressWarnings("resource")
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
 
-        Student student1 = (Student) context.getBean("myStudent");
-        Student student2 = (Student) context.getBean("myStudent");
+    Student student1 = (Student) context.getBean("myStudent");
+    Student student2 = (Student) context.getBean("myStudent");
 
-        System.out.println(student1);
-        System.out.println(student2);
-        System.out.println(student1 == student2);
-    }
+    System.out.println(student1);
+    System.out.println(student2);
+    System.out.println(student1 == student2);
+}
+```
 
 输出：
 
-    Student [name=张三, age=23, school=School [sname=清华大学]]
-    Student [name=张三, age=23, school=School [sname=清华大学]]
-    false
+```xml
+Student [name=张三, age=23, school=School [sname=清华大学]]
+Student [name=张三, age=23, school=School [sname=清华大学]]
+false
+```
 
 #### 2.4.4 基本类型属性注入@Value
 
 需要在属性上使用注解@Value，该注解的value属性用于指定要注入的值。
 
-**
-使用该注解完成属性注入时，类中无需setter。
-**
+**使用该注解完成属性注入时，类中无需setter。**
 
 示例：
 
 去掉School类的setter方法：
 
-    package tavish.bit.annoDi;
+```java
+package tavish.bit.annoDi;
 
-    import org.springframework.beans.factory.annotation.Value;
-    import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
-    @Component("mySchool")
-    public class School {
-        
-        @Value("清华大学")
-        private String sname;
+@Component("mySchool")
+public class School {
+    
+    @Value("清华大学")
+    private String sname;
 
-        @Override
-        public String toString() {
-            return "School [sname=" + sname + "]";
-        }
+    @Override
+    public String toString() {
+        return "School [sname=" + sname + "]";
     }
+}
+```
 
 测试方法：
 
-    @Test
-    public void test01() {
-        String configLocation = "tavish/bit/annoDi/applicationContext.xml";
+```java
+@Test
+public void test01() {
+    String configLocation = "tavish/bit/annoDi/applicationContext.xml";
 
-        @SuppressWarnings("resource")
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
+    @SuppressWarnings("resource")
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
 
-        Student student1 = (Student) context.getBean("myStudent");
-        Student student2 = (Student) context.getBean("myStudent");
+    Student student1 = (Student) context.getBean("myStudent");
+    Student student2 = (Student) context.getBean("myStudent");
 
-        System.out.println(student1);
-        System.out.println(student2);
-        System.out.println(student1 == student2);
-    }
+    System.out.println(student1);
+    System.out.println(student2);
+    System.out.println(student1 == student2);
+}
+```
 
 输出：
 
-    Student [name=张三, age=23, school=School [sname=清华大学]]
-    Student [name=张三, age=23, school=School [sname=清华大学]]
-    false
+```text
+Student [name=张三, age=23, school=School [sname=清华大学]]
+Student [name=张三, age=23, school=School [sname=清华大学]]
+false
+```
 
 #### 2.4.5 注入方式@Autowired
 
 要使用byName注入方式，不仅需要@Qualifier同时也需要@Autowired。
 
 示例：
-    
-    // byName自动注入
-    @Autowired 
-    @Qualifier("mySchool")
-    private School school; 
+
+```java
+// byName自动注入
+@Autowired 
+@Qualifier("mySchool")
+private School school; 
+```
 
 与此不同的是，byType方式只需要@Autowired。
 
-    // byType自动注入
-    @Autowired 
-    private School school; 
+```java
+// byType自动注入
+@Autowired 
+private School school; 
+```
 
 #### 2.4.5 域属性注解@Resource
 
@@ -2239,31 +2484,37 @@ Spring提供了对JSR-250规范中定义@Resource标准注解的支持。@Resour
 
 Student类的域属性：
 
-    @Resource
-    private School school; 
+```java
+@Resource
+private School school; 
+```
 
 测试方法：
 
-    @Test
-    public void test01() {
-        String configLocation = "tavish/bit/annoDi/resource/applicationContext.xml";
+```java
+@Test
+public void test01() {
+    String configLocation = "tavish/bit/annoDi/resource/applicationContext.xml";
 
-        @SuppressWarnings("resource")
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
+    @SuppressWarnings("resource")
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
 
-        Student student1 = (Student) context.getBean("myStudent");
-        Student student2 = (Student) context.getBean("myStudent");
+    Student student1 = (Student) context.getBean("myStudent");
+    Student student2 = (Student) context.getBean("myStudent");
 
-        System.out.println(student1);
-        System.out.println(student2);
-        System.out.println(student1 == student2);
-    }
+    System.out.println(student1);
+    System.out.println(student2);
+    System.out.println(student1 == student2);
+}
+```
 
 输出：
 
-    Student [name=张三, age=23, school=School [sname=清华大学]]
-    Student [name=张三, age=23, school=School [sname=清华大学]]
-    false
+```text
+Student [name=张三, age=23, school=School [sname=清华大学]]
+Student [name=张三, age=23, school=School [sname=清华大学]]
+false
+```
 
 ##### 2.4.5.2 按名称注入域属性
 
@@ -2273,31 +2524,37 @@ Student类的域属性：
 
 Student类的域属性：
 
-    @Resource(name="mySchool")
-    private School school; 
+```java
+@Resource(name="mySchool")
+private School school; 
+```
 
 测试方法：
 
-    @Test
-    public void test01() {
-        String configLocation = "tavish/bit/annoDi/resource/applicationContext.xml";
+```java
+@Test
+public void test01() {
+    String configLocation = "tavish/bit/annoDi/resource/applicationContext.xml";
 
-        @SuppressWarnings("resource")
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
+    @SuppressWarnings("resource")
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
 
-        Student student1 = (Student) context.getBean("myStudent");
-        Student student2 = (Student) context.getBean("myStudent");
+    Student student1 = (Student) context.getBean("myStudent");
+    Student student2 = (Student) context.getBean("myStudent");
 
-        System.out.println(student1);
-        System.out.println(student2);
-        System.out.println(student1 == student2);
-    }
+    System.out.println(student1);
+    System.out.println(student2);
+    System.out.println(student1 == student2);
+}
+```
 
 输出：
 
-    Student [name=张三, age=23, school=School [sname=清华大学]]
-    Student [name=张三, age=23, school=School [sname=清华大学]]
-    false
+```text
+Student [name=张三, age=23, school=School [sname=清华大学]]
+Student [name=张三, age=23, school=School [sname=清华大学]]
+false
+```
 
 #### 2.4.7 Bean的生命始末注解
 
@@ -2307,41 +2564,47 @@ Student类的域属性：
 
 在Student类中加入两个方法，同时去掉其@Scope注解：
 
-    @PostConstruct
-    public void afterInit() {
-        System.out.println("初始化完毕后");
-    }
-    
-    @PreDestroy
-    public void beforeDestory() {
-        System.out.println("销毁前");
-    }
+```java
+@PostConstruct
+public void afterInit() {
+    System.out.println("初始化完毕后");
+}
+
+@PreDestroy
+public void beforeDestory() {
+    System.out.println("销毁前");
+}
+```
 
 测试方法：
 
-    @Test
-    public void test01() {
-        String configLocation = "tavish/bit/annoDi/lifeCycle/applicationContext.xml";
+```java
+@Test
+public void test01() {
+    String configLocation = "tavish/bit/annoDi/lifeCycle/applicationContext.xml";
 
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
 
-        Student student1 = (Student) context.getBean("myStudent");
-        Student student2 = (Student) context.getBean("myStudent");
+    Student student1 = (Student) context.getBean("myStudent");
+    Student student2 = (Student) context.getBean("myStudent");
 
-        System.out.println(student1);
-        System.out.println(student2);
-        System.out.println(student1 == student2);
-        
-        ((ClassPathXmlApplicationContext)context).close();
-    }
+    System.out.println(student1);
+    System.out.println(student2);
+    System.out.println(student1 == student2);
+    
+    ((ClassPathXmlApplicationContext)context).close();
+}
+```
 
 输出：
 
-    初始化完毕后
-    Student [name=张三, age=23, school=School [sname=清华大学]]
-    Student [name=张三, age=23, school=School [sname=清华大学]]
-    true
-    销毁前
+```text
+初始化完毕后
+Student [name=张三, age=23, school=School [sname=清华大学]]
+Student [name=张三, age=23, school=School [sname=清华大学]]
+true
+销毁前
+```
 
 #### 2.4.8 使用JavaConfig进行配置
 
@@ -2353,92 +2616,98 @@ JavaConfig，是在Spring 3.0开始从一个独立的项目并入到Spring中的
 
 School.java：
 
-    package tavish.bit.annoDi.javaConfig.byName;
+```java
+package tavish.bit.annoDi.javaConfig.byName;
 
-    public class School {
+public class School {
 
-        private String sname;
+    private String sname;
 
-        public School(String sname) {
-            super();
-            this.sname = sname;
-        }
-
-        public School() {
-            super();
-        }
-
-        public void setSname(String sname) {
-            this.sname = sname;
-        }
-
-        @Override
-        public String toString() {
-            return "School [sname=" + sname + "]";
-        }
+    public School(String sname) {
+        super();
+        this.sname = sname;
     }
+
+    public School() {
+        super();
+    }
+
+    public void setSname(String sname) {
+        this.sname = sname;
+    }
+
+    @Override
+    public String toString() {
+        return "School [sname=" + sname + "]";
+    }
+}
+```
 
 Student.java：
 
-    package tavish.bit.annoDi.javaConfig.byName;
+```java
+package tavish.bit.annoDi.javaConfig.byName;
 
-    public class Student {
+public class Student {
 
-        private String name;
+    private String name;
 
-        private int age;
+    private int age;
 
-        private School school;
+    private School school;
 
-        public Student(String name, int age) {
-            super();
-            this.name = name;
-            this.age = age;
-        }
-
-        public Student() {
-            super();
-        }
-
-        public void setSchool(School school) {
-            this.school = school;
-        }
-
-        public void setName(String name) {
-            this.name = name;
-        }
-
-        public void setAge(int age) {
-            this.age = age;
-        }
-
-        @Override
-        public String toString() {
-            return "Student [name=" + name + ", age=" + age + ", school=" + school + "]";
-        }
+    public Student(String name, int age) {
+        super();
+        this.name = name;
+        this.age = age;
     }
+
+    public Student() {
+        super();
+    }
+
+    public void setSchool(School school) {
+        this.school = school;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public void setAge(int age) {
+        this.age = age;
+    }
+
+    @Override
+    public String toString() {
+        return "Student [name=" + name + ", age=" + age + ", school=" + school + "]";
+    }
+}
+```
 
 定义JavaConfig类：
 
-    package tavish.bit.annoDi.javaConfig.byType;
+```java
+package tavish.bit.annoDi.javaConfig.byType;
 
-    import org.springframework.beans.factory.annotation.Autowire;
-    import org.springframework.context.annotation.Bean;
-    import org.springframework.context.annotation.Configuration;
+import org.springframework.beans.factory.annotation.Autowire;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 
-    @Configuration 
-    public class MyJavaConfig {
-        
-        @Bean(name="mySchool")
-        public School mySchoolCreator() {
-            return new School("北京大学");
-        }
-
-        @Bean(name="myStudent", autowire=Autowire.BY_TYPE)
-        public Student myStudentCreator() {
-            return new Student("李四", 24);
-        }
+@Configuration 
+public class MyJavaConfig {
+    
+    @Bean(name="mySchool")
+    public School mySchoolCreator() {
+        return new School("北京大学");
     }
+
+    @Bean(name="myStudent", autowire=Autowire.BY_TYPE)
+    public Student myStudentCreator() {
+        return new Student("李四", 24);
+    }
+}
+```
 
 - @Configuration：表明该类作为Spring容器使用。
 - @Bean：方法返回的对象Bean的名称（id）为name指定名称。
@@ -2448,38 +2717,44 @@ Student.java：
 
 定义JavaConfig类：
 
-    // 此Bean的name值要与Student类中的属性名一致
-    @Bean(name = "school")
-    public School mySchoolCreator() {
-        return new School("北京大学");
-    }
+```java
+// 此Bean的name值要与Student类中的属性名一致
+@Bean(name = "school")
+public School mySchoolCreator() {
+    return new School("北京大学");
+}
 
-    @Bean(name = "myStudent", autowire = Autowire.BY_NAME)
-    public Student myStudentCreator() {
-        return new Student("李四", 24);
-    }
+@Bean(name = "myStudent", autowire = Autowire.BY_NAME)
+public Student myStudentCreator() {
+    return new Student("李四", 24);
+}
+```
 
 测试方法：使用byType方式。
 
-    @Test
-    public void test01() {
-        String configLocation = "tavish/bit/annoDi/javaConfig/byType/applicationContext.xml";
+```java
+@Test
+public void test01() {
+    String configLocation = "tavish/bit/annoDi/javaConfig/byType/applicationContext.xml";
 
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
 
-        Student student = (Student) context.getBean("myStudent");
-        School school = (School) context.getBean("mySchool");
+    Student student = (Student) context.getBean("myStudent");
+    School school = (School) context.getBean("mySchool");
 
-        System.out.println(student);
-        System.out.println(school);
-        
-        ((ClassPathXmlApplicationContext)context).close();
-    }
+    System.out.println(student);
+    System.out.println(school);
+    
+    ((ClassPathXmlApplicationContext)context).close();
+}
+```
 
 输出：
 
-    Student [name=李四, age=24, school=School [sname=北京大学]]
-    School [sname=北京大学]
+```text
+Student [name=李四, age=24, school=School [sname=北京大学]]
+School [sname=北京大学]
+```
 
 #### 2.4.9 使用junit4测试Spring
 
@@ -2491,77 +2766,83 @@ Student.java：
 
 定义实体类，Student.java：
 
-    package tavish.bit.annoDi.test;
+```java
+package tavish.bit.annoDi.test;
 
-    import javax.annotation.Resource;
+import javax.annotation.Resource;
 
-    import org.springframework.beans.factory.annotation.Value;
-    import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
-    @Component("myStudent")
-    public class Student {
-        
-        @Value("张三")
-        private String name;
-        
-        @Value("23")
-        private int age;
-        
-        @Resource(name="mySchool")
-        private School school; 
+@Component("myStudent")
+public class Student {
+    
+    @Value("张三")
+    private String name;
+    
+    @Value("23")
+    private int age;
+    
+    @Resource(name="mySchool")
+    private School school; 
 
-        public void setSchool(School school) {
-            this.school = school;
-        }
-
-        @Override
-        public String toString() {
-            return "Student [name=" + name + ", age=" + age + ", school=" + school + "]";
-        }
+    public void setSchool(School school) {
+        this.school = school;
     }
+
+    @Override
+    public String toString() {
+        return "Student [name=" + name + ", age=" + age + ", school=" + school + "]";
+    }
+}
+```
 
 定义实体类，School.java：
 
-    package tavish.bit.annoDi.test;
+```java
+package tavish.bit.annoDi.test;
 
-    import org.springframework.beans.factory.annotation.Value;
-    import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
-    @Component("mySchool")
-    public class School {
-        
-        @Value("清华大学")
-        private String sname;
+@Component("mySchool")
+public class School {
+    
+    @Value("清华大学")
+    private String sname;
 
-        @Override
-        public String toString() {
-            return "School [sname=" + sname + "]";
-        }
+    @Override
+    public String toString() {
+        return "School [sname=" + sname + "]";
     }
+}
+```
 
 测试类：
 
-    package tavish.bit.annoDi.test;
+```java
+package tavish.bit.annoDi.test;
 
-    import javax.annotation.Resource;
+import javax.annotation.Resource;
 
-    import org.junit.Test;
-    import org.junit.runner.RunWith;
-    import org.springframework.test.context.ContextConfiguration;
-    import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
-    @RunWith(SpringJUnit4ClassRunner.class)
-    @ContextConfiguration(locations="classpath:tavish/bit/annoDi/test/applicationContext.xml")
-    public class MyTest {
+@RunWith(SpringJUnit4ClassRunner.class)
+@ContextConfiguration(locations="classpath:tavish/bit/annoDi/test/applicationContext.xml")
+public class MyTest {
 
-        @Resource(name="myStudent")
-        private Student student;
-        
-        @Test
-        public void test01() {
-            System.out.println(student);
-        }
+    @Resource(name="myStudent")
+    private Student student;
+    
+    @Test
+    public void test01() {
+        System.out.println(student);
     }
+}
+```
 
 - @RunWith：指定运行环境。
 - @ContextConfiguration：指定配置文件位置。
@@ -2570,7 +2851,9 @@ Student.java：
 
 输出：
 
-    Student [name=张三, age=23, school=School [sname=清华大学]]
+```text
+Student [name=张三, age=23, school=School [sname=清华大学]]
+```
 
 #### 2.4.10 注解与XML共同使用
 
@@ -2586,112 +2869,122 @@ XML配置方式的最大好处是，对其所做修改，无需编译代码，�
 
 bean类，School.java：
 
-    package tavish.bit.annoDi.xmlWithAnno;
+```java
+package tavish.bit.annoDi.xmlWithAnno;
 
-    import org.springframework.beans.factory.annotation.Value;
-    import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
-    @Component("mySchool")
-    public class School {
+@Component("mySchool")
+public class School {
 
-        @Value("清华大学")
-        private String sname;
+    @Value("清华大学")
+    private String sname;
 
-        public void setSname(String sname) {
-            this.sname = sname;
-        }
-
-        @Override
-        public String toString() {
-            return "School [sname=" + sname + "]";
-        }
+    public void setSname(String sname) {
+        this.sname = sname;
     }
+
+    @Override
+    public String toString() {
+        return "School [sname=" + sname + "]";
+    }
+}
+```
 
 bean类，Student.java：
 
-    package tavish.bit.annoDi.xmlWithAnno;
+```java
+package tavish.bit.annoDi.xmlWithAnno;
 
-    import javax.annotation.Resource;
+import javax.annotation.Resource;
 
-    import org.springframework.beans.factory.annotation.Value;
-    import org.springframework.context.annotation.Scope;
-    import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Scope;
+import org.springframework.stereotype.Component;
 
-    @Scope("prototype")
-    @Component("myStudent")
-    public class Student {
+@Scope("prototype")
+@Component("myStudent")
+public class Student {
 
-        @Value("张三")
-        private String name;
+    @Value("张三")
+    private String name;
 
-        @Value("23")
-        private int age;
+    @Value("23")
+    private int age;
 
-        @Resource(name = "mySchool")
-        private School school;
+    @Resource(name = "mySchool")
+    private School school;
 
-        public void setName(String name) {
-            this.name = name;
-        }
-
-        public void setAge(int age) {
-            this.age = age;
-        }
-
-        public void setSchool(School school) {
-            this.school = school;
-        }
-
-        @Override
-        public String toString() {
-            return "Student [name=" + name + ", age=" + age + ", school=" + school + "]";
-        }
+    public void setName(String name) {
+        this.name = name;
     }
 
-    配置文件：
+    public void setAge(int age) {
+        this.age = age;
+    }
 
-    <?xml version="1.0" encoding="UTF-8"?>
-    <beans
-        xmlns="http://www.springframework.org/schema/beans"
-        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xmlns:context="http://www.springframework.org/schema/context"
-        xsi:schemaLocation="
-            http://www.springframework.org/schema/beans 
-            http://www.springframework.org/schema/beans/spring-beans.xsd
-            http://www.springframework.org/schema/context 
-            http://www.springframework.org/schema/context/spring-context.xsd">
+    public void setSchool(School school) {
+        this.school = school;
+    }
 
-        <!-- 在指定的基本包中扫描注解 -->
-        <context:component-scan base-package="tavish.bit.annoDi.xmlWithAnno" />
-        
-        <bean id="mySchool" class="tavish.bit.annoDi.xmlWithAnno.School">
-            <property name="sname" value="北京大学" />
-        </bean>
-        
-        <bean id="myStudent" class="tavish.bit.annoDi.xmlWithAnno.Student">
-            <property name="name" value="李四" />
-            <property name="age" value="24" />
-            <property name="school" ref="mySchool" />
-        </bean>
-    </beans>
+    @Override
+    public String toString() {
+        return "Student [name=" + name + ", age=" + age + ", school=" + school + "]";
+    }
+}
+```
+
+配置文件：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans
+    xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:context="http://www.springframework.org/schema/context"
+    xsi:schemaLocation="
+        http://www.springframework.org/schema/beans 
+        http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/context 
+        http://www.springframework.org/schema/context/spring-context.xsd">
+
+    <!-- 在指定的基本包中扫描注解 -->
+    <context:component-scan base-package="tavish.bit.annoDi.xmlWithAnno" />
+    
+    <bean id="mySchool" class="tavish.bit.annoDi.xmlWithAnno.School">
+        <property name="sname" value="北京大学" />
+    </bean>
+    
+    <bean id="myStudent" class="tavish.bit.annoDi.xmlWithAnno.Student">
+        <property name="name" value="李四" />
+        <property name="age" value="24" />
+        <property name="school" ref="mySchool" />
+    </bean>
+</beans>
+```
 
 测试方法：
 
-    @Test
-    public void test01() {
-        String configLocation = "tavish/bit/annoDi/xmlWithAnno/applicationContext.xml";
+```java
+@Test
+public void test01() {
+    String configLocation = "tavish/bit/annoDi/xmlWithAnno/applicationContext.xml";
 
-        @SuppressWarnings("resource")
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
+    @SuppressWarnings("resource")
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
 
-        Student student = (Student) context.getBean("myStudent");
+    Student student = (Student) context.getBean("myStudent");
 
-        System.out.println(student);
-    }
+    System.out.println(student);
+}
+```
 
 输出：
 
-    Student [name=李四, age=24, school=School [sname=北京大学]]
+```text
+Student [name=李四, age=24, school=School [sname=北京大学]]
+```
 
 此时XML的设置覆盖了注解。
 
@@ -2731,15 +3024,17 @@ AOP底层，就是采用动态代理模式实现的。采用了两种代理：**
 
 配置文件：
 
-    <?xml version="1.0" encoding="UTF-8"?>
-    <beans
-        xmlns="http://www.springframework.org/schema/beans"
-        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xsi:schemaLocation="
-            http://www.springframework.org/schema/beans 
-            http://www.springframework.org/schema/beans/spring-beans.xsd">
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans
+    xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="
+        http://www.springframework.org/schema/beans 
+        http://www.springframework.org/schema/beans/spring-beans.xsd">
 
-    </beans>
+</beans>
+```
 
 ### 3.2 通知
 
@@ -2755,21 +3050,23 @@ AOP底层，就是采用动态代理模式实现的。采用了两种代理：**
 
 示例：
 
-    package tavish.bit.aop.methodBeforeAdvice.service;
+```java
+package tavish.bit.aop.methodBeforeAdvice.service;
 
-    // 目标类
-    public class SomeServiceImpl implements ISomeService {
+// 目标类
+public class SomeServiceImpl implements ISomeService {
 
-        @Override
-        public void doFirst() {
-            System.out.println("执行主业务逻辑doFisrt()");
-        }
-
-        @Override
-        public void doSecond() {
-            System.out.println("执行主业务逻辑doSecond()");
-        }
+    @Override
+    public void doFirst() {
+        System.out.println("执行主业务逻辑doFisrt()");
     }
+
+    @Override
+    public void doSecond() {
+        System.out.println("执行主业务逻辑doSecond()");
+    }
+}
+```
 
 **第二步：定义通知类**
 
@@ -2784,8 +3081,10 @@ AOP底层，就是采用动态代理模式实现的。采用了两种代理：**
 
 即在Spring配置文件中注册目标对象Bean。
 
-    <!-- 注册目标对象 -->
-    <bean id="someService" class="tavish.bit.aop.methodBeforeAdvice.service.SomeServiceImpl" />
+```xml
+<!-- 注册目标对象 -->
+<bean id="someService" class="tavish.bit.aop.methodBeforeAdvice.service.SomeServiceImpl" />
+```
 
 **第四步：注册通知切面**
 
@@ -2793,32 +3092,40 @@ AOP底层，就是采用动态代理模式实现的。采用了两种代理：**
 
 以前置通知为例：
 
-    <!-- 注册前置通知 -->
-    <bean id="myMethodBeforeAdvice" class="tavish.bit.aop.methodBeforeAdvice.advice.MyMethodBeforeAdvice"/>
+```xml
+<!-- 注册前置通知 -->
+<bean id="myMethodBeforeAdvice" class="tavish.bit.aop.methodBeforeAdvice.advice.MyMethodBeforeAdvice"/>
+```
 
 **第五步：注册代理工厂Bean类对象**
 
 示例：
 
-    <!-- 生成代理对象 -->
-    <bean id="serviceProxy" class="org.springframework.aop.framework.ProxyFactoryBean">
-        <!-- 指定要生成代理的目标对象 -->
-        <!-- <property name="targetName" value="someService"/> -->
-        <property name="target" ref="someService"/>
-        <!-- 指定切面 -->
-        <property name="interceptorNames" value="myMethodBeforeAdvice"/>
-    </bean>
+```xml
+<!-- 生成代理对象 -->
+<bean id="serviceProxy" class="org.springframework.aop.framework.ProxyFactoryBean">
+    <!-- 指定要生成代理的目标对象 -->
+    <!-- <property name="targetName" value="someService"/> -->
+    <property name="target" ref="someService"/>
+    <!-- 指定切面 -->
+    <property name="interceptorNames" value="myMethodBeforeAdvice"/>
+</bean>
+```
 
 这里的代理使用的是ProxyFactoryBean类。代理对象的配置，是与JDK的Proxy代理参数是一致的，都需要指定三部分：目标类，接口，切面。
 
 指定目标类：
 
-    <property name="target" ref="目标对象Bean的id" />
+```xml
+<property name="target" ref="目标对象Bean的id" />
+```
 
 指定目标对象的Bean的id。也可写为如下形式：
 
-    <property name="targetName" value="目标对象Bean的id" />
-    <property name="proxyInterfaces" value="接口全限定性名" />
+```xml
+<property name="targetName" value="目标对象Bean的id" />
+<property name="proxyInterfaces" value="接口全限定性名" />
+```
 
 指定接口：
 
@@ -2828,7 +3135,9 @@ AOP底层，就是采用动态代理模式实现的。采用了两种代理：**
 
 指定切面：
 
-    <property name="interceptorNames" value= "通知的id" />
+```xml
+<property name="interceptorNames" value= "通知的id" />
+```
 
 指定切面，这里指通知。注意，这里对于id的指定使用的是value属性，而非ref。因为该属性名为xxxNames，是名称，所以其值为字符串，而非对象。
 
@@ -2836,7 +3145,9 @@ AOP底层，就是采用动态代理模式实现的。采用了两种代理：**
 
 例如：
 
-    ISomeService service = (ISomeService) context.getBean("serviceProxy");
+```java
+ISomeService service = (ISomeService) context.getBean("serviceProxy");
+```
 
 这里serviceProxy指的是代理对象。
 
@@ -2856,100 +3167,112 @@ AOP底层，就是采用动态代理模式实现的。采用了两种代理：**
 
 主业务接口：
 
-    package tavish.bit.aop.methodBeforeAdvice.service;
+```java
+package tavish.bit.aop.methodBeforeAdvice.service;
 
-    // 主业务接口
-    public interface ISomeService {
-        // 目标方法
-        void doFirst();
-        void doSecond();
-    }
+// 主业务接口
+public interface ISomeService {
+    // 目标方法
+    void doFirst();
+    void doSecond();
+}
+```
 
 目标类：
 
-    package tavish.bit.aop.methodBeforeAdvice.service;
+```java
+package tavish.bit.aop.methodBeforeAdvice.service;
 
-    // 目标类
-    public class SomeServiceImpl implements ISomeService {
+// 目标类
+public class SomeServiceImpl implements ISomeService {
 
-        @Override
-        public void doFirst() {
-            System.out.println("执行主业务逻辑doFisrt()");
-        }
-
-        @Override
-        public void doSecond() {
-            System.out.println("执行主业务逻辑doSecond()");
-        }
+    @Override
+    public void doFirst() {
+        System.out.println("执行主业务逻辑doFisrt()");
     }
+
+    @Override
+    public void doSecond() {
+        System.out.println("执行主业务逻辑doSecond()");
+    }
+}
+```
 
 定义前置通知：
 
-    package tavish.bit.aop.methodBeforeAdvice.advice;
+```java
+package tavish.bit.aop.methodBeforeAdvice.advice;
 
-    import java.lang.reflect.Method;
+import java.lang.reflect.Method;
 
-    import org.springframework.aop.MethodBeforeAdvice;
+import org.springframework.aop.MethodBeforeAdvice;
 
-    // 前置通知
-    public class MyMethodBeforeAdvice implements MethodBeforeAdvice {
+// 前置通知
+public class MyMethodBeforeAdvice implements MethodBeforeAdvice {
 
-        // 前置通知方法：在目标方法执行之前执行。
-        // method：目标方法
-        // args：目标方法的参数列表
-        // target：目标对象
-        @Override
-        public void before(Method method, Object[] args, Object target) throws Throwable {
-            System.out.println("执行前置通知方法");
-        }
+    // 前置通知方法：在目标方法执行之前执行。
+    // method：目标方法
+    // args：目标方法的参数列表
+    // target：目标对象
+    @Override
+    public void before(Method method, Object[] args, Object target) throws Throwable {
+        System.out.println("执行前置通知方法");
     }
+}
+```
 
 配置文件配置：
 
-    <!-- 注册目标对象 -->
-    <bean id="someService" class="tavish.bit.aop.methodBeforeAdvice.service.SomeServiceImpl" />
-    
-    <!-- 注册前置通知 -->
-    <bean id="myMethodBeforeAdvice" class="tavish.bit.aop.methodBeforeAdvice.advice.MyMethodBeforeAdvice"/>
-    
-    <!-- 生成代理对象 -->
-    <bean id="serviceProxy" class="org.springframework.aop.framework.ProxyFactoryBean">
-        <!-- 指定要生成代理的目标对象 -->
-        <!-- <property name="targetName" value="someService"/> -->
-        <property name="target" ref="someService"/>
-        <!-- 指定切面 -->
-        <property name="interceptorNames" value="myMethodBeforeAdvice"/>
-    </bean>
+```xml
+<!-- 注册目标对象 -->
+<bean id="someService" class="tavish.bit.aop.methodBeforeAdvice.service.SomeServiceImpl" />
+
+<!-- 注册前置通知 -->
+<bean id="myMethodBeforeAdvice" class="tavish.bit.aop.methodBeforeAdvice.advice.MyMethodBeforeAdvice"/>
+
+<!-- 生成代理对象 -->
+<bean id="serviceProxy" class="org.springframework.aop.framework.ProxyFactoryBean">
+    <!-- 指定要生成代理的目标对象 -->
+    <!-- <property name="targetName" value="someService"/> -->
+    <property name="target" ref="someService"/>
+    <!-- 指定切面 -->
+    <property name="interceptorNames" value="myMethodBeforeAdvice"/>
+</bean>
+```
 
 测试方法：
 
-    @Test
-    public void test01() {
-        String configLocation = "tavish/bit/aop/methodBeforeAdvice/applicationContext.xml";
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
+```java
+@Test
+public void test01() {
+    String configLocation = "tavish/bit/aop/methodBeforeAdvice/applicationContext.xml";
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
 
-        ISomeService service = (ISomeService) context.getBean("serviceProxy");
+    ISomeService service = (ISomeService) context.getBean("serviceProxy");
 
-        service.doFirst();
-        
-        System.out.println("============");
-        
-        service.doSecond();
+    service.doFirst();
+    
+    System.out.println("============");
+    
+    service.doSecond();
 
-        ((ClassPathXmlApplicationContext) context).close();
-    }
+    ((ClassPathXmlApplicationContext) context).close();
+}
+```
 
 输出：
 
-    执行前置通知方法
-    执行主业务逻辑doFisrt()
-    ============
-    执行前置通知方法
-    执行主业务逻辑doSecond()
+```text
+执行前置通知方法
+执行主业务逻辑doFisrt()
+============
+执行前置通知方法
+执行主业务逻辑doSecond()
+```
 
 ##### 3.2.2.2 后置通知----AfterReturningAdvice
 
-定义后置通知，需要实现接口AfterReturningAdvice。该接口中有一个方法afterReturning ()，会在目标方法执行之后执行。后置通知的特点：
+定义后置通知，需要实现接口AfterReturningAdvice。该接口中有一个方法afterReturning()，会在目标方法执行之后执行。后置通知的特点：
 
 - 在目标方法执行之后执行。
 - 不改变目标方法的执行流程，后置通知代码不能阻止目标方法执行。
@@ -2962,70 +3285,76 @@ AOP底层，就是采用动态代理模式实现的。采用了两种代理：**
 
 定义后置通知：
 
-    package tavish.bit.aop.afterReturningAdvice.advice;
+```java
+package tavish.bit.aop.afterReturningAdvice.advice;
 
-    import java.lang.reflect.Method;
+import java.lang.reflect.Method;
 
-    import org.springframework.aop.AfterReturningAdvice;
+import org.springframework.aop.AfterReturningAdvice;
 
-    // 后置通知：
-    public class MyAfterReturningAdvice implements AfterReturningAdvice {
+// 后置通知：
+public class MyAfterReturningAdvice implements AfterReturningAdvice {
 
-        // 后置通知方法：在目标方法执行之后执行。
-        // returnValue：目标方法返回值
-        // method：目标方法
-        // args：目标方法的参数列表
-        // target：目标对象
-        @Override
-        public void afterReturning(Object returnValue, Method method, Object[] args, Object target) throws Throwable {
-            System.out.println("执行后置通知方法");
-        } 
-    }
+    // 后置通知方法：在目标方法执行之后执行。
+    // returnValue：目标方法返回值
+    // method：目标方法
+    // args：目标方法的参数列表
+    // target：目标对象
+    @Override
+    public void afterReturning(Object returnValue, Method method, Object[] args, Object target) throws Throwable {
+        System.out.println("执行后置通知方法");
+    } 
+}
+```
 
 配置文件：
 
-    <!-- 注册后置通知 -->
-    <bean id="myAfterReturningAdvice" class="tavish.bit.aop.afterReturningAdvice.advice.MyAfterReturningAdvice"/>
-    
-    <!-- 生成代理对象 -->
-    <bean id="serviceProxy" class="org.springframework.aop.framework.ProxyFactoryBean">
-        <property name="target" ref="someService"/>
-        <property name="interceptorNames" value="myAfterReturningAdvice"/>
-    </bean>
+```xml
+<!-- 注册后置通知 -->
+<bean id="myAfterReturningAdvice" class="tavish.bit.aop.afterReturningAdvice.advice.MyAfterReturningAdvice"/>
+
+<!-- 生成代理对象 -->
+<bean id="serviceProxy" class="org.springframework.aop.framework.ProxyFactoryBean">
+    <property name="target" ref="someService"/>
+    <property name="interceptorNames" value="myAfterReturningAdvice"/>
+</bean>
+```
 
 测试方法：
 
-    @Test
-    public void test01() {
-        String configLocation = "tavish/bit/aop/afterReturningAdvice/applicationContext.xml";
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
+```java
+@Test
+public void test01() {
+    String configLocation = "tavish/bit/aop/afterReturningAdvice/applicationContext.xml";
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
 
-        ISomeService service = (ISomeService) context.getBean("serviceProxy");
+    ISomeService service = (ISomeService) context.getBean("serviceProxy");
 
-        service.doFirst();
-        
-        System.out.println("============");
-        
-        service.doSecond();
+    service.doFirst();
+    
+    System.out.println("============");
+    
+    service.doSecond();
 
-        ((ClassPathXmlApplicationContext) context).close();
-    }
+    ((ClassPathXmlApplicationContext) context).close();
+}
+```
 
 输出：
 
-    执行主业务逻辑doFisrt()
-    执行后置通知方法
-    ============
-    执行主业务逻辑doSecond()
-    执行后置通知方法
+```text
+执行主业务逻辑doFisrt()
+执行后置通知方法
+============
+执行主业务逻辑doSecond()
+执行后置通知方法
+```
 
 ##### 3.2.2.3 环绕通知----MethodInterceptor
 
 定义环绕通知，需要实现MethodInterceptor接口。
 
-**
-环绕通知，也叫方法拦截器，可以在目标方法调用之前及之后做处理，可以改变目标方法的返回值，也可以改变程序执行流程。
-**
+**环绕通知，也叫方法拦截器，可以在目标方法调用之前及之后做处理，可以改变目标方法的返回值，也可以改变程序执行流程。**
 
 *注意， org.aopalliance.intercept.MethodInterceptor才是需要的包。*
 
@@ -3033,100 +3362,114 @@ AOP底层，就是采用动态代理模式实现的。采用了两种代理：**
 
 定义主业务接口及目标类：
 
-    // 主业务接口
-    public interface ISomeService {
-        // 目标方法
-        String doFirst();
-        void doSecond();
-    }
+```java
+// 主业务接口
+public interface ISomeService {
+    // 目标方法
+    String doFirst();
+    void doSecond();
+}
+```
 
+```java
 package tavish.bit.aop.methodInterceptor.service;
 
-    // 目标类
-    public class SomeServiceImpl implements ISomeService {
+// 目标类
+public class SomeServiceImpl implements ISomeService {
 
-        @Override
-        public String doFirst() {
-            System.out.println("执行主业务逻辑doFisrt()");
-            return "abcde";
-        }
-
-        @Override
-        public void doSecond() {
-            System.out.println("执行主业务逻辑doSecond()");
-        }
+    @Override
+    public String doFirst() {
+        System.out.println("执行主业务逻辑doFisrt()");
+        return "abcde";
     }
+
+    @Override
+    public void doSecond() {
+        System.out.println("执行主业务逻辑doSecond()");
+    }
+}
+```
 
 定义环绕通知：
 
-    // 将目标方法的返回值由小写转为大写
-    public class MyMethodInterceptor implements MethodInterceptor {
+```java
+// 将目标方法的返回值由小写转为大写
+public class MyMethodInterceptor implements MethodInterceptor {
 
-        @Override
-        public Object invoke(MethodInvocation invocation) throws Throwable {
-            System.out.println("执行环绕通知，目标方法执行之前。");
-            // 执行目标方法
-            Object result = invocation.proceed();
-            System.out.println("执行环绕通知，目标方法执行之后。");
-            return result == null ? result : ((String) result).toUpperCase();
-        }
+    @Override
+    public Object invoke(MethodInvocation invocation) throws Throwable {
+        System.out.println("执行环绕通知，目标方法执行之前。");
+        // 执行目标方法
+        Object result = invocation.proceed();
+        System.out.println("执行环绕通知，目标方法执行之后。");
+        return result == null ? result : ((String) result).toUpperCase();
     }
+}
+```
 
 配置文件：
 
-    <!-- 注册目标对象 -->
-    <bean id="someService" class="tavish.bit.aop.methodInterceptor.service.SomeServiceImpl" />
-    
-    <!-- 注册环绕通知 -->
-    <bean id="myMethodInterceptor" class="tavish.bit.aop.methodInterceptor.advice.MyMethodInterceptor"/>
-    
-    <!-- 生成代理对象 -->
-    <bean id="serviceProxy" class="org.springframework.aop.framework.ProxyFactoryBean">
-        <!-- 指定要生成代理的目标对象 -->
-        <property name="target" ref="someService"/>
-        <!-- 指定切面 -->
-        <property name="interceptorNames" value="myMethodInterceptor"/>
-    </bean>
+```xml
+<!-- 注册目标对象 -->
+<bean id="someService" class="tavish.bit.aop.methodInterceptor.service.SomeServiceImpl" />
+
+<!-- 注册环绕通知 -->
+<bean id="myMethodInterceptor" class="tavish.bit.aop.methodInterceptor.advice.MyMethodInterceptor"/>
+
+<!-- 生成代理对象 -->
+<bean id="serviceProxy" class="org.springframework.aop.framework.ProxyFactoryBean">
+    <!-- 指定要生成代理的目标对象 -->
+    <property name="target" ref="someService"/>
+    <!-- 指定切面 -->
+    <property name="interceptorNames" value="myMethodInterceptor"/>
+</bean>
+```
 
 测试方法：
 
-    @Test
-    public void test01() {
-        String configLocation = "tavish/bit/aop/methodInterceptor/applicationContext.xml";
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
+```java
+@Test
+public void test01() {
+    String configLocation = "tavish/bit/aop/methodInterceptor/applicationContext.xml";
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
 
-        ISomeService service = (ISomeService) context.getBean("serviceProxy");
+    ISomeService service = (ISomeService) context.getBean("serviceProxy");
 
-        String result = service.doFirst();
-        
-        System.out.println("result = " + result);
-        System.out.println("============");
-        
-        service.doSecond();
+    String result = service.doFirst();
+    
+    System.out.println("result = " + result);
+    System.out.println("============");
+    
+    service.doSecond();
 
-        ((ClassPathXmlApplicationContext) context).close();
-    }
+    ((ClassPathXmlApplicationContext) context).close();
+}
+```
 
 输出：
 
-    执行环绕通知，目标方法执行之前。
-    执行主业务逻辑doFisrt()
-    执行环绕通知，目标方法执行之后。
-    result = ABCDE
-    ============
-    执行环绕通知，目标方法执行之前。
-    执行主业务逻辑doSecond()
-    执行环绕通知，目标方法执行之后。
+```text
+执行环绕通知，目标方法执行之前。
+执行主业务逻辑doFisrt()
+执行环绕通知，目标方法执行之后。
+result = ABCDE
+============
+执行环绕通知，目标方法执行之前。
+执行主业务逻辑doSecond()
+执行环绕通知，目标方法执行之后。
+```
 
 ##### 3.2.2.4 异常通知----ThrowsAdvice
 
 定义异常通知，需要实现ThrowsAdvice接口。该接口的主要作用是，在目标方法抛出异常后，根据异常的不同做出相应的处理。当该接口处理完异常后，会简单地将异常再次抛出给目标方法。
 不过，这个接口较为特殊，从形式上看，该接口中没有必须要实现的方法。但，这个接口却确实有必须要实现的方法afterThrowing()。这个方法重载了四种形式。由于使用时，一般只使用其中一种，若要都定义到接口中，则势必要使程序员在使用时必须要实现这四个方法。这是很麻烦的。所以就将该接口定义为了标识接口。
 
-    public void afterThrowing(Exception ex)
-    public void afterThrowing(RemoteException)
-    public void afterThrowing(Method method, Object[] args, Object target, Exception ex)
-    public void afterThrowing(Method method, Object[] args, Object target, ServletException ex)
+```java
+public void afterThrowing(Exception ex)
+public void afterThrowing(RemoteException)
+public void afterThrowing(Method method, Object[] args, Object target, Exception ex)
+public void afterThrowing(Method method, Object[] args, Object target, ServletException ex)
+```
 
 示例：
 
@@ -3134,73 +3477,83 @@ package tavish.bit.aop.methodInterceptor.service;
 
 目标类：doFirst()方法会抛出异常。
 
+```java
 package tavish.bit.aop.throwsAdvice.service;
 
-    // 目标类
-    public class SomeServiceImpl implements ISomeService {
+// 目标类
+public class SomeServiceImpl implements ISomeService {
 
-        @Override
-        public void doFirst() {
-            System.out.println("执行主业务逻辑doFisrt()" + 3 / 0);
-        }
-
-        @Override
-        public void doSecond() {
-            System.out.println("执行主业务逻辑doSecond()");
-        }
+    @Override
+    public void doFirst() {
+        System.out.println("执行主业务逻辑doFisrt()" + 3 / 0);
     }
+
+    @Override
+    public void doSecond() {
+        System.out.println("执行主业务逻辑doSecond()");
+    }
+}
+```
 
 异常通知：
 
-    package tavish.bit.aop.throwsAdvice.advice;
+```java
+package tavish.bit.aop.throwsAdvice.advice;
 
-    import org.springframework.aop.ThrowsAdvice;
+import org.springframework.aop.ThrowsAdvice;
 
-    // 异常通知
-    public class MyThrowsAdvice implements ThrowsAdvice {
-        
-        public void afterThrowing(Exception ex) {
-            System.out.println("执行异常通知方法 ex = " + ex.getMessage());
-        }
+// 异常通知
+public class MyThrowsAdvice implements ThrowsAdvice {
+    
+    public void afterThrowing(Exception ex) {
+        System.out.println("执行异常通知方法 ex = " + ex.getMessage());
     }
+}
+```
 
 配置文件：
 
-    <!-- 注册目标对象 -->
-    <bean id="someService" class="tavish.bit.aop.throwsAdvice.service.SomeServiceImpl" />
-    
-    <!-- 注册异常通知 -->
-    <bean id="myThrowsAdvice" class="tavish.bit.aop.throwsAdvice.advice.MyThrowsAdvice"/>
-    
-    <!-- 生成代理对象 -->
-    <bean id="serviceProxy" class="org.springframework.aop.framework.ProxyFactoryBean">
-        <!-- 指定要生成代理的目标对象 -->
-        <property name="target" ref="someService"/>
-        <!-- 指定切面 -->
-        <property name="interceptorNames" value="myThrowsAdvice"/>
-    </bean>
+```xml
+<!-- 注册目标对象 -->
+<bean id="someService" class="tavish.bit.aop.throwsAdvice.service.SomeServiceImpl" />
+
+<!-- 注册异常通知 -->
+<bean id="myThrowsAdvice" class="tavish.bit.aop.throwsAdvice.advice.MyThrowsAdvice"/>
+
+<!-- 生成代理对象 -->
+<bean id="serviceProxy" class="org.springframework.aop.framework.ProxyFactoryBean">
+    <!-- 指定要生成代理的目标对象 -->
+    <property name="target" ref="someService"/>
+    <!-- 指定切面 -->
+    <property name="interceptorNames" value="myThrowsAdvice"/>
+</bean>
+```
 
 测试方法：
 
-    @Test
-    public void test01() {
-        String configLocation = "tavish/bit/aop/throwsAdvice/applicationContext.xml";
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
+```java
+@Test
+public void test01() {
+    String configLocation = "tavish/bit/aop/throwsAdvice/applicationContext.xml";
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
 
-        ISomeService service = (ISomeService) context.getBean("serviceProxy");
+    ISomeService service = (ISomeService) context.getBean("serviceProxy");
 
-        service.doFirst();
-        
-        System.out.println("============");
-        
-        service.doSecond();
+    service.doFirst();
+    
+    System.out.println("============");
+    
+    service.doSecond();
 
-        ((ClassPathXmlApplicationContext) context).close();
-    }
+    ((ClassPathXmlApplicationContext) context).close();
+}
+```
 
 输出：
 
-    执行异常通知方法 ex = / by zero
+```text
+执行异常通知方法 ex = / by zero
+```
 
 示例2：
 
@@ -3208,141 +3561,153 @@ package tavish.bit.aop.throwsAdvice.service;
 
 主业务接口和目标类：
 
-    package tavish.bit.aop.throwsAdvice2.service;
+```java
+package tavish.bit.aop.throwsAdvice2.service;
 
-    import tavish.bit.aop.throwsAdvice2.exception.UserException;
+import tavish.bit.aop.throwsAdvice2.exception.UserException;
 
-    public interface ISomeService {
-        boolean checkUser(String username, String password) throws UserException;
-    }
+public interface ISomeService {
+    boolean checkUser(String username, String password) throws UserException;
+}
 
-    package tavish.bit.aop.throwsAdvice2.service;
+package tavish.bit.aop.throwsAdvice2.service;
 
-    import tavish.bit.aop.throwsAdvice2.exception.PasswordException;
-    import tavish.bit.aop.throwsAdvice2.exception.UserException;
-    import tavish.bit.aop.throwsAdvice2.exception.UsernameException;
+import tavish.bit.aop.throwsAdvice2.exception.PasswordException;
+import tavish.bit.aop.throwsAdvice2.exception.UserException;
+import tavish.bit.aop.throwsAdvice2.exception.UsernameException;
 
-    public class SomeServiceImpl implements ISomeService {
+public class SomeServiceImpl implements ISomeService {
 
-        @Override
-        public boolean checkUser(String username, String password) throws UserException {
-            
-            if (!"Tavish".equals(username.trim())) {
-                throw new UsernameException("用户名有误");
-            }
-            
-            if(!"1111".equals(password.trim())) {
-                throw new PasswordException("密码有误");
-            }
-            
-            return true;
+    @Override
+    public boolean checkUser(String username, String password) throws UserException {
+        
+        if (!"Tavish".equals(username.trim())) {
+            throw new UsernameException("用户名有误");
         }
+        
+        if(!"1111".equals(password.trim())) {
+            throw new PasswordException("密码有误");
+        }
+        
+        return true;
     }
+}
+```
 
 自定义异常：
 
-    package tavish.bit.aop.throwsAdvice2.exception;
+```java
+package tavish.bit.aop.throwsAdvice2.exception;
 
-    public class UserException extends Exception {
+public class UserException extends Exception {
 
-        private static final long serialVersionUID = 2411887317589296825L;
+    private static final long serialVersionUID = 2411887317589296825L;
 
-        public UserException() {
-            super();
-        }
-
-        public UserException(String message) {
-            super(message);
-        }
-
+    public UserException() {
+        super();
     }
 
+    public UserException(String message) {
+        super(message);
+    }
+}
+```
 
-    package tavish.bit.aop.throwsAdvice2.exception;
+```java
+package tavish.bit.aop.throwsAdvice2.exception;
 
-    public class UsernameException extends UserException {
+public class UsernameException extends UserException {
 
-        private static final long serialVersionUID = -4509857821392759158L;
+    private static final long serialVersionUID = -4509857821392759158L;
 
-        public UsernameException() {
-            super();
-        }
-
-        public UsernameException(String message) {
-            super(message);
-        }
+    public UsernameException() {
+        super();
     }
 
-    package tavish.bit.aop.throwsAdvice2.exception;
-
-    public class PasswordException extends UserException {
-
-        private static final long serialVersionUID = 2230247107104456859L;
-
-        public PasswordException() {
-            super();
-        }
-
-        public PasswordException(String message) {
-            super(message);
-        }
+    public UsernameException(String message) {
+        super(message);
     }
+}
+```
+
+```java
+package tavish.bit.aop.throwsAdvice2.exception;
+
+public class PasswordException extends UserException {
+
+    private static final long serialVersionUID = 2230247107104456859L;
+
+    public PasswordException() {
+        super();
+    }
+
+    public PasswordException(String message) {
+        super(message);
+    }
+}
+```
 
 异常通知：
 
-    package tavish.bit.aop.throwsAdvice2.advice;
+```java
+package tavish.bit.aop.throwsAdvice2.advice;
 
-    import org.springframework.aop.ThrowsAdvice;
+import org.springframework.aop.ThrowsAdvice;
 
-    import tavish.bit.aop.throwsAdvice2.exception.PasswordException;
-    import tavish.bit.aop.throwsAdvice2.exception.UsernameException;
+import tavish.bit.aop.throwsAdvice2.exception.PasswordException;
+import tavish.bit.aop.throwsAdvice2.exception.UsernameException;
 
-    public class MyThrowsAdvice implements ThrowsAdvice {
-        
-        public void afterThrowing(UsernameException ex) {
-            System.out.println("用户名输错了！---- ex = " + ex.getMessage());
-        }
-        
-        public void afterThrowing(PasswordException ex) {
-            System.out.println("密码输错了！---- ex = " + ex.getMessage());
-        }
+public class MyThrowsAdvice implements ThrowsAdvice {
+    
+    public void afterThrowing(UsernameException ex) {
+        System.out.println("用户名输错了！---- ex = " + ex.getMessage());
     }
+    
+    public void afterThrowing(PasswordException ex) {
+        System.out.println("密码输错了！---- ex = " + ex.getMessage());
+    }
+}
+```
 
 配置文件：
 
-    <!-- 注册目标对象 -->
-    <bean id="someService" class="tavish.bit.aop.throwsAdvice2.service.SomeServiceImpl" />
-    
-    <!-- 注册异常通知 -->
-    <bean id="myThrowsAdvice" class="tavish.bit.aop.throwsAdvice2.advice.MyThrowsAdvice"/>
-    
-    <!-- 生成代理对象 -->
-    <bean id="serviceProxy" class="org.springframework.aop.framework.ProxyFactoryBean">
-        <!-- 指定要生成代理的目标对象 -->
-        <property name="target" ref="someService"/>
-        <!-- 指定切面 -->
-        <property name="interceptorNames" value="myThrowsAdvice"/>
-    </bean>
+```xml
+<!-- 注册目标对象 -->
+<bean id="someService" class="tavish.bit.aop.throwsAdvice2.service.SomeServiceImpl" />
+
+<!-- 注册异常通知 -->
+<bean id="myThrowsAdvice" class="tavish.bit.aop.throwsAdvice2.advice.MyThrowsAdvice"/>
+
+<!-- 生成代理对象 -->
+<bean id="serviceProxy" class="org.springframework.aop.framework.ProxyFactoryBean">
+    <!-- 指定要生成代理的目标对象 -->
+    <property name="target" ref="someService"/>
+    <!-- 指定切面 -->
+    <property name="interceptorNames" value="myThrowsAdvice"/>
+</bean>
+```
 
 测试方法：
 
-    @Test
-    public void test01() {
-        
-        String configLocation = "tavish/bit/aop/throwsAdvice2/applicationContext.xml";
-        
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
-        
-        ISomeService service = (ISomeService) context.getBean("serviceProxy");
-        
-        try {
-            service.checkUser("Tavish", "1111");
-        } catch (UserException e) {
-            e.printStackTrace();
-        }
-        
-        ((ClassPathXmlApplicationContext) context).close();
+```java
+@Test
+public void test01() {
+    
+    String configLocation = "tavish/bit/aop/throwsAdvice2/applicationContext.xml";
+    
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
+    
+    ISomeService service = (ISomeService) context.getBean("serviceProxy");
+    
+    try {
+        service.checkUser("Tavish", "1111");
+    } catch (UserException e) {
+        e.printStackTrace();
     }
+    
+    ((ClassPathXmlApplicationContext) context).close();
+}
+```
 
 输出：
 
@@ -3363,79 +3728,88 @@ package tavish.bit.aop.throwsAdvice.service;
 
 两个通知：
 
-    package tavish.bit.aop.multiAspect.advice;
+```java
+package tavish.bit.aop.multiAspect.advice;
 
-    import java.lang.reflect.Method;
-    import org.springframework.aop.MethodBeforeAdvice;
+import java.lang.reflect.Method;
+import org.springframework.aop.MethodBeforeAdvice;
 
-    // 前置通知
-    public class MyMethodBeforeAdvice implements MethodBeforeAdvice {
+// 前置通知
+public class MyMethodBeforeAdvice implements MethodBeforeAdvice {
 
-        @Override
-        public void before(Method method, Object[] args, Object target) throws Throwable {
-            System.out.println("执行前置通知方法");
-        }
+    @Override
+    public void before(Method method, Object[] args, Object target) throws Throwable {
+        System.out.println("执行前置通知方法");
     }
+}
+```
 
-    package tavish.bit.aop.multiAspect.advice;
+```java
+package tavish.bit.aop.multiAspect.advice;
 
-    import java.lang.reflect.Method;
-    import org.springframework.aop.AfterReturningAdvice;
+import java.lang.reflect.Method;
+import org.springframework.aop.AfterReturningAdvice;
 
-    // 后置通知：
-    public class MyAfterReturningAdvice implements AfterReturningAdvice {
+// 后置通知：
+public class MyAfterReturningAdvice implements AfterReturningAdvice {
 
-        @Override
-        public void afterReturning(Object returnValue, Method method, Object[] args, Object target) throws Throwable {
-            System.out.println("执行后置通知方法");
-        }
+    @Override
+    public void afterReturning(Object returnValue, Method method, Object[] args, Object target) throws Throwable {
+        System.out.println("执行后置通知方法");
     }
-
+}
+```
 
 配置文件：
 
-    <!-- 注册目标对象 -->
-    <bean id="someService" class="tavish.bit.aop.multiAspect.service.SomeServiceImpl" />
-    
-    <!-- 注册通知 -->
-    <bean id="myAfterReturningAdvice" class="tavish.bit.aop.multiAspect.advice.MyAfterReturningAdvice"/>
-    <bean id="myMethodBeforeAdvice" class="tavish.bit.aop.multiAspect.advice.MyMethodBeforeAdvice"/>
-    
-    <!-- 生成代理对象 -->
-    <bean id="serviceProxy" class="org.springframework.aop.framework.ProxyFactoryBean">
-        <!-- 指定要生成代理的目标对象 -->
-        <property name="target" ref="someService"/>
-        <!-- 指定切面 -->
-        <property name="interceptorNames" value="myMethodBeforeAdvice, myAfterReturningAdvice"/>
-    </bean>
+```xml
+<!-- 注册目标对象 -->
+<bean id="someService" class="tavish.bit.aop.multiAspect.service.SomeServiceImpl" />
+
+<!-- 注册通知 -->
+<bean id="myAfterReturningAdvice" class="tavish.bit.aop.multiAspect.advice.MyAfterReturningAdvice"/>
+<bean id="myMethodBeforeAdvice" class="tavish.bit.aop.multiAspect.advice.MyMethodBeforeAdvice"/>
+
+<!-- 生成代理对象 -->
+<bean id="serviceProxy" class="org.springframework.aop.framework.ProxyFactoryBean">
+    <!-- 指定要生成代理的目标对象 -->
+    <property name="target" ref="someService"/>
+    <!-- 指定切面 -->
+    <property name="interceptorNames" value="myMethodBeforeAdvice, myAfterReturningAdvice"/>
+</bean>
+```
 
 测试方法：
 
-    @Test
-    public void test01() {
-        String configLocation = "tavish/bit/aop/multiAspect/applicationContext.xml";
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
+```java
+@Test
+public void test01() {
+    String configLocation = "tavish/bit/aop/multiAspect/applicationContext.xml";
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
 
-        ISomeService service =  (ISomeService) context.getBean("serviceProxy");
+    ISomeService service =  (ISomeService) context.getBean("serviceProxy");
 
-        service.doFirst();
-        
-        System.out.println("============");
-        
-        service.doSecond();
+    service.doFirst();
+    
+    System.out.println("============");
+    
+    service.doSecond();
 
-        ((ClassPathXmlApplicationContext) context).close();
-    }
+    ((ClassPathXmlApplicationContext) context).close();
+}
+```
 
 输出：
 
-    执行前置通知方法
-    执行主业务逻辑doFisrt()
-    执行后置通知方法
-    ============
-    执行前置通知方法
-    执行主业务逻辑doSecond()
-    执行后置通知方法
+```text
+执行前置通知方法
+执行主业务逻辑doFisrt()
+执行后置通知方法
+============
+执行前置通知方法
+执行主业务逻辑doSecond()
+执行后置通知方法
+```
 
 ##### 3.2.3.2 无接口的CGLIB动态代理
 
@@ -3445,90 +3819,104 @@ package tavish.bit.aop.throwsAdvice.service;
 
 目标类：
 
-    package tavish.bit.aop.cglibWithoutInterface;
+```java
+package tavish.bit.aop.cglibWithoutInterface;
 
-    // 目标类
-    public class SomeService {
+// 目标类
+public class SomeService {
 
-        public void doFirst() {
-            System.out.println("执行主业务逻辑doFisrt()");
-        }
-
-        public void doSecond() {
-            System.out.println("执行主业务逻辑doSecond()");
-        }
+    public void doFirst() {
+        System.out.println("执行主业务逻辑doFisrt()");
     }
+
+    public void doSecond() {
+        System.out.println("执行主业务逻辑doSecond()");
+    }
+}
+```
 
 后置通知：
 
-    package tavish.bit.aop.cglibWithoutInterface;
+```java
+package tavish.bit.aop.cglibWithoutInterface;
 
-    import java.lang.reflect.Method;
+import java.lang.reflect.Method;
 
-    import org.springframework.aop.AfterReturningAdvice;
+import org.springframework.aop.AfterReturningAdvice;
 
-    // 后置通知：
-    public class MyAfterReturningAdvice implements AfterReturningAdvice {
+// 后置通知：
+public class MyAfterReturningAdvice implements AfterReturningAdvice {
 
-        @Override
-        public void afterReturning(Object returnValue, Method method, Object[] args, Object target) throws Throwable {
-            System.out.println("执行后置通知方法");
-        }
+    @Override
+    public void afterReturning(Object returnValue, Method method, Object[] args, Object target) throws Throwable {
+        System.out.println("执行后置通知方法");
     }
+}
+```
 
 配置文件：
 
-    <!-- 注册目标对象 -->
-    <bean id="someService" class="tavish.bit.aop.cglibWithoutInterface.SomeService" />
-    
-    <!-- 注册通知 -->
-    <bean id="myAfterReturningAdvice" class="tavish.bit.aop.cglibWithoutInterface.MyAfterReturningAdvice"/>
-    
-    <!-- 生成代理对象 -->
-    <bean id="serviceProxy" class="org.springframework.aop.framework.ProxyFactoryBean">
-        <!-- 指定要生成代理的目标对象 -->
-        <property name="target" ref="someService"/>
-        <!-- 指定切面 -->
-        <property name="interceptorNames" value="myAfterReturningAdvice"/>
-    </bean>
+```xml
+<!-- 注册目标对象 -->
+<bean id="someService" class="tavish.bit.aop.cglibWithoutInterface.SomeService" />
+
+<!-- 注册通知 -->
+<bean id="myAfterReturningAdvice" class="tavish.bit.aop.cglibWithoutInterface.MyAfterReturningAdvice"/>
+
+<!-- 生成代理对象 -->
+<bean id="serviceProxy" class="org.springframework.aop.framework.ProxyFactoryBean">
+    <!-- 指定要生成代理的目标对象 -->
+    <property name="target" ref="someService"/>
+    <!-- 指定切面 -->
+    <property name="interceptorNames" value="myAfterReturningAdvice"/>
+</bean>
+```
 
 测试方法：
 
-    @Test
-    public void test01() {
-        String configLocation = "tavish/bit/aop/cglibWithoutInterface/applicationContext.xml";
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
+```java
+@Test
+public void test01() {
+    String configLocation = "tavish/bit/aop/cglibWithoutInterface/applicationContext.xml";
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
 
-        SomeService service =  (SomeService) context.getBean("serviceProxy");
+    SomeService service =  (SomeService) context.getBean("serviceProxy");
 
-        service.doFirst();
-        
-        System.out.println("============");
-        
-        service.doSecond();
+    service.doFirst();
+    
+    System.out.println("============");
+    
+    service.doSecond();
 
-        ((ClassPathXmlApplicationContext) context).close();
-    }
+    ((ClassPathXmlApplicationContext) context).close();
+}
+```
 
 输出：
 
-    执行主业务逻辑doFisrt()
-    执行后置通知方法
-    ============
-    执行主业务逻辑doSecond()
-    执行后置通知方法
+```text
+执行主业务逻辑doFisrt()
+执行后置通知方法
+============
+执行主业务逻辑doSecond()
+执行后置通知方法
+```
 
 ##### 3.2.3.3 有接口的CGLIB动态代理
 
 若存在接口，但又需要使用CGLIB生成代理对象，此时，只需要在配置文件中增加一个proxyTargetClass属性设置，用于指定强制使用CGLIB代理机制。
 
-    <!-- 指定使用CGLIB代理 -->
-    <property name="proxyTargetClass" value="true"/>
+```xml
+<!-- 指定使用CGLIB代理 -->
+<property name="proxyTargetClass" value="true"/>
+```
 
 或者使用optimize属性也可以达到同样的效果：
 
-    <!-- 指定使用CGLIB代理 -->
-    <property name="optimize" value="true"/>
+```xml
+<!-- 指定使用CGLIB代理 -->
+<property name="optimize" value="true"/>
+```
 
 示例，略。
 
@@ -3555,103 +3943,113 @@ NameMatchMethodPointcutAdvisor，即名称匹配方法切入点顾问。容器�
 
 主业务接口与目标类：
 
-    package tavish.bit.aop.nameMatchMethodPointcutAdvisor;
+```java
+package tavish.bit.aop.nameMatchMethodPointcutAdvisor;
 
-    public interface ISomeService {
-        void doFirst();
-        void doSecond();
-        void doThird();
+public interface ISomeService {
+    void doFirst();
+    void doSecond();
+    void doThird();
+}
+
+package tavish.bit.aop.nameMatchMethodPointcutAdvisor;
+
+public class SomeServiceImpl implements ISomeService {
+
+    @Override
+    public void doFirst() {
+        System.out.println("执行主业务逻辑doFirst()");
     }
 
-    package tavish.bit.aop.nameMatchMethodPointcutAdvisor;
-
-    public class SomeServiceImpl implements ISomeService {
-
-        @Override
-        public void doFirst() {
-            System.out.println("执行主业务逻辑doFirst()");
-        }
-
-        @Override
-        public void doSecond() {
-            System.out.println("执行主业务逻辑doSecond()");
-        }
-
-        @Override
-        public void doThird() {
-            System.out.println("执行主业务逻辑doThird()");
-        }
+    @Override
+    public void doSecond() {
+        System.out.println("执行主业务逻辑doSecond()");
     }
+
+    @Override
+    public void doThird() {
+        System.out.println("执行主业务逻辑doThird()");
+    }
+}
+```
 
 定义通知：
 
-    package tavish.bit.aop.nameMatchMethodPointcutAdvisor;
+```java
+package tavish.bit.aop.nameMatchMethodPointcutAdvisor;
 
-    import java.lang.reflect.Method;
+import java.lang.reflect.Method;
 
-    import org.springframework.aop.AfterReturningAdvice;
+import org.springframework.aop.AfterReturningAdvice;
 
-    public class MyAfterReturningAdvice implements AfterReturningAdvice {
+public class MyAfterReturningAdvice implements AfterReturningAdvice {
 
-        @Override
-        public void afterReturning(Object returnValue, Method method, Object[] args, Object target) throws Throwable {
-            System.out.println("执行后置通知方法");
-        }
+    @Override
+    public void afterReturning(Object returnValue, Method method, Object[] args, Object target) throws Throwable {
+        System.out.println("执行后置通知方法");
     }
+}
+```
 
 在配置文件中定义顾问：
 
-    <!-- 注册目标对象 -->
-    <bean id="someService" class="tavish.bit.aop.nameMatchMethodPointcutAdvisor.SomeServiceImpl" />
-    
-    <!-- 注册通知 advice-->
-    <bean id="myAdvice" class="tavish.bit.aop.nameMatchMethodPointcutAdvisor.MyAfterReturningAdvice"/>
-    
-    <!-- 注册顾问 advisor-->
-    <bean id="myAdvisor" class="org.springframework.aop.support.NameMatchMethodPointcutAdvisor">
-        <property name="advice" ref="myAdvice" />
-        <!-- <property name="mappedName" value="doFirst" /> -->
-        <!-- <property name="mappedNames" value="doFirst, doSecond" /> -->
-        <!-- 匹配的是简单方法名 -->
-        <property name="mappedNames" value="*ir*" />
-    </bean>
-    
-    <!-- 生成代理对象 -->
-    <bean id="serviceProxy" class="org.springframework.aop.framework.ProxyFactoryBean">
-        <!-- 指定要生成代理的目标对象 -->
-        <property name="target" ref="someService"/>
-        <!-- 指定切面 -->
-        <property name="interceptorNames" value="myAdvisor"/>
-    </bean>
+```xml
+<!-- 注册目标对象 -->
+<bean id="someService" class="tavish.bit.aop.nameMatchMethodPointcutAdvisor.SomeServiceImpl" />
+
+<!-- 注册通知 advice-->
+<bean id="myAdvice" class="tavish.bit.aop.nameMatchMethodPointcutAdvisor.MyAfterReturningAdvice"/>
+
+<!-- 注册顾问 advisor-->
+<bean id="myAdvisor" class="org.springframework.aop.support.NameMatchMethodPointcutAdvisor">
+    <property name="advice" ref="myAdvice" />
+    <!-- <property name="mappedName" value="doFirst" /> -->
+    <!-- <property name="mappedNames" value="doFirst, doSecond" /> -->
+    <!-- 匹配的是简单方法名 -->
+    <property name="mappedNames" value="*ir*" />
+</bean>
+
+<!-- 生成代理对象 -->
+<bean id="serviceProxy" class="org.springframework.aop.framework.ProxyFactoryBean">
+    <!-- 指定要生成代理的目标对象 -->
+    <property name="target" ref="someService"/>
+    <!-- 指定切面 -->
+    <property name="interceptorNames" value="myAdvisor"/>
+</bean>
+```
 
 测试：
 
-    @Test
-    public void test01() {
-        String configLocation = "tavish/bit/aop/nameMatchMethodPointcutAdvisor/applicationContext.xml";
-        
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
-        
-        ISomeService service = (ISomeService) context.getBean("serviceProxy");
-        
-        service.doFirst();
-        System.out.println("=================");
-        service.doSecond();
-        System.out.println("=================");
-        service.doThird();
-        
-        ((ClassPathXmlApplicationContext)context).close();
-    }
+```java
+@Test
+public void test01() {
+    String configLocation = "tavish/bit/aop/nameMatchMethodPointcutAdvisor/applicationContext.xml";
+    
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
+    
+    ISomeService service = (ISomeService) context.getBean("serviceProxy");
+    
+    service.doFirst();
+    System.out.println("=================");
+    service.doSecond();
+    System.out.println("=================");
+    service.doThird();
+    
+    ((ClassPathXmlApplicationContext)context).close();
+}
+```
 
 输出：
 
-    执行主业务逻辑doFirst()
-    执行后置通知方法
-    =================
-    执行主业务逻辑doSecond()
-    =================
-    执行主业务逻辑doThird()
-    执行后置通知方法
+```text
+执行主业务逻辑doFirst()
+执行后置通知方法
+=================
+执行主业务逻辑doSecond()
+=================
+执行主业务逻辑doThird()
+执行后置通知方法
+```
 
 #### 3.3.2 正则表达式匹配方法切入点顾问
 
@@ -3663,26 +4061,28 @@ RegexpMethodPointcutAdvisor，即正则表达式方法顾问。容器可根据�
 
 配置文件：
 
-    <!-- 注册目标对象 -->
-    <bean id="someService" class="tavish.bit.aop.regexpMethodPointcutAdvisor.SomeServiceImpl" />
-    
-    <!-- 注册通知 advice-->
-    <bean id="myAdvice" class="tavish.bit.aop.regexpMethodPointcutAdvisor.MyAfterReturningAdvice"/>
-    
-    <!-- 注册顾问 advisor-->
-    <bean id="myAdvisor" class="org.springframework.aop.support.RegexpMethodPointcutAdvisor">
-        <property name="advice" ref="myAdvice" />
-        <!-- 匹配的是全限定方法名 -->
-        <property name="pattern" value=".*ir.*" />
-    </bean>
-    
-    <!-- 生成代理对象 -->
-    <bean id="serviceProxy" class="org.springframework.aop.framework.ProxyFactoryBean">
-        <!-- 指定要生成代理的目标对象 -->
-        <property name="target" ref="someService"/>
-        <!-- 指定切面 -->
-        <property name="interceptorNames" value="myAdvisor"/>
-    </bean>
+```xml
+<!-- 注册目标对象 -->
+<bean id="someService" class="tavish.bit.aop.regexpMethodPointcutAdvisor.SomeServiceImpl" />
+
+<!-- 注册通知 advice-->
+<bean id="myAdvice" class="tavish.bit.aop.regexpMethodPointcutAdvisor.MyAfterReturningAdvice"/>
+
+<!-- 注册顾问 advisor-->
+<bean id="myAdvisor" class="org.springframework.aop.support.RegexpMethodPointcutAdvisor">
+    <property name="advice" ref="myAdvice" />
+    <!-- 匹配的是全限定方法名 -->
+    <property name="pattern" value=".*ir.*" />
+</bean>
+
+<!-- 生成代理对象 -->
+<bean id="serviceProxy" class="org.springframework.aop.framework.ProxyFactoryBean">
+    <!-- 指定要生成代理的目标对象 -->
+    <property name="target" ref="someService"/>
+    <!-- 指定切面 -->
+    <property name="interceptorNames" value="myAdvisor"/>
+</bean>
+```
 
 当使用patterns时，value写法：regex1,regex2,...
 当使用pattern时，value写法：regex1|regex2|...
@@ -3718,63 +4118,69 @@ DefaultAdvisorAutoProxyCreator代理的生成方式是，将所有的目标对�
 
 配置文件：
 
-    <!-- 注册目标对象 -->
-    <bean id="someService" class="tavish.bit.aop.autoProxy.defaultAdvisorAutoProxyCreator.SomeServiceImpl" />
-    <bean id="someService2" class="tavish.bit.aop.autoProxy.defaultAdvisorAutoProxyCreator.SomeServiceImpl" />
-    
-    <!-- 注册通知 advice-->
-    <bean id="myAdvice" class="tavish.bit.aop.autoProxy.defaultAdvisorAutoProxyCreator.MyAfterReturningAdvice"/>
-    
-    <!-- 注册顾问 advisor-->
-    <bean id="myAdvisor" class="org.springframework.aop.support.NameMatchMethodPointcutAdvisor">
-        <property name="advice" ref="myAdvice" />
-        <property name="mappedName" value="doFirst" />
-    </bean>
-    
-    <!-- 注册默认Advisor自动代理生成器 -->
-    <bean class="org.springframework.aop.framework.autoproxy.DefaultAdvisorAutoProxyCreator" />
+```xml
+<!-- 注册目标对象 -->
+<bean id="someService" class="tavish.bit.aop.autoProxy.defaultAdvisorAutoProxyCreator.SomeServiceImpl" />
+<bean id="someService2" class="tavish.bit.aop.autoProxy.defaultAdvisorAutoProxyCreator.SomeServiceImpl" />
+
+<!-- 注册通知 advice-->
+<bean id="myAdvice" class="tavish.bit.aop.autoProxy.defaultAdvisorAutoProxyCreator.MyAfterReturningAdvice"/>
+
+<!-- 注册顾问 advisor-->
+<bean id="myAdvisor" class="org.springframework.aop.support.NameMatchMethodPointcutAdvisor">
+    <property name="advice" ref="myAdvice" />
+    <property name="mappedName" value="doFirst" />
+</bean>
+
+<!-- 注册默认Advisor自动代理生成器 -->
+<bean class="org.springframework.aop.framework.autoproxy.DefaultAdvisorAutoProxyCreator" />
+```
 
 测试方法：
 
-    @Test
-    public void test01() {
-        String configLocation = "tavish/bit/aop/autoProxy/defaultAdvisorAutoProxyCreator/applicationContext.xml";
-        
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
-        
-        ISomeService service = (ISomeService) context.getBean("someService");
-        ISomeService service2 = (ISomeService) context.getBean("someService2");
-        
-        service.doFirst();
-        System.out.println("=================");
-        service.doSecond();
-        System.out.println("=================");
-        service.doThird();
-        System.out.println("*******************");
-        service2.doFirst();
-        System.out.println("=================");
-        service2.doSecond();
-        System.out.println("=================");
-        service2.doThird();
-        
-        ((ClassPathXmlApplicationContext)context).close();
-    }
+```java
+@Test
+public void test01() {
+    String configLocation = "tavish/bit/aop/autoProxy/defaultAdvisorAutoProxyCreator/applicationContext.xml";
+    
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
+    
+    ISomeService service = (ISomeService) context.getBean("someService");
+    ISomeService service2 = (ISomeService) context.getBean("someService2");
+    
+    service.doFirst();
+    System.out.println("=================");
+    service.doSecond();
+    System.out.println("=================");
+    service.doThird();
+    System.out.println("*******************");
+    service2.doFirst();
+    System.out.println("=================");
+    service2.doSecond();
+    System.out.println("=================");
+    service2.doThird();
+    
+    ((ClassPathXmlApplicationContext)context).close();
+}
+```
 
 输出：
 
-    执行主业务逻辑doFirst()
-    执行后置通知方法
-    =================
-    执行主业务逻辑doSecond()
-    =================
-    执行主业务逻辑doThird()
-    *******************
-    执行主业务逻辑doFirst()
-    执行后置通知方法
-    =================
-    执行主业务逻辑doSecond()
-    =================
-    执行主业务逻辑doThird()
+```text
+执行主业务逻辑doFirst()
+执行后置通知方法
+=================
+执行主业务逻辑doSecond()
+=================
+执行主业务逻辑doThird()
+*******************
+执行主业务逻辑doFirst()
+执行后置通知方法
+=================
+执行主业务逻辑doSecond()
+=================
+执行主业务逻辑doThird()
+```
 
 #### 3.5.2 Bean名称自动代理生成器
 
@@ -3788,67 +4194,73 @@ DefaultAdvisorAutoProxyCreator会为每一个目标对象织入所有匹配的Ad
 
 配置文件：
 
-    <!-- 注册目标对象 -->
-    <bean id="someService" class="tavish.bit.aop.autoProxy.beanNameAutoProxyCreator.SomeServiceImpl" />
-    <bean id="someService2" class="tavish.bit.aop.autoProxy.beanNameAutoProxyCreator.SomeServiceImpl" />
-    
-    <!-- 注册通知 advice-->
-    <bean id="myAdvice" class="tavish.bit.aop.autoProxy.beanNameAutoProxyCreator.MyAfterReturningAdvice"/>
-    
-    <!-- 注册顾问 advisor-->
-    <bean id="myAdvisor" class="org.springframework.aop.support.NameMatchMethodPointcutAdvisor">
-        <property name="advice" ref="myAdvice" />
-        <property name="mappedName" value="doFirst" />
-    </bean>
-    
-    <!-- 注册Bean名称自动代理生成器 -->
-    <bean class="org.springframework.aop.framework.autoproxy.BeanNameAutoProxyCreator" >
-        <!-- 只增强someService，不增强someService2 -->
-        <property name="beanNames" value="someService" />
-        <!-- 指定切面 -->
-        <property name="interceptorNames" value="myAdvisor" />
-    </bean>
+```xml
+<!-- 注册目标对象 -->
+<bean id="someService" class="tavish.bit.aop.autoProxy.beanNameAutoProxyCreator.SomeServiceImpl" />
+<bean id="someService2" class="tavish.bit.aop.autoProxy.beanNameAutoProxyCreator.SomeServiceImpl" />
+
+<!-- 注册通知 advice-->
+<bean id="myAdvice" class="tavish.bit.aop.autoProxy.beanNameAutoProxyCreator.MyAfterReturningAdvice"/>
+
+<!-- 注册顾问 advisor-->
+<bean id="myAdvisor" class="org.springframework.aop.support.NameMatchMethodPointcutAdvisor">
+    <property name="advice" ref="myAdvice" />
+    <property name="mappedName" value="doFirst" />
+</bean>
+
+<!-- 注册Bean名称自动代理生成器 -->
+<bean class="org.springframework.aop.framework.autoproxy.BeanNameAutoProxyCreator" >
+    <!-- 只增强someService，不增强someService2 -->
+    <property name="beanNames" value="someService" />
+    <!-- 指定切面 -->
+    <property name="interceptorNames" value="myAdvisor" />
+</bean>
+```
 
 测试方法：
 
-    @Test
-    public void test01() {
-        String configLocation = "tavish/bit/aop/autoProxy/beanNameAutoProxyCreator/applicationContext.xml";
-        
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
-        
-        ISomeService service = (ISomeService) context.getBean("someService");
-        ISomeService service2 = (ISomeService) context.getBean("someService2");
-        
-        service.doFirst();
-        System.out.println("=================");
-        service.doSecond();
-        System.out.println("=================");
-        service.doThird();
-        System.out.println("*******************");
-        service2.doFirst();
-        System.out.println("=================");
-        service2.doSecond();
-        System.out.println("=================");
-        service2.doThird();
-        
-        ((ClassPathXmlApplicationContext)context).close();
-    }
+```java
+@Test
+public void test01() {
+    String configLocation = "tavish/bit/aop/autoProxy/beanNameAutoProxyCreator/applicationContext.xml";
+    
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
+    
+    ISomeService service = (ISomeService) context.getBean("someService");
+    ISomeService service2 = (ISomeService) context.getBean("someService2");
+    
+    service.doFirst();
+    System.out.println("=================");
+    service.doSecond();
+    System.out.println("=================");
+    service.doThird();
+    System.out.println("*******************");
+    service2.doFirst();
+    System.out.println("=================");
+    service2.doSecond();
+    System.out.println("=================");
+    service2.doThird();
+    
+    ((ClassPathXmlApplicationContext)context).close();
+}
+```
 
 输出：
 
-    执行主业务逻辑doFirst()
-    执行后置通知方法
-    =================
-    执行主业务逻辑doSecond()
-    =================
-    执行主业务逻辑doThird()
-    *******************
-    执行主业务逻辑doFirst()
-    =================
-    执行主业务逻辑doSecond()
-    =================
-    执行主业务逻辑doThird()
+```text
+执行主业务逻辑doFirst()
+执行后置通知方法
+=================
+执行主业务逻辑doSecond()
+=================
+执行主业务逻辑doThird()
+*******************
+执行主业务逻辑doFirst()
+=================
+执行主业务逻辑doSecond()
+=================
+执行主业务逻辑doThird()
+```
 
 ### 3.6 AspectJ对AOP的实现
 
@@ -3899,55 +4311,81 @@ execution([modifiers-pattern] ret-type-pattern [declaring-type-pattern] name-pat
 
 1.指定切入点为：任意公共方法。
 
-    execution(public * *(..))
+```text
+execution(public * *(..))
+```
 
 2.指定切入点为：任何一个以“set”开始的方法。
 
-    execution(* set *(..))
+```text
+execution(* set*(..))
+```
 
 3.指定切入点为：定义在service包里的任意类的任意方法。
 
-    execution(* com.xyz.service.*.*(..))
+```text
+execution(* com.xyz.service.*.*(..))
+```
 
 4.指定切入点为：定义在service包或者子包里的任意类的任意方法。“..”出现在类名中时，后面必须跟“*”，表示包、子包下的所有类。
 
-    execution(* com.xyz.service..*.*(..))
+```text
+execution(* com.xyz.service..*.*(..))
+```
 
 5.指定只有一级包下的IUserSerivce下的doSome()方法为切入点。
 
-    execution(* *.IUserService.doSome())
+```text
+execution(* *.IUserService.doSome())
+```
 
 6.指定所有包下的IUserSerivce下的doSome()方法为切入点。
 
-    execution(* *..IUserService.doSome())
+```text
+execution(* *..IUserService.doSome())
+```
 
 7.指定切入点为： IAccountService 接口中的任意方法。
 
-    execution(* com.xyz.service.IAccountService.*(..))
+```text
+execution(* com.xyz.service.IAccountService.*(..))
+```
 
 8.指定切入点为： IAccountService 若为接口，则为接口中的任意方法及其所有实现类中的任意方法；若为类，则为该类及其子类中的任意方法。
 
-    execution(* com.xyz.service.IAccountService+.*(..))
+```text
+execution(* com.xyz.service.IAccountService+.*(..))
+```
 
-9.指定切入点为：所有的joke(String,int)方法，且joke()方法的第一个参数是String，第二个参数是int。如果方法中的参数类型是java.lang包下的类，可以直接使用类名，否则必须使用全限定类名，如joke( java.util.List, int)。
+9.指定切入点为：所有的joke(String,int)方法，且joke()方法的第一个参数是String，第二个参数是int。如果方法中的参数类型是java.lang包下的类，可以直接使用类名，否则必须使用全限定类名，如joke(java.util.List, int)。
 
-    execution(* joke(String,int)))
+```text
+execution(* joke(String,int)))
+```
 
 10.指定切入点为：所有的joke()方法，该方法第一个参数为String，第二个参数可以是任意类型，如joke(String s1,String s2)和joke(String s1,double d2)都是，但joke(String s1,double d2,String s3)不是。
 
-    execution(* joke(String,*))
+```text
+execution(* joke(String,*))
+```
 
 11.指定切入点为：所有的joke()方法，该方法第 一个参数为String，后面可以有任意个参数且参数类型不限，如joke(String s1)、joke(String s1,String s2)和joke(String s1,double d2,String s3)都是。
 
-    execution(* joke(String,..))
+```text
+execution(* joke(String,..))
+```
 
 12.指定切入点为：所有的joke()方法，方法拥有一个参数，且参数是Object类型。 joke(Object ob)是，但，joke(String s)与joke(User u)均不是。
 
-    execution(* joke(Object))
+```text
+execution(* joke(Object))
+```
 
 13.指定切入点为：所有的joke()方法，方法拥有一个参数，且参数是Object类型或该类的子类。不仅joke(Object ob)是，joke(String s)和joke(User u)也是。
 
-    execution(* joke(Object+))
+```text
+execution(* joke(Object+))
+```
 
 #### 3.6.3 AspectJ的开发环境
 
@@ -3958,16 +4396,18 @@ execution([modifiers-pattern] ret-type-pattern [declaring-type-pattern] name-pat
 
 步骤二：引入AOP约束
 
-    <?xml version="1.0" encoding="UTF-8"?>
-    <beans xmlns="http://www.springframework.org/schema/beans"
-        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xmlns:aop="http://www.springframework.org/schema/aop" xsi:schemaLocation="
-            http://www.springframework.org/schema/beans 
-            http://www.springframework.org/schema/beans/spring-beans.xsd
-            http://www.springframework.org/schema/aop 
-            http://www.springframework.org/schema/aop/spring-aop.xsd"> 
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:aop="http://www.springframework.org/schema/aop" xsi:schemaLocation="
+        http://www.springframework.org/schema/beans 
+        http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/aop 
+        http://www.springframework.org/schema/aop/spring-aop.xsd"> 
 
-    </beans>
+</beans>
+```
 
 在前面Spring实现AOP时，并未引入AOP的约束，而在AspectJ实现AOP时，才提出要引入AOP的约束。说明，配置文件中使用的AOP约束中的标签，均是AspectJ框架使用的，而非Spring框架本身在实现AOP时使用的。
 
@@ -3993,106 +4433,118 @@ execution([modifiers-pattern] ret-type-pattern [declaring-type-pattern] name-pat
 
 主业务接口及目标类：
 
-    package tavish.bit.aspectj;
+```java
+package tavish.bit.aspectj;
 
-    public interface ISomeService {
-        void doFirst();
-        String doSecond();
-        void doThird();
+public interface ISomeService {
+    void doFirst();
+    String doSecond();
+    void doThird();
+}
+```
+
+```java
+package tavish.bit.aspectj;
+
+public class SomeServiceImpl implements ISomeService {
+
+    @Override
+    public void doFirst() {
+        System.out.println("执行主业务逻辑doFirst()");
     }
 
-    package tavish.bit.aspectj;
-
-    public class SomeServiceImpl implements ISomeService {
-
-        @Override
-        public void doFirst() {
-            System.out.println("执行主业务逻辑doFirst()");
-        }
-
-        @Override
-        public String doSecond() {
-            System.out.println("执行主业务逻辑doSecond()");
-            return "abcde";
-        }
-
-        @Override
-        public void doThird() {
-            System.out.println("执行主业务逻辑doThird()");
-        }
+    @Override
+    public String doSecond() {
+        System.out.println("执行主业务逻辑doSecond()");
+        return "abcde";
     }
+
+    @Override
+    public void doThird() {
+        System.out.println("执行主业务逻辑doThird()");
+    }
+}
+```
 
 POJO类：
 
-    package tavish.bit.aspectj;
+```java
+package tavish.bit.aspectj;
 
-    import org.aspectj.lang.JoinPoint;
-    import org.aspectj.lang.annotation.Aspect;
-    import org.aspectj.lang.annotation.Before;
+import org.aspectj.lang.JoinPoint;
+import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.annotation.Before;
 
-    @Aspect // 表示当前类为切面
-    public class MyAspect {
-        
-        @Before("execution(* *..ISomeService.doFirst(..))")
-        public void before() {
-            System.out.println("前置通知方法");
-        }
-        
-        // 附带JoinPoint参数的前置通知方法
-        @Before("execution(* *..ISomeService.doFirst(..))")
-        public void before(JoinPoint jp) {
-            System.out.println("前置通知方法() jp = " + jp);
-        }
+@Aspect // 表示当前类为切面
+public class MyAspect {
+    
+    @Before("execution(* *..ISomeService.doFirst(..))")
+    public void before() {
+        System.out.println("前置通知方法");
     }
+    
+    // 附带JoinPoint参数的前置通知方法
+    @Before("execution(* *..ISomeService.doFirst(..))")
+    public void before(JoinPoint jp) {
+        System.out.println("前置通知方法() jp = " + jp);
+    }
+}
+```
 
 配置文件：
 
-    <?xml version="1.0" encoding="UTF-8"?>
-    <beans
-        xmlns="http://www.springframework.org/schema/beans"
-        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xmlns:aop="http://www.springframework.org/schema/aop"
-        xsi:schemaLocation="
-                http://www.springframework.org/schema/beans 
-                http://www.springframework.org/schema/beans/spring-beans.xsd
-                http://www.springframework.org/schema/aop 
-                http://www.springframework.org/schema/aop/spring-aop.xsd">
-                
-        <bean id="someService" class="tavish.bit.aspectj.SomeServiceImpl" />
-        
-        <!-- 注册切面 -->
-        <bean id="myAspect" class="tavish.bit.aspectj.MyAspect" />
-        
-        <!-- 使用AspectJ的自动代理 -->
-        <aop:aspectj-autoproxy />
-    </beans>
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans
+    xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:aop="http://www.springframework.org/schema/aop"
+    xsi:schemaLocation="
+            http://www.springframework.org/schema/beans 
+            http://www.springframework.org/schema/beans/spring-beans.xsd
+            http://www.springframework.org/schema/aop 
+            http://www.springframework.org/schema/aop/spring-aop.xsd">
+            
+    <bean id="someService" class="tavish.bit.aspectj.SomeServiceImpl" />
+    
+    <!-- 注册切面 -->
+    <bean id="myAspect" class="tavish.bit.aspectj.MyAspect" />
+    
+    <!-- 使用AspectJ的自动代理 -->
+    <aop:aspectj-autoproxy />
+</beans>
+```
 
 测试方法：
 
-    @Test
-    public void test01() {
-        String configLocation = "tavish/bit/aspectj/applicationContext.xml";
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
-        ISomeService service = (ISomeService) context.getBean("someService");
-        service.doFirst();
-        System.out.println("-----------");
-        String result = service.doSecond();
-        System.out.println("result = " + result);
-        System.out.println("-----------");
-        service.doThird();
-        ((ClassPathXmlApplicationContext)context).close();
-    }
+```java
+@Test
+public void test01() {
+    String configLocation = "tavish/bit/aspectj/applicationContext.xml";
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
+    ISomeService service = (ISomeService) context.getBean("someService");
+    service.doFirst();
+    System.out.println("-----------");
+    String result = service.doSecond();
+    System.out.println("result = " + result);
+    System.out.println("-----------");
+    service.doThird();
+    ((ClassPathXmlApplicationContext)context).close();
+}
+```
 
 输出：
 
-    前置通知方法
-    前置通知方法() jp = execution(void tavish.bit.aspectj.ISomeService.doFirst())
-    执行主业务逻辑doFirst()
-    -----------
-    执行主业务逻辑doSecond()
-    result = abcde
-    -----------
-    执行主业务逻辑doThird()
+```text
+前置通知方法
+前置通知方法() jp = execution(void tavish.bit.aspectj.ISomeService.doFirst())
+执行主业务逻辑doFirst()
+-----------
+执行主业务逻辑doSecond()
+result = abcde
+-----------
+执行主业务逻辑doThird()
+```
 
 *可以看到jp就是我们的切入点表达式。*
 
@@ -4104,32 +4556,36 @@ POJO类：
 
 POJO类中定义：
 
-    // 后置通知
-    @AfterReturning("execution(* *..ISomeService.doSecond(..))")
-    public void afterReturning() {
-        System.out.println("后置通知方法");
-    }
-    
-    // 后置通知，获取返回值
-    @AfterReturning(value="execution(* *..ISomeService.doSecond(..))", returning="result")
-    public void afterReturning(Object result) {
-        System.out.println("后置通知方法 result = " + result);
-    }
+```java
+// 后置通知
+@AfterReturning("execution(* *..ISomeService.doSecond(..))")
+public void afterReturning() {
+    System.out.println("后置通知方法");
+}
+
+// 后置通知，获取返回值
+@AfterReturning(value="execution(* *..ISomeService.doSecond(..))", returning="result")
+public void afterReturning(Object result) {
+    System.out.println("后置通知方法 result = " + result);
+}
+```
 
 测试方法及其他同上一节，略。
 
 输出：
 
-    前置通知方法() jp = execution(void tavish.bit.aspectj.ISomeService.doFirst())
-    前置通知方法
-    执行主业务逻辑doFirst()
-    -----------
-    执行主业务逻辑doSecond()
-    后置通知方法
-    后置通知方法 result = abcde
-    result = abcde
-    -----------
-    执行主业务逻辑doThird()
+```text
+前置通知方法() jp = execution(void tavish.bit.aspectj.ISomeService.doFirst())
+前置通知方法
+执行主业务逻辑doFirst()
+-----------
+执行主业务逻辑doSecond()
+后置通知方法
+后置通知方法 result = abcde
+result = abcde
+-----------
+执行主业务逻辑doThird()
+```
 
 ##### 3.6.4.4 @Around环绕通知
 
@@ -4137,30 +4593,34 @@ POJO类中定义：
 
 示例：
 
-    // 环绕通知
-    @Around("execution(* *..ISomeService.doSecond(..))")
-    public Object around(ProceedingJoinPoint pjp) throws Throwable {
-        System.out.println("环绕通知方法，目标方法执行之前");
-        // 执行目标方法
-        Object result = pjp.proceed();
-        System.out.println("环绕通知方法，目标方法执行之后");
-        return ((String) result).toUpperCase();
-    }
+```java
+// 环绕通知
+@Around("execution(* *..ISomeService.doSecond(..))")
+public Object around(ProceedingJoinPoint pjp) throws Throwable {
+    System.out.println("环绕通知方法，目标方法执行之前");
+    // 执行目标方法
+    Object result = pjp.proceed();
+    System.out.println("环绕通知方法，目标方法执行之后");
+    return ((String) result).toUpperCase();
+}
+```
 
 输出：
 
-    前置通知方法() jp = execution(void tavish.bit.aspectj.ISomeService.doFirst())
-    前置通知方法
-    执行主业务逻辑doFirst()
-    -----------
-    环绕通知方法，目标方法执行之前
-    执行主业务逻辑doSecond()
-    环绕通知方法，目标方法执行之后
-    后置通知方法 result = ABCDE
-    后置通知方法
-    result = ABCDE
-    -----------
-    执行主业务逻辑doThird()
+```text
+前置通知方法() jp = execution(void tavish.bit.aspectj.ISomeService.doFirst())
+前置通知方法
+执行主业务逻辑doFirst()
+-----------
+环绕通知方法，目标方法执行之前
+执行主业务逻辑doSecond()
+环绕通知方法，目标方法执行之后
+后置通知方法 result = ABCDE
+后置通知方法
+result = ABCDE
+-----------
+执行主业务逻辑doThird()
+```
 
 ##### 3.6.4.5 @AfterThrowing异常通知
 
@@ -4170,60 +4630,68 @@ POJO类中定义：
 
 修改目标类方法，使其产生异常：
 
-    @Override
-    public void doThird() {
-        System.out.println("执行主业务逻辑doThird()");
-        System.out.println(3 / 0);
-    }
+```java
+@Override
+public void doThird() {
+    System.out.println("执行主业务逻辑doThird()");
+    System.out.println(3 / 0);
+}
+```
 
 定义异常通知：
 
-    // 异常通知
-    @AfterThrowing("execution(* *..ISomeService.doThird(..))")
-    public void afterThrowing() {
-        System.out.println("异常通知方法");
-    }
+```java
+// 异常通知
+@AfterThrowing("execution(* *..ISomeService.doThird(..))")
+public void afterThrowing() {
+    System.out.println("异常通知方法");
+}
 
-    @AfterThrowing(value="execution(* *..ISomeService.doThird(..))",throwing="ex")
-    public void afterThrowing(Exception ex) {
-        System.out.println("异常通知方法 ex = " + ex.getMessage());
-    }
+@AfterThrowing(value="execution(* *..ISomeService.doThird(..))",throwing="ex")
+public void afterThrowing(Exception ex) {
+    System.out.println("异常通知方法 ex = " + ex.getMessage());
+}
+```
 
 测试方法：
 
-    @Test
-    public void test01() {
-        String configLocation = "tavish/bit/aspectj/applicationContext.xml";
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
-        ISomeService service = (ISomeService) context.getBean("someService");
-        service.doFirst();
-        System.out.println("-----------");
-        String result = service.doSecond();
-        System.out.println("result = " + result);
-        System.out.println("-----------");
-        try {
-            service.doThird();
-        } catch (Exception e) {
-        }
-        ((ClassPathXmlApplicationContext)context).close();
+```java
+@Test
+public void test01() {
+    String configLocation = "tavish/bit/aspectj/applicationContext.xml";
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
+    ISomeService service = (ISomeService) context.getBean("someService");
+    service.doFirst();
+    System.out.println("-----------");
+    String result = service.doSecond();
+    System.out.println("result = " + result);
+    System.out.println("-----------");
+    try {
+        service.doThird();
+    } catch (Exception e) {
     }
+    ((ClassPathXmlApplicationContext)context).close();
+}
+```
 
 输出：
 
-    前置通知方法() jp = execution(void tavish.bit.aspectj.ISomeService.doFirst())
-    前置通知方法
-    执行主业务逻辑doFirst()
-    -----------
-    环绕通知方法，目标方法执行之前
-    执行主业务逻辑doSecond()
-    环绕通知方法，目标方法执行之后
-    后置通知方法 result = ABCDE
-    后置通知方法
-    result = ABCDE
-    -----------
-    执行主业务逻辑doThird()
-    异常通知方法
-    异常通知方法 ex = / by zero
+```text
+前置通知方法() jp = execution(void tavish.bit.aspectj.ISomeService.doFirst())
+前置通知方法
+执行主业务逻辑doFirst()
+-----------
+环绕通知方法，目标方法执行之前
+执行主业务逻辑doSecond()
+环绕通知方法，目标方法执行之后
+后置通知方法 result = ABCDE
+后置通知方法
+result = ABCDE
+-----------
+执行主业务逻辑doThird()
+异常通知方法
+异常通知方法 ex = / by zero
+```
 
 ##### 3.6.4.6 @After最终通知
 
@@ -4231,29 +4699,33 @@ POJO类中定义：
 
 示例：
 
-    // 最终通知
-    @After("execution(* *..ISomeService.doThird(..))")
-    public void after() {
-        System.out.println("最终通知方法");
-    }
+```java
+// 最终通知
+@After("execution(* *..ISomeService.doThird(..))")
+public void after() {
+    System.out.println("最终通知方法");
+}
+```
 
 输出：
 
-    前置通知方法() jp = execution(void tavish.bit.aspectj.ISomeService.doFirst())
-    前置通知方法
-    执行主业务逻辑doFirst()
-    -----------
-    环绕通知方法，目标方法执行之前
-    执行主业务逻辑doSecond()
-    环绕通知方法，目标方法执行之后
-    后置通知方法 result = ABCDE
-    后置通知方法
-    result = ABCDE
-    -----------
-    执行主业务逻辑doThird()
-    最终通知方法
-    异常通知方法 ex = / by zero
-    异常通知方法
+```text
+前置通知方法() jp = execution(void tavish.bit.aspectj.ISomeService.doFirst())
+前置通知方法
+执行主业务逻辑doFirst()
+-----------
+环绕通知方法，目标方法执行之前
+执行主业务逻辑doSecond()
+环绕通知方法，目标方法执行之后
+后置通知方法 result = ABCDE
+后置通知方法
+result = ABCDE
+-----------
+执行主业务逻辑doThird()
+最终通知方法
+异常通知方法 ex = / by zero
+异常通知方法
+```
 
 ##### 3.6.4.7 @Pointcut定义切入点
 
@@ -4265,48 +4737,198 @@ POJO类中定义：
 
 定义切入点：
 
-    // 定义切入点
-    @Pointcut("execution(* *..ISomeService.doThird(..))")
-    private void doThirdPointcut() {
-        
-    }
+```java
+// 定义切入点
+@Pointcut("execution(* *..ISomeService.doThird(..))")
+private void doThirdPointcut() {
+    
+}
+```
 
 使用切入点：
 
-    // 异常通知
+```java
+// 异常通知
+@AfterThrowing("doThirdPointcut()")
+public void afterThrowing() {
+    System.out.println("异常通知方法");
+}
+
+@AfterThrowing(value="doThirdPointcut()",throwing="ex")
+public void afterThrowing(Exception ex) {
+    System.out.println("异常通知方法 ex = " + ex.getMessage());
+}
+
+// 最终通知
+@After("doThirdPointcut()")
+public void after() {
+    System.out.println("最终通知方法");
+}
+```
+
+测试输出：
+
+```text
+前置通知方法
+前置通知方法() jp = execution(void tavish.bit.aspectj.ISomeService.doFirst())
+执行主业务逻辑doFirst()
+-----------
+环绕通知方法，目标方法执行之前
+执行主业务逻辑doSecond()
+环绕通知方法，目标方法执行之后
+后置通知方法
+后置通知方法 result = ABCDE
+result = ABCDE
+-----------
+执行主业务逻辑doThird()
+最终通知方法
+异常通知方法 ex = / by zero
+异常通知方法
+```
+
+##### 3.6.4.8 全注解零XML配置
+
+定义Config类：
+
+```java
+@Configuration
+@ComponentScan("pers.tavish.aop")
+public class Config {
+
+}
+```
+
+定义接口：
+
+```java
+public interface ISomeService {
+    void doFirst();
+    String doSecond();
+    void doThird();
+}
+```
+
+定义实现类：
+
+```java
+@Component
+public class ISomeServiceImpl implements ISomeService {
+
+    @Override
+    public void doFirst() {
+        System.out.println("执行主业务逻辑doFirst()");
+    }
+
+    @Override
+    public String doSecond() {
+        System.out.println("执行主业务逻辑doSecond()");
+        return "abcde";
+    }
+
+    @Override
+    public void doThird() {
+        System.out.println("执行主业务逻辑doThird()");
+        System.out.println(3 / 0);
+    }
+}
+```
+
+定义切面：
+
+```java
+@Aspect
+@Component
+@EnableAspectJAutoProxy
+public class MyAspect {
+
+    @Before("execution(* *..ISomeService.doFirst(..))")
+    public void before() {
+        System.out.println("前置通知方法");
+    }
+
+    @Before("execution(* *..ISomeService.doFirst(..))")
+    public void before(JoinPoint jp) {
+        System.out.println("前置通知方法() jp = " + jp);
+    }
+
+    @AfterReturning("execution(* *..ISomeService.doSecond(..))")
+    public void afterReturning() {
+        System.out.println("后置通知方法");
+    }
+
+    @AfterReturning(value = "execution(* *..ISomeService.doSecond(..))", returning = "result")
+    public void afterReturning(Object result) {
+        System.out.println("后置通知方法 result = " + result);
+    }
+
+    @Around("execution(* *..ISomeService.doSecond(..))")
+    public Object around(ProceedingJoinPoint pjp) throws Throwable {
+        System.out.println("环绕通知方法，目标方法执行之前");
+        Object result = pjp.proceed();
+        System.out.println("环绕通知方法，目标方法执行之后");
+        return ((String) result).toUpperCase();
+    }
+
     @AfterThrowing("doThirdPointcut()")
     public void afterThrowing() {
         System.out.println("异常通知方法");
     }
 
-    @AfterThrowing(value="doThirdPointcut()",throwing="ex")
+    @AfterThrowing(value = "doThirdPointcut()", throwing = "ex")
     public void afterThrowing(Exception ex) {
         System.out.println("异常通知方法 ex = " + ex.getMessage());
     }
-    
-    // 最终通知
+
     @After("doThirdPointcut()")
     public void after() {
         System.out.println("最终通知方法");
     }
 
-测试输出：
+    @Pointcut("execution(* *..ISomeService.doThird(..))")
+    private void doThirdPointcut() {
 
-    前置通知方法
-    前置通知方法() jp = execution(void tavish.bit.aspectj.ISomeService.doFirst())
-    执行主业务逻辑doFirst()
-    -----------
-    环绕通知方法，目标方法执行之前
-    执行主业务逻辑doSecond()
-    环绕通知方法，目标方法执行之后
-    后置通知方法
-    后置通知方法 result = ABCDE
-    result = ABCDE
-    -----------
-    执行主业务逻辑doThird()
-    最终通知方法
-    异常通知方法 ex = / by zero
-    异常通知方法
+    }
+}
+```
+
+Main类：
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        ApplicationContext context = new AnnotationConfigApplicationContext(Config.class);
+        ISomeService service = context.getBean(ISomeService.class);
+        service.doFirst();
+        System.out.println("-----------");
+        service.doSecond();
+        System.out.println("-----------");
+        try {
+            service.doThird();
+        } catch (Exception e) {
+
+        }
+    }
+}
+```
+
+输出：
+
+```text
+前置通知方法() jp = execution(void pers.tavish.aop.ISomeService.doFirst())
+前置通知方法
+执行主业务逻辑doFirst()
+-----------
+环绕通知方法，目标方法执行之前
+执行主业务逻辑doSecond()
+环绕通知方法，目标方法执行之后
+后置通知方法
+后置通知方法 result = ABCDE
+-----------
+执行主业务逻辑doThird()
+最终通知方法
+异常通知方法 ex = / by zero
+异常通知方法
+```
 
 #### 3.6.5  AspectJ基于XML的AOP实现
 
@@ -4344,235 +4966,271 @@ AspectJ的6种通知的XML标签如下：
 
 定义业务接口与实现类：
 
-    package tavish.bit.aspectj;
+```java
+package tavish.bit.aspectj;
 
-    public interface ISomeService {
-        void doFirst();
-        String doSecond();
-        void doThird();
+public interface ISomeService {
+    void doFirst();
+    String doSecond();
+    void doThird();
+}
+```
+
+```java
+package tavish.bit.aspectj;
+
+public class SomeServiceImpl implements ISomeService {
+
+    @Override
+    public void doFirst() {
+        System.out.println("执行主业务逻辑doFirst()");
     }
 
-    package tavish.bit.aspectj;
-
-    public class SomeServiceImpl implements ISomeService {
-
-        @Override
-        public void doFirst() {
-            System.out.println("执行主业务逻辑doFirst()");
-        }
-
-        @Override
-        public String doSecond() {
-            System.out.println("执行主业务逻辑doSecond()");
-            return "abcde";
-        }
-
-        @Override
-        public void doThird() {
-            System.out.println("执行主业务逻辑doThird()");
-            System.out.println(3 / 0);
-        }
+    @Override
+    public String doSecond() {
+        System.out.println("执行主业务逻辑doSecond()");
+        return "abcde";
     }
+
+    @Override
+    public void doThird() {
+        System.out.println("执行主业务逻辑doThird()");
+        System.out.println(3 / 0);
+    }
+}
+```
 
 定义POJO类：
 
-    // 前置通知
-    public void before() {
-        System.out.println("前置通知方法");
-    }
-    
-    public void before(JoinPoint jp) {
-        System.out.println("前置通知方法() jp = " + jp);
-    }
+```java
+// 前置通知
+public void before() {
+    System.out.println("前置通知方法");
+}
+
+public void before(JoinPoint jp) {
+    System.out.println("前置通知方法() jp = " + jp);
+}
+```
 
 配置文件：
 
-    <bean id="someService" class="tavish.bit.aspectj.SomeServiceImpl" />
-    
-    <!-- 注册切面 -->
-    <bean id="myAspect" class="tavish.bit.aspectj.MyAspect" />
-    
-    <!-- aop配置 -->
-    <aop:config>
-        <!-- 定义切入点 -->
-        <aop:pointcut expression="execution(* *..ISomeService.doFirst(..))" id="doFirstPointcut" />
-        <aop:pointcut expression="execution(* *..ISomeService.doSecond(..))" id="doSecondPointcut" />
-        <aop:pointcut expression="execution(* *..ISomeService.doThird(..))" id="doThirdPointcut" />
-        <!-- 定义具体的织入规则 -->
-        <aop:aspect ref="myAspect">
-            <!-- 前置通知 -->
-            <aop:before method="before" pointcut-ref="doFirstPointcut" />
-            <aop:before method="before(org.aspectj.lang.JoinPoint)" pointcut-ref="doFirstPointcut" />
-        </aop:aspect>
-    </aop:config>
+```xml
+<bean id="someService" class="tavish.bit.aspectj.SomeServiceImpl" />
+
+<!-- 注册切面 -->
+<bean id="myAspect" class="tavish.bit.aspectj.MyAspect" />
+
+<!-- aop配置 -->
+<aop:config>
+    <!-- 定义切入点 -->
+    <aop:pointcut expression="execution(* *..ISomeService.doFirst(..))" id="doFirstPointcut" />
+    <aop:pointcut expression="execution(* *..ISomeService.doSecond(..))" id="doSecondPointcut" />
+    <aop:pointcut expression="execution(* *..ISomeService.doThird(..))" id="doThirdPointcut" />
+    <!-- 定义具体的织入规则 -->
+    <aop:aspect ref="myAspect">
+        <!-- 前置通知 -->
+        <aop:before method="before" pointcut-ref="doFirstPointcut" />
+        <aop:before method="before(org.aspectj.lang.JoinPoint)" pointcut-ref="doFirstPointcut" />
+    </aop:aspect>
+</aop:config>
+```
 
 **选择重载的方法：在method属性赋值时，不仅要放方法名，还要放入方法的参数类型全类名。**
 
 测试方法：
 
-    @Test
-    public void test01() {
-        String configLocation = "tavish/bit/aspectj/applicationContext.xml";
-        ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
-        ISomeService service = (ISomeService) context.getBean("someService");
-        service.doFirst();
-        System.out.println("-----------");
-        String result = service.doSecond();
-        System.out.println("result = " + result);
-        System.out.println("-----------");
-        try {
-            service.doThird();
-        } catch (Exception e) {
-        }
-        ((ClassPathXmlApplicationContext)context).close();
+```java
+@Test
+public void test01() {
+    String configLocation = "tavish/bit/aspectj/applicationContext.xml";
+    ApplicationContext context = new ClassPathXmlApplicationContext(configLocation);
+    ISomeService service = (ISomeService) context.getBean("someService");
+    service.doFirst();
+    System.out.println("-----------");
+    String result = service.doSecond();
+    System.out.println("result = " + result);
+    System.out.println("-----------");
+    try {
+        service.doThird();
+    } catch (Exception e) {
     }
+    ((ClassPathXmlApplicationContext)context).close();
+}
+```
 
 输出：
 
-    前置通知方法
-    前置通知方法() jp = execution(void tavish.bit.aspectj.ISomeService.doFirst())
-    执行主业务逻辑doFirst()
-    -----------
-    执行主业务逻辑doSecond()
-    result = abcde
-    -----------
-    执行主业务逻辑doThird()
+```text
+前置通知方法
+前置通知方法() jp = execution(void tavish.bit.aspectj.ISomeService.doFirst())
+执行主业务逻辑doFirst()
+-----------
+执行主业务逻辑doSecond()
+result = abcde
+-----------
+执行主业务逻辑doThird()
+```
 
 ##### 3.6.5.2 &lt;aop:after-returning/&gt;后置通知
 
 定义POJO类：
 
-    // 后置通知
-    public void afterReturning() {
-        System.out.println("后置通知方法");
-    }
-    
-    // 后置通知，获取返回值
-    public void afterReturning(Object result) {
-        System.out.println("后置通知方法 result = " + result);
-    }
+```java
+// 后置通知
+public void afterReturning() {
+    System.out.println("后置通知方法");
+}
+
+// 后置通知，获取返回值
+public void afterReturning(Object result) {
+    System.out.println("后置通知方法 result = " + result);
+}
+```
 
 配置文件：
 
-    <!-- 后置通知 -->
-    <aop:after-returning method="afterReturning" pointcut-ref="doSecondPointcut"/>
-    <aop:after-returning method="afterReturning(java.lang.Object)" pointcut-ref="doSecondPointcut" returning="result" />
+```xml
+<!-- 后置通知 -->
+<aop:after-returning method="afterReturning" pointcut-ref="doSecondPointcut"/>
+<aop:after-returning method="afterReturning(java.lang.Object)" pointcut-ref="doSecondPointcut" returning="result" />
+```
 
 其中returning="result"的result要与参数方法名（Object result）相同。
 
 输出：
 
-    前置通知方法
-    前置通知方法() jp = execution(void tavish.bit.aspectj.ISomeService.doFirst())
-    执行主业务逻辑doFirst()
-    -----------
-    执行主业务逻辑doSecond()
-    后置通知方法
-    后置通知方法 result = abcde
-    result = abcde
-    -----------
-    执行主业务逻辑doThird()
+```text
+前置通知方法
+前置通知方法() jp = execution(void tavish.bit.aspectj.ISomeService.doFirst())
+执行主业务逻辑doFirst()
+-----------
+执行主业务逻辑doSecond()
+后置通知方法
+后置通知方法 result = abcde
+result = abcde
+-----------
+执行主业务逻辑doThird()
+```
 
 ##### 3.6.5.3 &lt;aop:around/&gt;环绕通知
 
 定义POJO类：
 
-    // 环绕通知
-    public Object around(ProceedingJoinPoint pjp) throws Throwable {
-        System.out.println("环绕通知方法，目标方法执行之前");
-        Object result = pjp.proceed();
-        System.out.println("环绕通知方法，目标方法执行之后");
-        return ((String) result).toUpperCase();
-    }
+```java
+// 环绕通知
+public Object around(ProceedingJoinPoint pjp) throws Throwable {
+    System.out.println("环绕通知方法，目标方法执行之前");
+    Object result = pjp.proceed();
+    System.out.println("环绕通知方法，目标方法执行之后");
+    return ((String) result).toUpperCase();
+}
+```
 
 配置文件：
 
-    <!-- 环绕通知 -->
-    <aop:around method="around" pointcut-ref="doSecondPointcut" />
+```xml
+<!-- 环绕通知 -->
+<aop:around method="around" pointcut-ref="doSecondPointcut" />
+```
 
 输出：
 
-    前置通知方法
-    前置通知方法() jp = execution(void tavish.bit.aspectj.ISomeService.doFirst())
-    执行主业务逻辑doFirst()
-    -----------
-    环绕通知方法，目标方法执行之前
-    执行主业务逻辑doSecond()
-    环绕通知方法，目标方法执行之后
-    后置通知方法 result = ABCDE
-    后置通知方法
-    result = ABCDE
-    -----------
-    执行主业务逻辑doThird()
+```text
+前置通知方法
+前置通知方法() jp = execution(void tavish.bit.aspectj.ISomeService.doFirst())
+执行主业务逻辑doFirst()
+-----------
+环绕通知方法，目标方法执行之前
+执行主业务逻辑doSecond()
+环绕通知方法，目标方法执行之后
+后置通知方法 result = ABCDE
+后置通知方法
+result = ABCDE
+-----------
+执行主业务逻辑doThird()
+```
 
 ##### 3.6.5.4 &lt;aop:after-throwing/&gt;异常通知
 
 定义POJO类：
 
-    // 异常通知
-    public void afterThrowing() {
-        System.out.println("异常通知方法");
-    }
+```java
+// 异常通知
+public void afterThrowing() {
+    System.out.println("异常通知方法");
+}
 
-    public void afterThrowing(Exception ex) {
-        System.out.println("异常通知方法 ex = " + ex.getMessage());
-    }
+public void afterThrowing(Exception ex) {
+    System.out.println("异常通知方法 ex = " + ex.getMessage());
+}
+```
 
 配置文件：
 
-    <aop:after-throwing method="afterThrowing" pointcut-ref="doThirdPointcut" />
-    <aop:after-throwing method="afterThrowing(java.lang.Exception)" pointcut-ref="doThirdPointcut" throwing="ex"/>
+```xml
+<aop:after-throwing method="afterThrowing" pointcut-ref="doThirdPointcut" />
+<aop:after-throwing method="afterThrowing(java.lang.Exception)" pointcut-ref="doThirdPointcut" throwing="ex"/>
+```
 
 其XML的配置中，有一个属性throwing，指定用于接收目标方法所抛出异常的变量名。其可作为增强方法的参数出现，该参数为Throwable类型。
 
 输出：
 
-    前置通知方法
-    前置通知方法() jp = execution(void tavish.bit.aspectj.ISomeService.doFirst())
-    执行主业务逻辑doFirst()
-    -----------
-    环绕通知方法，目标方法执行之前
-    执行主业务逻辑doSecond()
-    环绕通知方法，目标方法执行之后
-    后置通知方法 result = ABCDE
-    后置通知方法
-    result = ABCDE
-    -----------
-    执行主业务逻辑doThird()
-    异常通知方法 ex = / by zero
-    异常通知方法
+```text
+前置通知方法
+前置通知方法() jp = execution(void tavish.bit.aspectj.ISomeService.doFirst())
+执行主业务逻辑doFirst()
+-----------
+环绕通知方法，目标方法执行之前
+执行主业务逻辑doSecond()
+环绕通知方法，目标方法执行之后
+后置通知方法 result = ABCDE
+后置通知方法
+result = ABCDE
+-----------
+执行主业务逻辑doThird()
+异常通知方法 ex = / by zero
+异常通知方法
+```
 
 ##### 3.6.5.5 &lt;aop:after/&gt;最终通知
 
 定义POJO类：
 
-    // 最终通知
-    public void after() {
-        System.out.println("最终通知方法");
-    }
+```java
+// 最终通知
+public void after() {
+    System.out.println("最终通知方法");
+}
+```
 
 配置文件：
 
-    <!-- 最终通知 -->
-    <aop:after method="after" pointcut-ref="doThirdPointcut"/>
+```xml
+<!-- 最终通知 -->
+<aop:after method="after" pointcut-ref="doThirdPointcut"/>
+```
 
 输出：
 
-    前置通知方法
-    前置通知方法() jp = execution(void tavish.bit.aspectj.ISomeService.doFirst())
-    执行主业务逻辑doFirst()
-    -----------
-    环绕通知方法，目标方法执行之前
-    执行主业务逻辑doSecond()
-    环绕通知方法，目标方法执行之后
-    后置通知方法 result = ABCDE
-    后置通知方法
-    result = ABCDE
-    -----------
-    执行主业务逻辑doThird()
-    最终通知方法
-    异常通知方法 ex = / by zero
-    异常通知方法
+```text
+前置通知方法
+前置通知方法() jp = execution(void tavish.bit.aspectj.ISomeService.doFirst())
+执行主业务逻辑doFirst()
+-----------
+环绕通知方法，目标方法执行之前
+执行主业务逻辑doSecond()
+环绕通知方法，目标方法执行之后
+后置通知方法 result = ABCDE
+后置通知方法
+result = ABCDE
+-----------
+执行主业务逻辑doThird()
+最终通知方法
+异常通知方法 ex = / by zero
+异常通知方法
+```
 
 ## 第四章 Spring与DAO
 
@@ -4623,291 +5281,319 @@ Spring与Dao部分，是Spring的两大核心技术IoC与AOP的典型应用体�
 
 1）bean类：Student.java
 
-    package tavish.bit.beans;
+```java
+package tavish.bit.beans;
 
-    public class Student {
-        private Integer id;
-        private String name;
-        private int age;
+public class Student {
+    private Integer id;
+    private String name;
+    private int age;
 
-        public Student(String name, int age) {
-            super();
-            this.name = name;
-            this.age = age;
-        }
-
-        public Student() {
-            super();
-        }
-
-        public Integer getId() {
-            return id;
-        }
-
-        public void setId(Integer id) {
-            this.id = id;
-        }
-
-        public String getName() {
-            return name;
-        }
-
-        public void setName(String name) {
-            this.name = name;
-        }
-
-        public int getAge() {
-            return age;
-        }
-
-        public void setAge(int age) {
-            this.age = age;
-        }
-
-        @Override
-        public String toString() {
-            return "Student [id=" + id + ", name=" + name + ", age=" + age + "]";
-        }
+    public Student(String name, int age) {
+        super();
+        this.name = name;
+        this.age = age;
     }
+
+    public Student() {
+        super();
+    }
+
+    public Integer getId() {
+        return id;
+    }
+
+    public void setId(Integer id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public int getAge() {
+        return age;
+    }
+
+    public void setAge(int age) {
+        this.age = age;
+    }
+
+    @Override
+    public String toString() {
+        return "Student [id=" + id + ", name=" + name + ", age=" + age + "]";
+    }
+}
+```
 
 2）Service层
 
 业务接口：
 
-    package tavish.bit.service;
+```java
+package tavish.bit.service;
 
-    import java.util.List;
+import java.util.List;
 
-    import tavish.bit.beans.Student;
+import tavish.bit.beans.Student;
 
-    public interface IStudentService {
-        // 添加学生
-        void addStudent(Student student);
-        // 移除学生
-        void removeStudent(Student student);
-        // 修改学生
-        void modifyStudent(Student student);
-        // 查找出表中所有学生的名字
-        List<String> findAllStudentsNames();
-        // 根据id查找学生的名字
-        String findStudentNameById(int id);
-        // 查找出表中所有学生
-        List<Student> findAllStudents();
-        // 根据id查找学生
-        Student findStudentById(int id);
-    }
+public interface IStudentService {
+    // 添加学生
+    void addStudent(Student student);
+    // 移除学生
+    void removeStudent(Student student);
+    // 修改学生
+    void modifyStudent(Student student);
+    // 查找出表中所有学生的名字
+    List<String> findAllStudentsNames();
+    // 根据id查找学生的名字
+    String findStudentNameById(int id);
+    // 查找出表中所有学生
+    List<Student> findAllStudents();
+    // 根据id查找学生
+    Student findStudentById(int id);
+}
+```
 
 实现类：
 
-    package tavish.bit.service;
+```java
+package tavish.bit.service;
 
-    import java.util.List;
+import java.util.List;
 
-    import tavish.bit.beans.Student;
-    import tavish.bit.dao.IStudentDao;
+import tavish.bit.beans.Student;
+import tavish.bit.dao.IStudentDao;
 
-    public class StudentServiceImpl implements IStudentService {
+public class StudentServiceImpl implements IStudentService {
 
-        private IStudentDao dao;
+    private IStudentDao dao;
 
-        public void setDao(IStudentDao dao) {
-            this.dao = dao;
-        }
-
-        @Override
-        public void addStudent(Student student) {
-            dao.insertStudent(student);
-        }
-
-        @Override
-        public void removeStudent(Student student) {
-            dao.deleteStudent(student);
-        }
-
-        @Override
-        public void modifyStudent(Student student) {
-            dao.updateStudent(student);
-        }
-
-        @Override
-        public List<String> findAllStudentsNames() {
-            return dao.selectAllStudentsNames();
-        }
-
-        @Override
-        public String findStudentNameById(int id) {
-            return dao.selectStudentNameById(id);
-        }
-
-        @Override
-        public List<Student> findAllStudents() {
-            return dao.selectAllStudents();
-        }
-
-        @Override
-        public Student findStudentById(int id) {
-            return dao.selectStudentById(id);
-        }
+    public void setDao(IStudentDao dao) {
+        this.dao = dao;
     }
+
+    @Override
+    public void addStudent(Student student) {
+        dao.insertStudent(student);
+    }
+
+    @Override
+    public void removeStudent(Student student) {
+        dao.deleteStudent(student);
+    }
+
+    @Override
+    public void modifyStudent(Student student) {
+        dao.updateStudent(student);
+    }
+
+    @Override
+    public List<String> findAllStudentsNames() {
+        return dao.selectAllStudentsNames();
+    }
+
+    @Override
+    public String findStudentNameById(int id) {
+        return dao.selectStudentNameById(id);
+    }
+
+    @Override
+    public List<Student> findAllStudents() {
+        return dao.selectAllStudents();
+    }
+
+    @Override
+    public Student findStudentById(int id) {
+        return dao.selectStudentById(id);
+    }
+}
+```
 
 3）Dao层
 
 业务接口：
 
-    package tavish.bit.dao;
+```java
+package tavish.bit.dao;
 
-    import java.util.List;
+import java.util.List;
 
-    import tavish.bit.beans.Student;
+import tavish.bit.beans.Student;
 
-    public interface IStudentDao {
-        void insertStudent(Student student);
+public interface IStudentDao {
+    void insertStudent(Student student);
 
-        void deleteStudent(Student student);
+    void deleteStudent(Student student);
 
-        void updateStudent(Student student);
+    void updateStudent(Student student);
 
-        List<String> selectAllStudentsNames();
+    List<String> selectAllStudentsNames();
 
-        String selectStudentNameById(int id);
+    String selectStudentNameById(int id);
 
-        List<Student> selectAllStudents();
+    List<Student> selectAllStudents();
 
-        Student selectStudentById(int id);
-    }
+    Student selectStudentById(int id);
+}
+```
 
 实现类：
 
-    package tavish.bit.dao;
+```java
+package tavish.bit.dao;
 
-    import java.util.List;
+import java.util.List;
 
-    import org.springframework.jdbc.core.support.JdbcDaoSupport;
+import org.springframework.jdbc.core.support.JdbcDaoSupport;
 
-    import tavish.bit.beans.Student;
+import tavish.bit.beans.Student;
 
-    public class StudentDaoImpl extends JdbcDaoSupport implements IStudentDao {
+public class StudentDaoImpl extends JdbcDaoSupport implements IStudentDao {
 
-        @Override
-        public void insertStudent(Student student) {
-            String sql = "insert into student(name,age) values(?,?)";
-            this.getJdbcTemplate().update(sql, student.getName(), student.getAge());
-        }
-
-        @Override
-        public void deleteStudent(Student student) {
-            String sql = "delete from student where id=?";
-            this.getJdbcTemplate().update(sql, student.getId());
-        }
-
-        @Override
-        public void updateStudent(Student student) {
-            String sql = "update student set name=?, age=? where id=?";
-            this.getJdbcTemplate().update(sql, student.getName(), student.getAge(), student.getId());
-        }
-
-        @Override
-        public List<String> selectAllStudentsNames() {
-            return null;
-        }
-
-        @Override
-        public String selectStudentNameById(int id) {
-            return null;
-        }
-
-        @Override
-        public List<Student> selectAllStudents() {
-            return null;
-        }
-
-        @Override
-        public Student selectStudentById(int id) {
-            return null;
-        }
+    @Override
+    public void insertStudent(Student student) {
+        String sql = "insert into student(name,age) values(?,?)";
+        this.getJdbcTemplate().update(sql, student.getName(), student.getAge());
     }
+
+    @Override
+    public void deleteStudent(Student student) {
+        String sql = "delete from student where id=?";
+        this.getJdbcTemplate().update(sql, student.getId());
+    }
+
+    @Override
+    public void updateStudent(Student student) {
+        String sql = "update student set name=?, age=? where id=?";
+        this.getJdbcTemplate().update(sql, student.getName(), student.getAge(), student.getId());
+    }
+
+    @Override
+    public List<String> selectAllStudentsNames() {
+        return null;
+    }
+
+    @Override
+    public String selectStudentNameById(int id) {
+        return null;
+    }
+
+    @Override
+    public List<Student> selectAllStudents() {
+        return null;
+    }
+
+    @Override
+    public Student selectStudentById(int id) {
+        return null;
+    }
+}
+```
 
 （3）配置文件
 
 1）注册Service
 
-    <!-- 注册Service -->
-    <bean id="studentService" class="tavish.bit.service.StudentServiceImpl" >
-        <!-- 配置设值注入 -->
-        <property name="dao" ref="studentDao" />
-    </bean>
+```xml
+<!-- 注册Service -->
+<bean id="studentService" class="tavish.bit.service.StudentServiceImpl" >
+    <!-- 配置设值注入 -->
+    <property name="dao" ref="studentDao" />
+</bean>
+```
 
 2）注册Dao
 
-    <!-- 注册Dao -->
-    <bean id="studentDao" class="tavish.bit.dao.StudentDaoImpl" >
-        <!-- 配置JDBC模板 -->
-        <property name="jdbcTemplate" ref="jdbcTemplate" />
-    </bean>
+```xml
+<!-- 注册Dao -->
+<bean id="studentDao" class="tavish.bit.dao.StudentDaoImpl" >
+    <!-- 配置JDBC模板 -->
+    <property name="jdbcTemplate" ref="jdbcTemplate" />
+</bean>
+```
 
 3）注册jdbc模板
 
-    <!-- 注册JDBC模板对象 -->
-    <bean id="jdbcTemplate" class="org.springframework.jdbc.core.JdbcTemplate">
-        <!-- 配置数据源 -->
-        <property name="dataSource" ref="springDataSource" />
-    </bean>
+```xml
+<!-- 注册JDBC模板对象 -->
+<bean id="jdbcTemplate" class="org.springframework.jdbc.core.JdbcTemplate">
+    <!-- 配置数据源 -->
+    <property name="dataSource" ref="springDataSource" />
+</bean>
+```
 
 4）注册数据源，任意选择其一：
 
 A. Spring默认数据源：
 
-    <!-- 注册数据源：DriverManagerDataSource（Spring内置数据源） -->
-    <bean id="springDataSource" class="org.springframework.jdbc.datasource.DriverManagerDataSource">
-        <!-- 数据库连接四要素 -->
-        <property name="driverClassName" value="${jdbc.driver}" />
-        <property name="url" value="${jdbc.url}" />
-        <property name="username" value="${jdbc.user}" />
-        <property name="password" value="${jdbc.password}" />
-    </bean>
+```xml
+<!-- 注册数据源：DriverManagerDataSource（Spring内置数据源） -->
+<bean id="springDataSource" class="org.springframework.jdbc.datasource.DriverManagerDataSource">
+    <!-- 数据库连接四要素 -->
+    <property name="driverClassName" value="${jdbc.driver}" />
+    <property name="url" value="${jdbc.url}" />
+    <property name="username" value="${jdbc.user}" />
+    <property name="password" value="${jdbc.password}" />
+</bean>
+```
 
 B. DBCP2数据源：
 
-    <!-- 注册数据源：DBCP2数据源 -->
-    <bean id="dbcpDataSource" class="org.apache.commons.dbcp2.BasicDataSource">
-        <!-- 数据库连接四要素 -->
-        <property name="driverClassName" value="${jdbc.driver}" />
-        <property name="url" value="${jdbc.url}" />
-        <property name="username" value="${jdbc.user}" />
-        <property name="password" value="${jdbc.password}" />
-    </bean>
+```xml
+<!-- 注册数据源：DBCP2数据源 -->
+<bean id="dbcpDataSource" class="org.apache.commons.dbcp2.BasicDataSource">
+    <!-- 数据库连接四要素 -->
+    <property name="driverClassName" value="${jdbc.driver}" />
+    <property name="url" value="${jdbc.url}" />
+    <property name="username" value="${jdbc.user}" />
+    <property name="password" value="${jdbc.password}" />
+</bean>
+```
 
 C. c3p0数据源：
 
-    <!-- 注册数据源：c3p0数据源 -->
-    <bean id="c3p0DataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource">
-        <!-- 数据库连接四要素 -->
-        <property name="driverClass" value="${jdbc.driver}" />
-        <property name="jdbcUrl" value="${jdbc.url}" />
-        <property name="user" value="${jdbc.user}" />
-        <property name="password" value="${jdbc.password}" />
-    </bean>
+```xml
+<!-- 注册数据源：c3p0数据源 -->
+<bean id="c3p0DataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource">
+    <!-- 数据库连接四要素 -->
+    <property name="driverClass" value="${jdbc.driver}" />
+    <property name="jdbcUrl" value="${jdbc.url}" />
+    <property name="user" value="${jdbc.user}" />
+    <property name="password" value="${jdbc.password}" />
+</bean>
+```
 
 5）注册JDBC属性文件，任意选择其一：
 
 A. 以Bean的方式进行注册（不常用）：
 
-    <bean class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
-        <property name="location" value="classpath:jdbc.properties" />
-    </bean>
+```xml
+<bean class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+    <property name="location" value="classpath:jdbc.properties" />
+</bean>
+```
 
 B. 修改约束，加入context约束，使用如下标签注册：
 
-    <context:property-placeholder location="classpath:jdbc.properties" />
+```xml
+<context:property-placeholder location="classpath:jdbc.properties" />
+```
 
 （4）JDBC属性文件（可选）：
 
 classpath路径下：jdbc.properties
 
-    jdbc.driver=com.mysql.jdbc.Driver
-    jdbc.url=jdbc:mysql://localhost:3306/test
-    jdbc.user=root
-    jdbc.password=mysql
+```properties
+jdbc.driver=com.mysql.jdbc.Driver
+jdbc.url=jdbc:mysql://localhost:3306/test
+jdbc.user=root
+jdbc.password=mysql
+```
 
 #### 4.1.2 对DB的增删改操作
 
@@ -4915,59 +5601,60 @@ JdbcTemplate类中提供了对DB进行修改、查询的方法。Dao实现类使
 
 （1）测试类，使用外置的JUnit4，MyTest：
 
-    package tavish.bit.test;
+```java
+package tavish.bit.test;
 
-    import java.util.List;
+import java.util.List;
 
-    import org.junit.After;
-    import org.junit.Before;
-    import org.junit.Test;
-    import org.springframework.context.ApplicationContext;
-    import org.springframework.context.support.ClassPathXmlApplicationContext;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.support.ClassPathXmlApplicationContext;
 
-    import tavish.bit.beans.Student;
-    import tavish.bit.service.IStudentService;
+import tavish.bit.beans.Student;
+import tavish.bit.service.IStudentService;
 
-    public class MyTest {
-        
-        private ApplicationContext context;
-        private IStudentService service;
+public class MyTest {
+    
+    private ApplicationContext context;
+    private IStudentService service;
 
-        @Before
-        public void before() {
-            context = new ClassPathXmlApplicationContext("applicationContext.xml");
-            service = (IStudentService) context.getBean("studentService");
-        }
-        
-        @After
-        public void After() {
-            ((ClassPathXmlApplicationContext)context).close();
-        }
-        
-        // 增
-        @Test
-        public void testAdd() {
-            Student student = new Student("张三", 20);
-            service.addStudent(student);
-        }
-        
-        // 删
-        @Test
-        public void testRemove() {
-            Student student = new Student();
-            student.setId(3);
-            service.removeStudent(student);
-        }
-        
-        // 改
-        @Test
-        public void testModify() {
-            Student student = new Student("李四", 24);
-            student.setId(1);
-            service.modifyStudent(student);
-        }
+    @Before
+    public void before() {
+        context = new ClassPathXmlApplicationContext("applicationContext.xml");
+        service = (IStudentService) context.getBean("studentService");
     }
-
+    
+    @After
+    public void After() {
+        ((ClassPathXmlApplicationContext)context).close();
+    }
+    
+    // 增
+    @Test
+    public void testAdd() {
+        Student student = new Student("张三", 20);
+        service.addStudent(student);
+    }
+    
+    // 删
+    @Test
+    public void testRemove() {
+        Student student = new Student();
+        student.setId(3);
+        service.removeStudent(student);
+    }
+    
+    // 改
+    @Test
+    public void testModify() {
+        Student student = new Student("李四", 24);
+        student.setId(1);
+        service.modifyStudent(student);
+    }
+}
+```
 
 （2）使用Spring的JUnit4：
 
@@ -4978,74 +5665,81 @@ JdbcTemplate类中提供了对DB进行修改、查询的方法。Dao实现类使
 
 测试类，MyTestSpringJunit：
 
-    package tavish.bit.test;
+```java
+package tavish.bit.test;
 
-    import org.junit.Test;
-    import org.junit.runner.RunWith;
-    import org.springframework.beans.factory.annotation.Autowired;
-    import org.springframework.test.context.ContextConfiguration;
-    import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
-    import tavish.bit.beans.Student;
-    import tavish.bit.service.IStudentService;
+import tavish.bit.beans.Student;
+import tavish.bit.service.IStudentService;
 
-    @RunWith(SpringJUnit4ClassRunner.class)
-    @ContextConfiguration(locations="classpath:applicationContext.xml")
-    public class MyTestSpringJunit {
-        
-        @Autowired
-        private IStudentService service;
-        
-        @Test
-        public void testAdd() {
-            Student student = new Student("张三", 20);
-            service.addStudent(student);
-        }
-        
-        @Test
-        public void testRemove() {
-            Student student = new Student();
-            student.setId(4);
-            service.removeStudent(student);
-        }
-        
-        @Test
-        public void testModify() {
-            Student student = new Student("李小四", 24);
-            student.setId(1);
-            service.modifyStudent(student);
-        }
+@RunWith(SpringJUnit4ClassRunner.class)
+@ContextConfiguration(locations="classpath:applicationContext.xml")
+public class MyTestSpringJunit {
+    
+    @Autowired
+    private IStudentService service;
+    
+    @Test
+    public void testAdd() {
+        Student student = new Student("张三", 20);
+        service.addStudent(student);
     }
-
+    
+    @Test
+    public void testRemove() {
+        Student student = new Student();
+        student.setId(4);
+        service.removeStudent(student);
+    }
+    
+    @Test
+    public void testModify() {
+        Student student = new Student("李小四", 24);
+        student.setId(1);
+        service.modifyStudent(student);
+    }
+}
+```
 
 #### 4.1.3 将数据源直接注入给Dao
 
 根据JdbcDaoSupport类源码中的setDataSource方法：
 
-    /**
-     * Set the JDBC DataSource to be used by this DAO.
-     */
-    public final void setDataSource(DataSource dataSource) {
-        if (this.jdbcTemplate == null || dataSource != this.jdbcTemplate.getDataSource()) {
-            this.jdbcTemplate = createJdbcTemplate(dataSource);
-            initTemplateConfig();
-        }
+```java
+/**
+ * Set the JDBC DataSource to be used by this DAO.
+ */
+public final void setDataSource(DataSource dataSource) {
+    if (this.jdbcTemplate == null || dataSource != this.jdbcTemplate.getDataSource()) {
+        this.jdbcTemplate = createJdbcTemplate(dataSource);
+        initTemplateConfig();
     }
+}
+```
 
 可以将配置文件中的以下部分：
 
-    <bean id="jdbcTemplate" class="org.springframework.jdbc.core.JdbcTemplate">
-        <property name="dataSource" ref="c3p0DataSource" />
-    </bean>
-    <bean id="studentDao" class="tavish.bit.dao.StudentDaoImpl" >
-        <property name="jdbcTemplate" ref="jdbcTemplate" />
-    </bean>
+```xml
+<bean id="jdbcTemplate" class="org.springframework.jdbc.core.JdbcTemplate">
+    <property name="dataSource" ref="c3p0DataSource" />
+</bean>
+<bean id="studentDao" class="tavish.bit.dao.StudentDaoImpl" >
+    <property name="jdbcTemplate" ref="jdbcTemplate" />
+</bean>
+```
 
 合并为：
 
-    <bean id="studentDao" class="tavish.bit.dao.StudentDaoImpl" >
-        <property name="dataSource" ref="c3p0DataSource" />
-    </bean>
+```xml
+<bean id="studentDao" class="tavish.bit.dao.StudentDaoImpl" >
+    <property name="dataSource" ref="c3p0DataSource" />
+</bean>
+```
 
 即我们无需手工注册jdbcTemplate，我们可以直接向Dao注入数据源，在注入时，如果没有jdbcTemplate，则会自动创建。
 
@@ -5053,139 +5747,145 @@ JdbcTemplate类中提供了对DB进行修改、查询的方法。Dao实现类使
 
 查询方法：
 
-    @Override
-    public List<String> selectAllStudentsNames() {
-        String sql = "select name from student";
-        return this.getJdbcTemplate().queryForList(sql, String.class);
-    }
+```java
+@Override
+public List<String> selectAllStudentsNames() {
+    String sql = "select name from student";
+    return this.getJdbcTemplate().queryForList(sql, String.class);
+}
 
-    @Override
-    public String selectStudentNameById(int id) {
-        String sql = "select name from student where id=?";
-        return this.getJdbcTemplate().queryForObject(sql, String.class, id);
-    }
+@Override
+public String selectStudentNameById(int id) {
+    String sql = "select name from student where id=?";
+    return this.getJdbcTemplate().queryForObject(sql, String.class, id);
+}
 
-    @Override
-    public List<Student> selectAllStudents() {
-        String sql = "select * from student";
-        return this.getJdbcTemplate().query(sql, new StudentRowMapper());
-    }
+@Override
+public List<Student> selectAllStudents() {
+    String sql = "select * from student";
+    return this.getJdbcTemplate().query(sql, new StudentRowMapper());
+}
 
-    @Override
-    public Student selectStudentById(int id) {
-        String sql = "select * from student where id=?";
-        return this.getJdbcTemplate().queryForObject(sql, new StudentRowMapper(), id);
-    }
+@Override
+public Student selectStudentById(int id) {
+    String sql = "select * from student where id=?";
+    return this.getJdbcTemplate().queryForObject(sql, new StudentRowMapper(), id);
+}
+```
 
 由于queryForList和queryForObject方法不能自动包装数据为对象，所以需要自己实现。
 
 RowMapper实现类：
 
-    package tavish.bit.dao;
+```java
+package tavish.bit.dao;
 
-    import java.sql.ResultSet;
-    import java.sql.SQLException;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 
-    import org.springframework.jdbc.core.RowMapper;
+import org.springframework.jdbc.core.RowMapper;
 
-    import tavish.bit.beans.Student;
+import tavish.bit.beans.Student;
 
-    // 行映射器
-    public class StudentRowMapper implements RowMapper<Student> {
+// 行映射器
+public class StudentRowMapper implements RowMapper<Student> {
 
-        // rs：不是select查询的所有结果集，而是这个结果集中当前遍历的这一行记录
-        @Override
-        public Student mapRow(ResultSet rs, int rowNum) throws SQLException {
-            Student student = new Student();
-            student.setId(rs.getInt("id"));
-            student.setName(rs.getString("name"));
-            student.setAge(rs.getInt("age"));
-            return student;
-        }
+    // rs：不是select查询的所有结果集，而是这个结果集中当前遍历的这一行记录
+    @Override
+    public Student mapRow(ResultSet rs, int rowNum) throws SQLException {
+        Student student = new Student();
+        student.setId(rs.getInt("id"));
+        student.setName(rs.getString("name"));
+        student.setAge(rs.getInt("age"));
+        return student;
     }
+}
+```
 
 完整的测试类，MyTest：
 
-    package tavish.bit.test;
+```java
+package tavish.bit.test;
 
-    import java.util.List;
+import java.util.List;
 
-    import org.junit.After;
-    import org.junit.Before;
-    import org.junit.Test;
-    import org.springframework.context.ApplicationContext;
-    import org.springframework.context.support.ClassPathXmlApplicationContext;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.support.ClassPathXmlApplicationContext;
 
-    import tavish.bit.beans.Student;
-    import tavish.bit.service.IStudentService;
+import tavish.bit.beans.Student;
+import tavish.bit.service.IStudentService;
 
-    public class MyTest {
-        
-        private ApplicationContext context;
-        private IStudentService service;
+public class MyTest {
+    
+    private ApplicationContext context;
+    private IStudentService service;
 
-        @Before
-        public void before() {
-            context = new ClassPathXmlApplicationContext("applicationContext.xml");
-            service = (IStudentService) context.getBean("studentService");
-        }
-        
-        @After
-        public void After() {
-            ((ClassPathXmlApplicationContext)context).close();
-        }
-        
-        // 增
-        @Test
-        public void testAdd() {
-            Student student = new Student("张三", 20);
-            service.addStudent(student);
-        }
-        
-        // 删
-        @Test
-        public void testRemove() {
-            Student student = new Student();
-            student.setId(3);
-            service.removeStudent(student);
-        }
-        
-        // 改
-        @Test
-        public void testModify() {
-            Student student = new Student("李四", 24);
-            student.setId(1);
-            service.modifyStudent(student);
-        }
-        
-        // 查询所有名字
-        @Test
-        public void testFindAllStudentsNames() {
-            List<String> names = service.findAllStudentsNames();
-            System.out.println(names);
-        }
-        
-        // 根据Id查询名字
-        @Test
-        public void testFindStudentNameById() {
-            String name = service.findStudentNameById(1);
-            System.out.println(name);
-        }
-        
-        // 查询所有学生
-        @Test
-        public void testFindAllStudents() {
-            List<Student> students = service.findAllStudents();
-            System.out.println(students);
-        }
-        
-        // 根据Id查询学生
-        @Test
-        public void testFindStudentById() {
-            Student student = service.findStudentById(1);
-            System.out.println(student);
-        }
+    @Before
+    public void before() {
+        context = new ClassPathXmlApplicationContext("applicationContext.xml");
+        service = (IStudentService) context.getBean("studentService");
     }
+    
+    @After
+    public void After() {
+        ((ClassPathXmlApplicationContext)context).close();
+    }
+    
+    // 增
+    @Test
+    public void testAdd() {
+        Student student = new Student("张三", 20);
+        service.addStudent(student);
+    }
+    
+    // 删
+    @Test
+    public void testRemove() {
+        Student student = new Student();
+        student.setId(3);
+        service.removeStudent(student);
+    }
+    
+    // 改
+    @Test
+    public void testModify() {
+        Student student = new Student("李四", 24);
+        student.setId(1);
+        service.modifyStudent(student);
+    }
+    
+    // 查询所有名字
+    @Test
+    public void testFindAllStudentsNames() {
+        List<String> names = service.findAllStudentsNames();
+        System.out.println(names);
+    }
+    
+    // 根据Id查询名字
+    @Test
+    public void testFindStudentNameById() {
+        String name = service.findStudentNameById(1);
+        System.out.println(name);
+    }
+    
+    // 查询所有学生
+    @Test
+    public void testFindAllStudents() {
+        List<Student> students = service.findAllStudents();
+        System.out.println(students);
+    }
+    
+    // 根据Id查询学生
+    @Test
+    public void testFindStudentById() {
+        Student student = service.findStudentById(1);
+        System.out.println(student);
+    }
+}
+```
 
 #### 4.1.5 JDBC模板对象是多例的
 
@@ -5197,156 +5897,162 @@ JdbcTemplate对象是多例的，即系统会为每一个使用模板对象的�
 
 StudentDaoImpl2：将JdbcTemplate提出作为域，并在构造器中对其进行初始化。之后每次使用都使用该引用。即不在每次使用JdbcTemplate对象时都通过getJdbcTemplate()方法获取。
 
-    package tavish.bit.dao;
+```java
+package tavish.bit.dao;
 
-    import java.util.List;
+import java.util.List;
 
-    import org.springframework.jdbc.core.JdbcTemplate;
-    import org.springframework.jdbc.core.support.JdbcDaoSupport;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.support.JdbcDaoSupport;
 
-    import tavish.bit.beans.Student;
+import tavish.bit.beans.Student;
 
-    public class StudentDaoImpl2 extends JdbcDaoSupport implements IStudentDao {
-        
-        private JdbcTemplate jt;
-        
-        public StudentDaoImpl2() {
-            jt = this.getJdbcTemplate();
-        }
-
-        @Override
-        public void insertStudent(Student student) {
-            String sql = "insert into student(name,age) values(?,?)";
-            jt.update(sql, student.getName(), student.getAge());
-        }
-
-        @Override
-        public void deleteStudent(Student student) {
-            String sql = "delete from student where id=?";
-            jt.update(sql, student.getId());
-        }
-
-        @Override
-        public void updateStudent(Student student) {
-            String sql = "update student set name=?, age=? where id=?";
-            jt.update(sql, student.getName(), student.getAge(), student.getId());
-        }
-
-        @Override
-        public List<String> selectAllStudentsNames() {
-            String sql = "select name from student";
-            return jt.queryForList(sql, String.class);
-        }
-
-        @Override
-        public String selectStudentNameById(int id) {
-            String sql = "select name from student where id=?";
-            return jt.queryForObject(sql, String.class, id);
-        }
-
-        // 由于queryForList不能自动包装数据为对象，所以需要自己实现
-        @Override
-        public List<Student> selectAllStudents() {
-            String sql = "select * from student";
-            return jt.query(sql, new StudentRowMapper());
-        }
-
-        @Override
-        public Student selectStudentById(int id) {
-            String sql = "select * from student where id=?";
-            return jt.queryForObject(sql, new StudentRowMapper(), id);
-        }
-        
+public class StudentDaoImpl2 extends JdbcDaoSupport implements IStudentDao {
+    
+    private JdbcTemplate jt;
+    
+    public StudentDaoImpl2() {
+        jt = this.getJdbcTemplate();
     }
+
+    @Override
+    public void insertStudent(Student student) {
+        String sql = "insert into student(name,age) values(?,?)";
+        jt.update(sql, student.getName(), student.getAge());
+    }
+
+    @Override
+    public void deleteStudent(Student student) {
+        String sql = "delete from student where id=?";
+        jt.update(sql, student.getId());
+    }
+
+    @Override
+    public void updateStudent(Student student) {
+        String sql = "update student set name=?, age=? where id=?";
+        jt.update(sql, student.getName(), student.getAge(), student.getId());
+    }
+
+    @Override
+    public List<String> selectAllStudentsNames() {
+        String sql = "select name from student";
+        return jt.queryForList(sql, String.class);
+    }
+
+    @Override
+    public String selectStudentNameById(int id) {
+        String sql = "select name from student where id=?";
+        return jt.queryForObject(sql, String.class, id);
+    }
+
+    // 由于queryForList不能自动包装数据为对象，所以需要自己实现
+    @Override
+    public List<Student> selectAllStudents() {
+        String sql = "select * from student";
+        return jt.query(sql, new StudentRowMapper());
+    }
+
+    @Override
+    public Student selectStudentById(int id) {
+        String sql = "select * from student where id=?";
+        return jt.queryForObject(sql, new StudentRowMapper(), id);
+    }
+    
+}
+```
 
 配置文件，applicationContext2.xml，注册class为StudentDaoImpl2：
 
-    <bean id="studentDao" class="tavish.bit.dao.StudentDaoImpl2" >
-        <property name="dataSource" ref="c3p0DataSource" />
-    </bean>
+```xml
+<bean id="studentDao" class="tavish.bit.dao.StudentDaoImpl2" >
+    <property name="dataSource" ref="c3p0DataSource" />
+</bean>
+```
 
 测试类，MyTest2：
 
-    package tavish.bit.test;
+```java
+package tavish.bit.test;
 
-    import java.util.List;
+import java.util.List;
 
-    import org.junit.After;
-    import org.junit.Before;
-    import org.junit.Test;
-    import org.springframework.context.ApplicationContext;
-    import org.springframework.context.support.ClassPathXmlApplicationContext;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.support.ClassPathXmlApplicationContext;
 
-    import tavish.bit.beans.Student;
-    import tavish.bit.service.IStudentService;
+import tavish.bit.beans.Student;
+import tavish.bit.service.IStudentService;
 
-    public class MyTest2 {
-        
-        private ApplicationContext context;
-        private IStudentService service;
+public class MyTest2 {
+    
+    private ApplicationContext context;
+    private IStudentService service;
 
-        @Before
-        public void before() {
-            context = new ClassPathXmlApplicationContext("applicationContext2.xml");
-            service = (IStudentService) context.getBean("studentService");
-        }
-        
-        @After
-        public void After() {
-            ((ClassPathXmlApplicationContext)context).close();
-        }
-        
-        // 增
-        @Test
-        public void testAdd() {
-            Student student = new Student("张三", 20);
-            service.addStudent(student);
-        }
-        
-        // 删
-        @Test
-        public void testRemove() {
-            Student student = new Student();
-            student.setId(3);
-            service.removeStudent(student);
-        }
-        
-        // 改
-        @Test
-        public void testModify() {
-            Student student = new Student("李四", 24);
-            student.setId(1);
-            service.modifyStudent(student);
-        }
-        
-        // 查询所有名字
-        @Test
-        public void testFindAllStudentsNames() {
-            List<String> names = service.findAllStudentsNames();
-            System.out.println(names);
-        }
-        
-        // 根据Id查询名字
-        @Test
-        public void testFindStudentNameById() {
-            String name = service.findStudentNameById(1);
-            System.out.println(name);
-        }
-        
-        // 查询所有学生
-        @Test
-        public void testFindAllStudents() {
-            List<Student> students = service.findAllStudents();
-            System.out.println(students);
-        }
-        
-        // 根据Id查询学生
-        @Test
-        public void testFindStudentById() {
-            Student student = service.findStudentById(1);
-            System.out.println(student);
-        }
+    @Before
+    public void before() {
+        context = new ClassPathXmlApplicationContext("applicationContext2.xml");
+        service = (IStudentService) context.getBean("studentService");
     }
+    
+    @After
+    public void After() {
+        ((ClassPathXmlApplicationContext)context).close();
+    }
+    
+    // 增
+    @Test
+    public void testAdd() {
+        Student student = new Student("张三", 20);
+        service.addStudent(student);
+    }
+    
+    // 删
+    @Test
+    public void testRemove() {
+        Student student = new Student();
+        student.setId(3);
+        service.removeStudent(student);
+    }
+    
+    // 改
+    @Test
+    public void testModify() {
+        Student student = new Student("李四", 24);
+        student.setId(1);
+        service.modifyStudent(student);
+    }
+    
+    // 查询所有名字
+    @Test
+    public void testFindAllStudentsNames() {
+        List<String> names = service.findAllStudentsNames();
+        System.out.println(names);
+    }
+    
+    // 根据Id查询名字
+    @Test
+    public void testFindStudentNameById() {
+        String name = service.findStudentNameById(1);
+        System.out.println(name);
+    }
+    
+    // 查询所有学生
+    @Test
+    public void testFindAllStudents() {
+        List<Student> students = service.findAllStudents();
+        System.out.println(students);
+    }
+    
+    // 根据Id查询学生
+    @Test
+    public void testFindStudentById() {
+        Student student = service.findStudentById(1);
+        System.out.println(student);
+    }
+}
+```
 
 测试执行添加方法，报错：**空指针异常。**
 
@@ -5434,501 +6140,531 @@ Spring事务的默认回滚方式是：**发生运行时异常时回滚，发生
 
 Account类：
 
-    package tavish.bit.beans;
+```java
+package tavish.bit.beans;
 
-    public class Account {
-        private Integer aid; // 数据库id
-        private String aname; // 用户银行账户名称
-        private double balance; // 用户银行账户余额
+public class Account {
+    private Integer aid; // 数据库id
+    private String aname; // 用户银行账户名称
+    private double balance; // 用户银行账户余额
 
-        public Account() {
-            super();
-        }
-
-        public Account(String aname, double balance) {
-            super();
-            this.aname = aname;
-            this.balance = balance;
-        }
-
-        public Integer getAid() {
-            return aid;
-        }
-
-        public void setAid(Integer aid) {
-            this.aid = aid;
-        }
-
-        public String getAname() {
-            return aname;
-        }
-
-        public void setAname(String aname) {
-            this.aname = aname;
-        }
-
-        public double getBalance() {
-            return balance;
-        }
-
-        public void setBalance(double balance) {
-            this.balance = balance;
-        }
-
-        @Override
-        public String toString() {
-            return "Account [aid=" + aid + ", aname=" + aname + ", balance=" + balance + "]";
-        }
+    public Account() {
+        super();
     }
+
+    public Account(String aname, double balance) {
+        super();
+        this.aname = aname;
+        this.balance = balance;
+    }
+
+    public Integer getAid() {
+        return aid;
+    }
+
+    public void setAid(Integer aid) {
+        this.aid = aid;
+    }
+
+    public String getAname() {
+        return aname;
+    }
+
+    public void setAname(String aname) {
+        this.aname = aname;
+    }
+
+    public double getBalance() {
+        return balance;
+    }
+
+    public void setBalance(double balance) {
+        this.balance = balance;
+    }
+
+    @Override
+    public String toString() {
+        return "Account [aid=" + aid + ", aname=" + aname + ", balance=" + balance + "]";
+    }
+}
+```
 
 Stock类：
 
-    package tavish.bit.beans;
+```java
+package tavish.bit.beans;
 
-    public class Stock {
-        private Integer sid; // 数据库id
-        private String sname; // 用户持有的该股票名称
-        private int amount; // 用户持有的该股票数量
-        private int unitPrice; // 该股票单价
+public class Stock {
+    private Integer sid; // 数据库id
+    private String sname; // 用户持有的该股票名称
+    private int amount; // 用户持有的该股票数量
+    private int unitPrice; // 该股票单价
 
-        public Stock() {
-            super();
-        }
-
-        public Stock(String sname, int amount, int unitPrice) {
-            super();
-            this.sname = sname;
-            this.amount = amount;
-            this.unitPrice = unitPrice;
-        }
-
-        public Integer getSid() {
-            return sid;
-        }
-
-        public void setSid(Integer sid) {
-            this.sid = sid;
-        }
-
-        public String getSname() {
-            return sname;
-        }
-
-        public void setSname(String sname) {
-            this.sname = sname;
-        }
-
-        public int getAmount() {
-            return amount;
-        }
-
-        public void setAmount(int amount) {
-            this.amount = amount;
-        }
-
-        public void setUnitPrice(int unitPrice) {
-            this.unitPrice = unitPrice;
-        }
-
-        public int getUnitPrice() {
-            return unitPrice;
-        }
-
-        @Override
-        public String toString() {
-            return "Stock [sid=" + sid + ", sname=" + sname + ", amount=" + amount + ", unitPrice=" + unitPrice + "]";
-        }
+    public Stock() {
+        super();
     }
+
+    public Stock(String sname, int amount, int unitPrice) {
+        super();
+        this.sname = sname;
+        this.amount = amount;
+        this.unitPrice = unitPrice;
+    }
+
+    public Integer getSid() {
+        return sid;
+    }
+
+    public void setSid(Integer sid) {
+        this.sid = sid;
+    }
+
+    public String getSname() {
+        return sname;
+    }
+
+    public void setSname(String sname) {
+        this.sname = sname;
+    }
+
+    public int getAmount() {
+        return amount;
+    }
+
+    public void setAmount(int amount) {
+        this.amount = amount;
+    }
+
+    public void setUnitPrice(int unitPrice) {
+        this.unitPrice = unitPrice;
+    }
+
+    public int getUnitPrice() {
+        return unitPrice;
+    }
+
+    @Override
+    public String toString() {
+        return "Stock [sid=" + sid + ", sname=" + sname + ", amount=" + amount + ", unitPrice=" + unitPrice + "]";
+    }
+}
+```
 
 步骤二：创建Service及其实现类
 
 主业务接口：
 
-    package tavish.bit.service;
+```java
+package tavish.bit.service;
 
-    import tavish.bit.beans.Account;
-    import tavish.bit.beans.Stock;
+import tavish.bit.beans.Account;
+import tavish.bit.beans.Stock;
 
-    public interface IBuyStockService {
-        
-        // 开户
-        void openAccount(Account account);
+public interface IBuyStockService {
+    
+    // 开户
+    void openAccount(Account account);
 
-        void openStock(Stock stock);
-        
-        // 查询账户
-        Account getAccount(int id);
-        
-        Stock getStock(int id);
-        
-        // 购买&卖出
-        void updateStock(Account account, Stock stock, int amount, boolean isBuy);
-    }
+    void openStock(Stock stock);
+    
+    // 查询账户
+    Account getAccount(int id);
+    
+    Stock getStock(int id);
+    
+    // 购买&卖出
+    void updateStock(Account account, Stock stock, int amount, boolean isBuy);
+}
+```
 
 实现类：
 
-    package tavish.bit.service;
+```java
+package tavish.bit.service;
 
-    import tavish.bit.beans.Account;
-    import tavish.bit.beans.Stock;
-    import tavish.bit.dao.IAccountDao;
-    import tavish.bit.dao.IStockDao;
+import tavish.bit.beans.Account;
+import tavish.bit.beans.Stock;
+import tavish.bit.dao.IAccountDao;
+import tavish.bit.dao.IStockDao;
 
-    public class BuyStockServiceImpl implements IBuyStockService {
+public class BuyStockServiceImpl implements IBuyStockService {
 
-        private IAccountDao adao;
+    private IAccountDao adao;
 
-        private IStockDao sdao;
+    private IStockDao sdao;
 
-        public void setAdao(IAccountDao adao) {
-            this.adao = adao;
-        }
-
-        public void setSdao(IStockDao sdao) {
-            this.sdao = sdao;
-        }
-
-        @Override
-        public void openAccount(Account account) {
-            adao.insertAccount(account);
-        }
-
-        @Override
-        public void openStock(Stock stock) {
-            sdao.insertStock(stock);
-        }
-
-        @Override
-        public Account getAccount(int id) {
-            return adao.selectAccount(id);
-        }
-
-        @Override
-        public Stock getStock(int id) {
-            return sdao.selectStock(id);
-        }
-
-        @Override
-        public void updateStock(Account account, Stock stock, int amount, boolean isBuy) {
-            adao.updateAccount(account, stock, amount, isBuy);
-            sdao.updateStock(stock, amount, isBuy);
-        }
+    public void setAdao(IAccountDao adao) {
+        this.adao = adao;
     }
+
+    public void setSdao(IStockDao sdao) {
+        this.sdao = sdao;
+    }
+
+    @Override
+    public void openAccount(Account account) {
+        adao.insertAccount(account);
+    }
+
+    @Override
+    public void openStock(Stock stock) {
+        sdao.insertStock(stock);
+    }
+
+    @Override
+    public Account getAccount(int id) {
+        return adao.selectAccount(id);
+    }
+
+    @Override
+    public Stock getStock(int id) {
+        return sdao.selectStock(id);
+    }
+
+    @Override
+    public void updateStock(Account account, Stock stock, int amount, boolean isBuy) {
+        adao.updateAccount(account, stock, amount, isBuy);
+        sdao.updateStock(stock, amount, isBuy);
+    }
+}
+```
 
 步骤三：创建Dao及其实现类
 
 Dao接口：
 
-    package tavish.bit.dao;
+```java
+package tavish.bit.dao;
 
-    import tavish.bit.beans.Account;
-    import tavish.bit.beans.Stock;
+import tavish.bit.beans.Account;
+import tavish.bit.beans.Stock;
 
-    public interface IAccountDao {
+public interface IAccountDao {
 
-        void insertAccount(Account account);
+    void insertAccount(Account account);
 
-        Account selectAccount(int aid);
+    Account selectAccount(int aid);
 
-        void updateAccount(Account account, Stock stock, int amount, boolean isBuy);
+    void updateAccount(Account account, Stock stock, int amount, boolean isBuy);
 
-    }
+}
+```
 
-    package tavish.bit.dao;
+```java
+package tavish.bit.dao;
 
-    import tavish.bit.beans.Stock;
+import tavish.bit.beans.Stock;
 
-    public interface IStockDao {
+public interface IStockDao {
 
-        void insertStock(Stock stock);
+    void insertStock(Stock stock);
 
-        Stock selectStock(int sid);
+    Stock selectStock(int sid);
 
-        void updateStock(Stock stock, int amount, boolean isBuy);
+    void updateStock(Stock stock, int amount, boolean isBuy);
 
-    }
+}
+```
 
 实现类：
 
-    package tavish.bit.dao;
+```java
+package tavish.bit.dao;
 
-    import org.springframework.jdbc.core.support.JdbcDaoSupport;
+import org.springframework.jdbc.core.support.JdbcDaoSupport;
 
-    import tavish.bit.beans.Account;
-    import tavish.bit.beans.Stock;
+import tavish.bit.beans.Account;
+import tavish.bit.beans.Stock;
 
-    public class AccountDaoImpl extends JdbcDaoSupport implements IAccountDao {
+public class AccountDaoImpl extends JdbcDaoSupport implements IAccountDao {
 
-        @Override
-        public void insertAccount(Account account) {
-            String sql = "insert into account(aname, balance) values(?, ?)";
-            this.getJdbcTemplate().update(sql, account.getAname(), account.getBalance());
-        }
-        
-        @Override
-        public Account selectAccount(int aid) {
-            String sql = "select * from account where aid = ?";
-            return this.getJdbcTemplate().queryForObject(sql, new AccountRowMapper(), aid);
-        }
-
-        @Override
-        public void updateAccount(Account account, Stock stock, int amount, boolean isBuy) {
-            String sql = isBuy ? "update account set balance = balance - ? where aname = ?"
-                    : "update account set balance = balance + ? where aname = ?";
-            this.getJdbcTemplate().update(sql, stock.getUnitPrice() * amount, account.getAname());
-        }
-
+    @Override
+    public void insertAccount(Account account) {
+        String sql = "insert into account(aname, balance) values(?, ?)";
+        this.getJdbcTemplate().update(sql, account.getAname(), account.getBalance());
+    }
+    
+    @Override
+    public Account selectAccount(int aid) {
+        String sql = "select * from account where aid = ?";
+        return this.getJdbcTemplate().queryForObject(sql, new AccountRowMapper(), aid);
     }
 
-    package tavish.bit.dao;
-
-    import org.springframework.jdbc.core.support.JdbcDaoSupport;
-
-    import tavish.bit.beans.Stock;
-
-    public class StockDaoImpl extends JdbcDaoSupport implements IStockDao {
-
-
-        @Override
-        public void insertStock(Stock stock) {
-            String sql = "insert into stock(sname, amount, unitprice) values(?, ?, ?)";
-            this.getJdbcTemplate().update(sql, stock.getSname(),stock.getAmount(),stock.getUnitPrice());    
-        }
-
-        @Override
-        public Stock selectStock(int sid) {
-            String sql = "select * from stock where sid = ?";
-            return this.getJdbcTemplate().queryForObject(sql, new StockRowMapper(), sid);
-        }
-
-        @Override
-        public void updateStock(Stock stock, int amount, boolean isBuy) {
-            String sql = isBuy ? "update stock set amount = amount + ? where sname = ?"
-                    : "update stock set amount = amount - ? where sname = ?";
-            this.getJdbcTemplate().update(sql, amount, stock.getSname());
-        }
-
+    @Override
+    public void updateAccount(Account account, Stock stock, int amount, boolean isBuy) {
+        String sql = isBuy ? "update account set balance = balance - ? where aname = ?"
+                : "update account set balance = balance + ? where aname = ?";
+        this.getJdbcTemplate().update(sql, stock.getUnitPrice() * amount, account.getAname());
     }
+}
+```
+
+```java
+package tavish.bit.dao;
+
+import org.springframework.jdbc.core.support.JdbcDaoSupport;
+
+import tavish.bit.beans.Stock;
+
+public class StockDaoImpl extends JdbcDaoSupport implements IStockDao {
+
+
+    @Override
+    public void insertStock(Stock stock) {
+        String sql = "insert into stock(sname, amount, unitprice) values(?, ?, ?)";
+        this.getJdbcTemplate().update(sql, stock.getSname(),stock.getAmount(),stock.getUnitPrice());    
+    }
+
+    @Override
+    public Stock selectStock(int sid) {
+        String sql = "select * from stock where sid = ?";
+        return this.getJdbcTemplate().queryForObject(sql, new StockRowMapper(), sid);
+    }
+
+    @Override
+    public void updateStock(Stock stock, int amount, boolean isBuy) {
+        String sql = isBuy ? "update stock set amount = amount + ? where sname = ?"
+                : "update stock set amount = amount - ? where sname = ?";
+        this.getJdbcTemplate().update(sql, amount, stock.getSname());
+    }
+}
+```
 
 行映射器：
 
-    package tavish.bit.dao;
+```java
+package tavish.bit.dao;
 
-    import java.sql.ResultSet;
-    import java.sql.SQLException;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 
-    import org.springframework.jdbc.core.RowMapper;
+import org.springframework.jdbc.core.RowMapper;
 
-    import tavish.bit.beans.Account;
+import tavish.bit.beans.Account;
 
 
-    public class AccountRowMapper implements RowMapper<Account>{
+public class AccountRowMapper implements RowMapper<Account>{
 
-        @Override
-        public Account mapRow(ResultSet rs, int rowNum) throws SQLException {
-            Account account = new Account();
-            account.setAid(rs.getInt("aid"));
-            account.setAname(rs.getString("aname"));
-            account.setBalance(rs.getDouble("balance"));
-            return account;
-        }
-
+    @Override
+    public Account mapRow(ResultSet rs, int rowNum) throws SQLException {
+        Account account = new Account();
+        account.setAid(rs.getInt("aid"));
+        account.setAname(rs.getString("aname"));
+        account.setBalance(rs.getDouble("balance"));
+        return account;
     }
 
-    package tavish.bit.dao;
+}
+```
 
-    import java.sql.ResultSet;
-    import java.sql.SQLException;
+```java
+package tavish.bit.dao;
 
-    import org.springframework.jdbc.core.RowMapper;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 
-    import tavish.bit.beans.Stock;
+import org.springframework.jdbc.core.RowMapper;
 
-    public class StockRowMapper implements RowMapper<Stock>{
+import tavish.bit.beans.Stock;
 
-        @Override
-        public Stock mapRow(ResultSet rs, int rowNum) throws SQLException {
-            Stock stock = new Stock();
-            stock.setSid(rs.getInt("sid"));
-            stock.setSname(rs.getString("sname"));
-            stock.setAmount(rs.getInt("amount"));
-            stock.setUnitPrice(rs.getInt("unitprice"));
-            return stock;
-        }
+public class StockRowMapper implements RowMapper<Stock>{
 
+    @Override
+    public Stock mapRow(ResultSet rs, int rowNum) throws SQLException {
+        Stock stock = new Stock();
+        stock.setSid(rs.getInt("sid"));
+        stock.setSname(rs.getString("sname"));
+        stock.setAmount(rs.getInt("amount"));
+        stock.setUnitPrice(rs.getInt("unitprice"));
+        return stock;
     }
 
+}
+```
 
 步骤四：创建数据库表account和stock
 
-    CREATE TABLE `account` (
-      `aid` INT(5) NOT NULL AUTO_INCREMENT,
-      `aname` VARCHAR(20) DEFAULT NULL,
-      `balance` DOUBLE DEFAULT NULL,
-      PRIMARY KEY (`aid`)
-    ) ENGINE=INNODB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8
+```sql
+CREATE TABLE `account` (
+  `aid` INT(5) NOT NULL AUTO_INCREMENT,
+  `aname` VARCHAR(20) DEFAULT NULL,
+  `balance` DOUBLE DEFAULT NULL,
+  PRIMARY KEY (`aid`)
+) ENGINE=INNODB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8
 
-    CREATE TABLE `stock` (
-      `sid` INT(5) NOT NULL AUTO_INCREMENT,
-      `sname` VARCHAR(20) DEFAULT NULL,
-      `amount` INT(5) DEFAULT NULL,
-      `unitprice` INT(5) DEFAULT NULL,
-      PRIMARY KEY (`sid`)
-    ) ENGINE=INNODB DEFAULT CHARSET=utf8
+CREATE TABLE `stock` (
+  `sid` INT(5) NOT NULL AUTO_INCREMENT,
+  `sname` VARCHAR(20) DEFAULT NULL,
+  `amount` INT(5) DEFAULT NULL,
+  `unitprice` INT(5) DEFAULT NULL,
+  PRIMARY KEY (`sid`)
+) ENGINE=INNODB DEFAULT CHARSET=utf8
+```
 
 步骤五：配置文件
 
-    <!-- 注册数据源：c3p0数据源 -->
-    <bean id="c3p0DataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource">
-        <!-- 数据库连接四要素 -->
-        <property name="driverClass" value="${jdbc.driver}" />
-        <property name="jdbcUrl" value="${jdbc.url}" />
-        <property name="user" value="${jdbc.user}" />
-        <property name="password" value="${jdbc.password}" />
-    </bean> 
-         
-    <!-- 添加context约束，然后使用如下标签注册属性文件 -->
-    <context:property-placeholder location="classpath:jdbc.properties" />
+```xml
+<!-- 注册数据源：c3p0数据源 -->
+<bean id="c3p0DataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource">
+    <!-- 数据库连接四要素 -->
+    <property name="driverClass" value="${jdbc.driver}" />
+    <property name="jdbcUrl" value="${jdbc.url}" />
+    <property name="user" value="${jdbc.user}" />
+    <property name="password" value="${jdbc.password}" />
+</bean> 
      
-    <!-- 注册Dao -->
-    <bean id="accountDao" class="tavish.bit.dao.AccountDaoImpl" >
-        <property name="dataSource" ref="c3p0DataSource" />
-    </bean>
-    <bean id="stockDao" class="tavish.bit.dao.StockDaoImpl" >
-        <property name="dataSource" ref="c3p0DataSource" />
-    </bean>
-     
-    <!-- 注册Service -->
-    <bean id="buyStockService" class="tavish.bit.service.BuyStockServiceImpl" >
-        <!-- 配置设值注入 -->
-        <property name="adao" ref="accountDao" />
-        <property name="sdao" ref="stockDao" />
-    </bean>
+<!-- 添加context约束，然后使用如下标签注册属性文件 -->
+<context:property-placeholder location="classpath:jdbc.properties" />
+ 
+<!-- 注册Dao -->
+<bean id="accountDao" class="tavish.bit.dao.AccountDaoImpl" >
+    <property name="dataSource" ref="c3p0DataSource" />
+</bean>
+<bean id="stockDao" class="tavish.bit.dao.StockDaoImpl" >
+    <property name="dataSource" ref="c3p0DataSource" />
+</bean>
+ 
+<!-- 注册Service -->
+<bean id="buyStockService" class="tavish.bit.service.BuyStockServiceImpl" >
+    <!-- 配置设值注入 -->
+    <property name="adao" ref="accountDao" />
+    <property name="sdao" ref="stockDao" />
+</bean>
+```
 
 步骤六：测试
 
-    package tavish.bit.test;
+```java
+package tavish.bit.test;
 
-    import org.junit.After;
-    import org.junit.Before;
-    import org.junit.Test;
-    import org.springframework.context.ApplicationContext;
-    import org.springframework.context.support.ClassPathXmlApplicationContext;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.support.ClassPathXmlApplicationContext;
 
-    import tavish.bit.beans.Account;
-    import tavish.bit.beans.Stock;
-    import tavish.bit.service.IBuyStockService;
+import tavish.bit.beans.Account;
+import tavish.bit.beans.Stock;
+import tavish.bit.service.IBuyStockService;
 
-    public class MyTest {
+public class MyTest {
 
-        private IBuyStockService service;
-        private ApplicationContext context;
-        
-        @Before
-        public void before() {
-            context = new ClassPathXmlApplicationContext("applicationContext.xml");
-            service = (IBuyStockService) context.getBean("buyStockService");
-        }
-        
-        @After
-        public void after() {
-            ((ClassPathXmlApplicationContext)context).close();
-        }
-        
-        @Test
-        public void testOpen() {
-            Account account = new Account("Tavish", 10000);
-            Stock stock = new Stock("BIT", 0, 50);
-            service.openAccount(account);
-            service.openStock(stock);
-        }
-        
-        @Test
-        public void testGet() {
-            System.out.println(service.getAccount(1));
-            System.out.println(service.getStock(1));
-        }
-        
-        @Test
-        public void testBuyStock() {
-            Account account = service.getAccount(1);
-            Stock stock = service.getStock(1);
-            service.updateStock(account, stock, 50, true);
-        }
-        
-        @Test
-        public void testSoldStock() {
-            Account account = service.getAccount(1);
-            Stock stock = service.getStock(1);
-            service.updateStock(account, stock, 20, false);
-        }
+    private IBuyStockService service;
+    private ApplicationContext context;
+    
+    @Before
+    public void before() {
+        context = new ClassPathXmlApplicationContext("applicationContext.xml");
+        service = (IBuyStockService) context.getBean("buyStockService");
     }
-
-步骤七：模拟购买时发生异常
-
-定义异常：
-
-    package tavish.bit.exception;
-
-    public class BuyStockException extends Exception {
-        
-        private static final long serialVersionUID = -2302395152805564386L;
-
-        public BuyStockException() {
-            super();
-        }
-
-        public BuyStockException(String message) {
-            super(message);
-        }
-        
+    
+    @After
+    public void after() {
+        ((ClassPathXmlApplicationContext)context).close();
     }
-
-设置Service主业务接口，抛出异常：
-
-    void updateStock(Account account, Stock stock, int amount, boolean isBuy) throws BuyStockException;
-
-实现类抛出异常：
-
-    @Override
-    public void updateStock(Account account, Stock stock, int amount, boolean isBuy) throws BuyStockException {
-        adao.updateAccount(account, stock, amount, isBuy);
-        sdao.updateStock(stock, amount, isBuy);
-    }
-
-测试类抛出该异常：
-
+    
     @Test
-    public void testBuyStock() throws BuyStockException {
+    public void testOpen() {
+        Account account = new Account("Tavish", 10000);
+        Stock stock = new Stock("BIT", 0, 50);
+        service.openAccount(account);
+        service.openStock(stock);
+    }
+    
+    @Test
+    public void testGet() {
+        System.out.println(service.getAccount(1));
+        System.out.println(service.getStock(1));
+    }
+    
+    @Test
+    public void testBuyStock() {
         Account account = service.getAccount(1);
         Stock stock = service.getStock(1);
         service.updateStock(account, stock, 50, true);
     }
     
     @Test
-    public void testSoldStock() throws BuyStockException {
+    public void testSoldStock() {
         Account account = service.getAccount(1);
         Stock stock = service.getStock(1);
         service.updateStock(account, stock, 20, false);
     }
+}
+```
+
+步骤七：模拟购买时发生异常
+
+定义异常：
+
+```java
+package tavish.bit.exception;
+
+public class BuyStockException extends Exception {
+    
+    private static final long serialVersionUID = -2302395152805564386L;
+
+    public BuyStockException() {
+        super();
+    }
+
+    public BuyStockException(String message) {
+        super(message);
+    }
+}
+```
+
+设置Service主业务接口，抛出异常：
+
+```java
+void updateStock(Account account, Stock stock, int amount, boolean isBuy) throws BuyStockException;
+```
+
+实现类抛出异常：
+
+```java
+@Override
+public void updateStock(Account account, Stock stock, int amount, boolean isBuy) throws BuyStockException {
+    adao.updateAccount(account, stock, amount, isBuy);
+    sdao.updateStock(stock, amount, isBuy);
+}
+```
+
+测试类抛出该异常：
+
+```java
+@Test
+public void testBuyStock() throws BuyStockException {
+    Account account = service.getAccount(1);
+    Stock stock = service.getStock(1);
+    service.updateStock(account, stock, 50, true);
+}
+
+@Test
+public void testSoldStock() throws BuyStockException {
+    Account account = service.getAccount(1);
+    Stock stock = service.getStock(1);
+    service.updateStock(account, stock, 20, false);
+}
+```
 
 下面模拟买股票发生异常的情况，使updateStock方法发生异常：
 
-    @Override
-    public void updateStock(Account account, Stock stock, int amount, boolean isBuy) throws BuyStockException {
-        adao.updateAccount(account, stock, amount, isBuy);
-        if (isBuy) {
-            throw new BuyStockException("购买股票没有成功");
-        }
-        sdao.updateStock(stock, amount, isBuy);
+```java
+@Override
+public void updateStock(Account account, Stock stock, int amount, boolean isBuy) throws BuyStockException {
+    adao.updateAccount(account, stock, amount, isBuy);
+    if (isBuy) {
+        throw new BuyStockException("购买股票没有成功");
     }
+    sdao.updateStock(stock, amount, isBuy);
+}
+```
 
 此时买股票会发生异常，即钱少了，股票没多。
 
-**
-这个问题是由于在updateStock方法中，两个dao的方法只执行了一个。要修正这个问题，要使程序达到这样的效果：这两个dao方法只能同时生效或同时失败，即，使这两个操作具有原子性。
-所以我们要添加事务，把事务从DAO层提升到Service层。
-**
+**这个问题是由于在updateStock方法中，两个dao的方法只执行了一个。要修正这个问题，要使程序达到这样的效果：这两个dao方法只能同时生效或同时失败，即，使这两个操作具有原子性。
+所以我们要添加事务，把事务从DAO层提升到Service层。**
 
 #### 4.2.4 使用Spring的事务代理工厂管理事务
 
@@ -5944,39 +6680,43 @@ Dao接口：
 
 配置文件，增加事务配置：
 
-    <!-- 注册事务管理器 -->
-    <bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
-        <property name="dataSource" ref="c3p0DataSource" />
-    </bean>
-    
-    <!-- 生成Service的事务代理对象 -->
-    <bean id="serviceProxy" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean">
-        <property name="target" ref="buyStockService" />
-        <property name="transcationManager" ref="transactionManager" />
-        <property name="transcationAttributes">
-            <props>
-                <!-- 在指定的切入点方法上要应用什么事务属性 -->
-                <prop key="open*">ISOLATION_DEFAULT, PROPAGATION_REQUIRED</prop>
-                <prop key="get*">ISOLATION_DEFAULT, PROPAGATION_REQUIRED</prop>
-                <prop key="updateStock">ISOLATION_DEFAULT, PROPAGATION_REQUIRED, -BuyStockException</prop>
-            </props>
-        </property>
-    </bean>
+```xml
+<!-- 注册事务管理器 -->
+<bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+    <property name="dataSource" ref="c3p0DataSource" />
+</bean>
+
+<!-- 生成Service的事务代理对象 -->
+<bean id="serviceProxy" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean">
+    <property name="target" ref="buyStockService" />
+    <property name="transcationManager" ref="transactionManager" />
+    <property name="transcationAttributes">
+        <props>
+            <!-- 在指定的切入点方法上要应用什么事务属性 -->
+            <prop key="open*">ISOLATION_DEFAULT, PROPAGATION_REQUIRED</prop>
+            <prop key="get*">ISOLATION_DEFAULT, PROPAGATION_REQUIRED</prop>
+            <prop key="updateStock">ISOLATION_DEFAULT, PROPAGATION_REQUIRED, -BuyStockException</prop>
+        </props>
+    </property>
+</bean>
+```
 
 测试方法，getBean方法使用代理类的id：
 
-    @Before
-    public void before() {
-        context = new ClassPathXmlApplicationContext("applicationContext.xml");
-        service = (IBuyStockService) context.getBean("serviceProxy");
-    }
+```java
+@Before
+public void before() {
+    context = new ClassPathXmlApplicationContext("applicationContext.xml");
+    service = (IBuyStockService) context.getBean("serviceProxy");
+}
 
-    @Test
-    public void testBuyStock() throws BuyStockException {
-        Account account = service.getAccount(1);
-        Stock stock = service.getStock(1);
-        service.updateStock(account, stock, 50, true);
-    }
+@Test
+public void testBuyStock() throws BuyStockException {
+    Account account = service.getAccount(1);
+    Stock stock = service.getStock(1);
+    service.updateStock(account, stock, 50, true);
+}
+```
 
 测试结果：
 
@@ -5990,50 +6730,54 @@ Dao接口：
 
 配置文件，需增加tx约束：
 
-    <!-- ======================== 事务 ======================== -->
-    <!-- 注册事务管理器 -->
-    <bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
-        <property name="dataSource" ref="c3p0DataSource" />
-    </bean>
-    
-    <!-- 注册事务注解驱动 -->
-    <tx:annotation-driven transaction-manager="transactionManager"/>
+```xml
+<!-- ======================== 事务 ======================== -->
+<!-- 注册事务管理器 -->
+<bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+    <property name="dataSource" ref="c3p0DataSource" />
+</bean>
+
+<!-- 注册事务注解驱动 -->
+<tx:annotation-driven transaction-manager="transactionManager"/>
+```
 
 主业务实现类，增加注解：
 
-    @Transactional(isolation=Isolation.DEFAULT, propagation=Propagation.REQUIRED)
-    @Override
-    public void openAccount(Account account) {
-        adao.insertAccount(account);
-    }
+```java
+@Transactional(isolation=Isolation.DEFAULT, propagation=Propagation.REQUIRED)
+@Override
+public void openAccount(Account account) {
+    adao.insertAccount(account);
+}
 
-    @Transactional(isolation=Isolation.DEFAULT, propagation=Propagation.REQUIRED)
-    @Override
-    public void openStock(Stock stock) {
-        sdao.insertStock(stock);
-    }
+@Transactional(isolation=Isolation.DEFAULT, propagation=Propagation.REQUIRED)
+@Override
+public void openStock(Stock stock) {
+    sdao.insertStock(stock);
+}
 
-    @Transactional(isolation=Isolation.DEFAULT, propagation=Propagation.REQUIRED)
-    @Override
-    public Account getAccount(int id) {
-        return adao.selectAccount(id);
-    }
+@Transactional(isolation=Isolation.DEFAULT, propagation=Propagation.REQUIRED)
+@Override
+public Account getAccount(int id) {
+    return adao.selectAccount(id);
+}
 
-    @Transactional(isolation=Isolation.DEFAULT, propagation=Propagation.REQUIRED)
-    @Override
-    public Stock getStock(int id) {
-        return sdao.selectStock(id);
-    }
+@Transactional(isolation=Isolation.DEFAULT, propagation=Propagation.REQUIRED)
+@Override
+public Stock getStock(int id) {
+    return sdao.selectStock(id);
+}
 
-    @Transactional(isolation=Isolation.DEFAULT, propagation=Propagation.REQUIRED, rollbackFor=BuyStockException.class)
-    @Override
-    public void updateStock(Account account, Stock stock, int amount, boolean isBuy) throws BuyStockException {
-        adao.updateAccount(account, stock, amount, isBuy);
-        if (isBuy) {
-            throw new BuyStockException("购买股票没有成功");
-        }
-        sdao.updateStock(stock, amount, isBuy);
+@Transactional(isolation=Isolation.DEFAULT, propagation=Propagation.REQUIRED, rollbackFor=BuyStockException.class)
+@Override
+public void updateStock(Account account, Stock stock, int amount, boolean isBuy) throws BuyStockException {
+    adao.updateAccount(account, stock, amount, isBuy);
+    if (isBuy) {
+        throw new BuyStockException("购买股票没有成功");
     }
+    sdao.updateStock(stock, amount, isBuy);
+}
+```
 
 测试结果正常，发生异常时回滚。
 
@@ -6041,28 +6785,30 @@ Dao接口：
 
 配置文件：
 
-    <!-- ======================== 事务 ======================== -->
-    <!-- 注册事务管理器 -->
-    <bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
-        <property name="dataSource" ref="c3p0DataSource" />
-    </bean>
+```xml
+<!-- ======================== 事务 ======================== -->
+<!-- 注册事务管理器 -->
+<bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+    <property name="dataSource" ref="c3p0DataSource" />
+</bean>
+
+<!-- 注册事务通知 -->
+<tx:advice id="txAdvice" transaction-manager="transactionManager">
+    <tx:attributes>
+        <!-- 对连接点方法上要使用的事务属性进行配置 -->
+        <tx:method name="open*" isolation="DEFAULT" propagation="REQUIRED"/>
+        <tx:method name="get*" isolation="DEFAULT" propagation="REQUIRED"/>
+        <tx:method name="updateStock" isolation="DEFAULT" propagation="REQUIRED" rollback-for="BuyStockException"/>
+    </tx:attributes>
+</tx:advice>
     
-    <!-- 注册事务通知 -->
-    <tx:advice id="txAdvice" transaction-manager="transactionManager">
-        <tx:attributes>
-            <!-- 对连接点方法上要使用的事务属性进行配置 -->
-            <tx:method name="open*" isolation="DEFAULT" propagation="REQUIRED"/>
-            <tx:method name="get*" isolation="DEFAULT" propagation="REQUIRED"/>
-            <tx:method name="updateStock" isolation="DEFAULT" propagation="REQUIRED" rollback-for="BuyStockException"/>
-        </tx:attributes>
-    </tx:advice>
-    
-    <!-- AOP配置 -->
-    <aop:config>
-        <!-- 指定切入点 -->
-        <aop:pointcut expression="execution(* *..service.*.*(..))" id="myPointcut"/>
-        <aop:advisor advice-ref="txAdvice" pointcut-ref="myPointcut"/>
-    </aop:config>
+<!-- AOP配置 -->
+<aop:config>
+    <!-- 指定切入点 -->
+    <aop:pointcut expression="execution(* *..service.*.*(..))" id="myPointcut"/>
+    <aop:advisor advice-ref="txAdvice" pointcut-ref="myPointcut"/>
+</aop:config>
+```
 
 测试结果正常。
 
@@ -6076,9 +6822,7 @@ Dao接口：
 
 *Spring中一般不适用Hibernate模板对象。*
 
-**
-整合的重点：将Hibernate的SessionFactory交给Spring管理。
-**
+**整合的重点：将Hibernate的SessionFactory交给Spring管理。**
 
 具体整合示例：
 
@@ -6133,9 +6877,640 @@ Dao接口：
 
 （2） SessionFactory的注册
 
-Spring的精髓是，所有的Bean均由Spring容器统一管理，所以在SPring中若要使用Hibernate，就需要将SessionFactory交由Spring来管理。
+Spring的精髓是，所有的Bean均由Spring容器统一管理，所以在Spring中若要使用Hibernate，就需要将SessionFactory交由Spring来管理。
 配置SessionFactory的Bean，将hibernate.cfg.xml文件替换掉。使用的实现类为LocalSessionFactoryBean，注意，是hibernate5包下的。其用于设置的属性主要有三个：数据源，映射文件，及hibernate特性。其设置内容，与Hibernate主配置文件的基本相同。
 
+```xml
+<!-- 注册SessionFactory -->
+<bean id="mySessionFactory" class="org.springframework.orm.hibernate5.LocalSessionFactoryBean">
+    <!-- 配置数据源 -->
+    <property name="dataSource" ref="c3p0DataSource" />
+    <!-- 配置映射文件所在文件夹 -->
+    <property name="mappingDirectoryLocations" value="tavish/bit/beans" />      
+    <!-- 配置Hibernate属性 -->
+    <property name="hibernateProperties">
+        <props>
+            <!-- 配置方言 -->
+            <prop key="hibernate.dialect">org.hibernate.dialect.MySQL5Dialect</prop>
+            <!-- 配置session策略 -->
+            <prop key="hibernate.current_session_context_class">org.springframework.orm.hibernate5.SpringSessionContext</prop>
+            <!-- 配置自动建表 -->
+            <prop key="hibernate.hbm2ddl.auto">update</prop>
+            <!-- 显示SQL语句 -->
+            <prop key="hibernate.show_sql">true</prop>
+            <!-- sql语句格式化输出 -->
+            <prop key="hibernate.format_sql">true</prop>
+        </props>
+    </property>
+</bean>
+```
+
+（3） 配置数据源
+
+这里使用c3p0数据源。
+
+```xml
+<!-- 注册数据源：c3p0数据源 -->
+<bean id="c3p0DataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource">
+    <!-- 数据库连接四要素 -->
+    <property name="driverClass" value="${jdbc.driver}" />
+    <property name="jdbcUrl" value="${jdbc.url}" />
+    <property name="user" value="${jdbc.user}" />
+    <property name="password" value="${jdbc.password}" />
+</bean>
+
+<!-- 添加context约束，然后使用如下标签注册属性文件 -->
+<context:property-placeholder location="classpath:jdbc.properties" />
+```
+
+（4） 注册事务管理器及AspectJ事务管理
+
+```xml
+<!-- 注册事务管理器 -->
+<bean id="transactionManager" class="org.springframework.orm.hibernate5.HibernateTransactionManager">
+    <property name="sessionFactory" ref="mySessionFactory" />
+</bean> 
+
+<!-- 使用AspectJ的AOP事务管理 -->
+<tx:advice id="txAdvice" transaction-manager="transactionManager">
+    <tx:attributes>
+        <tx:method name="add*" isolation="DEFAULT" propagation="REQUIRED"/>
+        <tx:method name="remove*" isolation="DEFAULT" propagation="REQUIRED"/>
+        <tx:method name="modify*" isolation="DEFAULT" propagation="REQUIRED"/>
+        <tx:method name="find*" isolation="DEFAULT" propagation="REQUIRED" read-only="true"/>
+    </tx:attributes>
+</tx:advice>
+
+<aop:config>
+    <aop:pointcut expression="execution(* *..service.*.*(..))" id="myPointcut"/>
+    <aop:advisor advice-ref="txAdvice" pointcut-ref="myPointcut"/>
+</aop:config>
+```
+
+（5） 注册Dao及Service
+
+```xml
+<!-- 注册Dao -->
+<bean id="studentDao" class="tavish.bit.dao.StudentDaoHbnImpl" >
+    <property name="sessionFactory" ref="mySessionFactory" />
+</bean>
+ 
+<!-- 注册Service -->
+<bean id="studentService" class="tavish.bit.service.StudentServiceImpl" >
+    <!-- 配置设值注入 -->
+    <property name="dao" ref="studentDao" />
+</bean>
+```
+
+（6） 业务代码
+
+1）Service层：
+
+主业务接口：
+
+```java
+package tavish.bit.service;
+
+import java.util.List;
+
+import tavish.bit.beans.Student;
+
+public interface IStudentService {
+    void addStudent(Student student);
+
+    void removeStudent(Student student);
+
+    void modifyStudent(Student student);
+
+    List<Student> findAllStudents();
+
+    Student findStudentById(int id);
+}
+```
+
+实现类：
+
+```java
+package tavish.bit.service;
+
+import java.util.List;
+
+import tavish.bit.beans.Student;
+import tavish.bit.dao.IStudentDao;
+
+public class StudentServiceImpl implements IStudentService {
+
+    private IStudentDao dao;
+
+    public void setDao(IStudentDao dao) {
+        this.dao = dao;
+    }
+
+    @Override
+    public void addStudent(Student student) {
+        dao.insertStudent(student);
+    }
+
+    @Override
+    public void removeStudent(Student student) {
+        dao.deleteStudent(student);
+    }
+
+    @Override
+    public void modifyStudent(Student student) {
+        dao.updateStudent(student);
+    }
+
+    @Override
+    public List<Student> findAllStudents() {
+        return dao.selectAllStudents();
+    }
+
+    @Override
+    public Student findStudentById(int id) {
+        return dao.selectStudentById(id);
+    }
+}
+```
+
+2）Dao层：
+
+Dao接口：
+
+```java
+package tavish.bit.dao;
+
+import java.util.List;
+
+import tavish.bit.beans.Student;
+
+public interface IStudentDao {
+    void insertStudent(Student student);
+
+    void deleteStudent(Student student);
+
+    void updateStudent(Student student);
+
+    List<Student> selectAllStudents();
+
+    Student selectStudentById(int id);
+}
+```
+
+实现类：
+
+```java
+package tavish.bit.dao;
+
+import java.util.List;
+
+import org.hibernate.SessionFactory;
+
+import tavish.bit.beans.Student;
+
+public class StudentDaoHbnImpl implements IStudentDao {
+
+    private SessionFactory sessionFactory;
+    
+    public void setSessionFactory(SessionFactory sessionFactory) {
+        this.sessionFactory = sessionFactory;
+    }
+
+    @Override
+    public void insertStudent(Student student) {
+        sessionFactory.getCurrentSession().save(student);
+    }
+
+    @Override
+    public void deleteStudent(Student student) {
+        sessionFactory.getCurrentSession().delete(student);
+    }
+
+    @Override
+    public void updateStudent(Student student) {
+        sessionFactory.getCurrentSession().update(student);
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public List<Student> selectAllStudents() {
+        String hql = "from Student";
+        return sessionFactory.getCurrentSession().createQuery(hql).list();
+    }
+
+    @Override
+    public Student selectStudentById(int id) {
+        return sessionFactory.getCurrentSession().get(Student.class, id);
+    }
+}
+```
+
+3）Bean类及映射文件：
+
+Bean类：
+
+```java
+package tavish.bit.beans;
+
+public class Student {
+    private Integer id;
+    private String name;
+    private int age;
+
+    public Student(String name, int age) {
+        super();
+        this.name = name;
+        this.age = age;
+    }
+
+    public Student() {
+        super();
+    }
+
+    public Integer getId() {
+        return id;
+    }
+
+    public void setId(Integer id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public int getAge() {
+        return age;
+    }
+
+    public void setAge(int age) {
+        this.age = age;
+    }
+
+    @Override
+    public String toString() {
+        return "Student [id=" + id + ", name=" + name + ", age=" + age + "]";
+    }
+}
+```
+
+映射文件：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE hibernate-mapping PUBLIC 
+    "-//Hibernate/Hibernate Mapping DTD 3.0//EN"
+    "http://www.hibernate.org/dtd/hibernate-mapping-3.0.dtd">
+
+<hibernate-mapping package="tavish.bit.beans">
+
+    <class name="Student">
+        <id name="id">
+            <generator class="native" />
+        </id>
+        <property name="name" />
+        <property name="age" />
+    </class>
+    
+</hibernate-mapping>
+```
+
+4）测试类
+
+```java
+package tavish.bit.test;
+
+import java.util.List;
+
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.support.ClassPathXmlApplicationContext;
+
+import tavish.bit.beans.Student;
+import tavish.bit.service.IStudentService;
+
+public class MyTest {
+    
+    private ApplicationContext context;
+    private IStudentService service;
+
+    @Before
+    public void before() {
+        context = new ClassPathXmlApplicationContext("applicationContext.xml");
+        service = (IStudentService) context.getBean("studentService");
+    }
+    
+    @After
+    public void After() {
+        ((ClassPathXmlApplicationContext)context).close();
+    }
+    
+    // 增
+    @Test
+    public void testAdd() {
+        Student student = new Student("张三", 20);
+        service.addStudent(student);
+    }
+    
+    // 删
+    @Test
+    public void testRemove() {
+        Student student = new Student();
+        student.setId(3);
+        service.removeStudent(student);
+    }
+    
+    // 改
+    @Test
+    public void testModify() {
+        Student student = new Student("李四", 24);
+        student.setId(1);
+        service.modifyStudent(student);
+    }
+    
+    // 查询所有学生
+    @Test
+    public void testFindAllStudents() {
+        List<Student> students = service.findAllStudents();
+        System.out.println(students);
+    }
+    
+    // 根据Id查询学生
+    @Test
+    public void testFindStudentById() {
+        Student student = service.findStudentById(1);
+        System.out.println(student);
+    }
+}
+```
+
+### 5.2 Spring在Web项目中的应用
+
+在Web项目中使用Spring框架，首先要解决在Servlet中（暂时不使用Struts2）获取
+到Spring容器的问题。只要在View层获取到了Spring容器，便可从容器中获取到Service对象。
+
+#### 5.2.1 Spring、Hibernate与Web整合的简单实现
+
+##### 5.2.1.1 在页面上提交表单对数据库进行插入
+
+*源代码在Spring-11-SSH-web下。*
+
+步骤一：创建实体及映射文件
+
+实体：
+
+```java
+package tavish.bit.beans;
+
+public class Student {
+    private Integer id;
+    private String name;
+    private int age;
+
+    public Student(String name, int age) {
+        super();
+        this.name = name;
+        this.age = age;
+    }
+
+    public Student() {
+        super();
+    }
+
+    public Integer getId() {
+        return id;
+    }
+
+    public void setId(Integer id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public int getAge() {
+        return age;
+    }
+
+    public void setAge(int age) {
+        this.age = age;
+    }
+
+    @Override
+    public String toString() {
+        return "Student [id=" + id + ", name=" + name + ", age=" + age + "]";
+    }
+}
+```
+
+映射文件：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE hibernate-mapping PUBLIC 
+    "-//Hibernate/Hibernate Mapping DTD 3.0//EN"
+    "http://www.hibernate.org/dtd/hibernate-mapping-3.0.dtd">
+
+<hibernate-mapping package="tavish.bit.beans">
+
+    <class name="Student">
+        <id name="id">
+            <generator class="native" />
+        </id>
+        <property name="name" />
+        <property name="age" />
+    </class>
+    
+</hibernate-mapping>
+```
+
+步骤二：创建Service接口及实现类
+
+Service接口：
+
+```java
+package tavish.bit.service;
+
+import java.util.List;
+
+import tavish.bit.beans.Student;
+
+public interface IStudentService {
+    void addStudent(Student student);
+
+    void removeStudent(Student student);
+
+    void modifyStudent(Student student);
+
+    List<Student> findAllStudents();
+
+    Student findStudentById(int id);
+}
+```
+
+实现类：
+
+```java
+package tavish.bit.service;
+
+import java.util.List;
+
+import tavish.bit.beans.Student;
+import tavish.bit.dao.IStudentDao;
+
+public class StudentServiceImpl implements IStudentService {
+
+    private IStudentDao dao;
+
+    public void setDao(IStudentDao dao) {
+        this.dao = dao;
+    }
+
+    @Override
+    public void addStudent(Student student) {
+        dao.insertStudent(student);
+    }
+
+    @Override
+    public void removeStudent(Student student) {
+        dao.deleteStudent(student);
+    }
+
+    @Override
+    public void modifyStudent(Student student) {
+        dao.updateStudent(student);
+    }
+
+    @Override
+    public List<Student> findAllStudents() {
+        return dao.selectAllStudents();
+    }
+
+    @Override
+    public Student findStudentById(int id) {
+        return dao.selectStudentById(id);
+    }
+}
+```
+
+步骤三：创建Dao接口及实现类
+
+接口：
+
+```java
+package tavish.bit.dao;
+
+import java.util.List;
+
+import tavish.bit.beans.Student;
+
+public interface IStudentDao {
+    void insertStudent(Student student);
+
+    void deleteStudent(Student student);
+
+    void updateStudent(Student student);
+
+    List<Student> selectAllStudents();
+
+    Student selectStudentById(int id);
+}
+```
+
+实现类：
+
+```java
+pa
+`ckage tavish.bit.dao;
+
+import java.util.List;
+
+import org.hibernate.SessionFactory;
+
+import tavish.bit.beans.Student;
+
+public class StudentDaoHbnImpl implements IStudentDao {
+
+    private SessionFactory sessionFactory;
+    
+    public void setSessionFactory(SessionFactory sessionFactory) {
+        this.sessionFactory = sessionFactory;
+    }
+
+    @Override
+    public void insertStudent(Student student) {
+        sessionFactory.getCurrentSession().save(student);
+    }
+
+    @Override
+    public void deleteStudent(Student student) {
+        sessionFactory.getCurrentSession().delete(student);
+    }
+
+    @Override
+    public void updateStudent(Student student) {
+        sessionFactory.getCurrentSession().update(student);
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public List<Student> selectAllStudents() {
+        String hql = "from Student";
+        return sessionFactory.getCurrentSession().createQuery(hql).list();
+    }
+
+    @Override
+    public Student selectStudentById(int id) {
+        return sessionFactory.getCurrentSession().get(Student.class, id);
+    }
+}
+```
+
+步骤四：配置Spring容器
+
+Spring配置文件：
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans
+    xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:context="http://www.springframework.org/schema/context"
+    xmlns:aop="http://www.springframework.org/schema/aop"
+    xmlns:tx="http://www.springframework.org/schema/tx"
+    xsi:schemaLocation="
+        http://www.springframework.org/schema/beans 
+        http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/context 
+        http://www.springframework.org/schema/context/spring-context.xsd
+        http://www.springframework.org/schema/tx 
+        http://www.springframework.org/schema/tx/spring-tx.xsd
+        http://www.springframework.org/schema/aop 
+        http://www.springframework.org/schema/aop/spring-aop.xsd">
+        
+    <!-- 注册数据源：c3p0数据源 -->
+    <bean id="c3p0DataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource">
+        <!-- 数据库连接四要素 -->
+        <property name="driverClass" value="${jdbc.driver}" />
+        <property name="jdbcUrl" value="${jdbc.url}" />
+        <property name="user" value="${jdbc.user}" />
+        <property name="password" value="${jdbc.password}" />
+    </bean>
+    
+    <!-- 添加context约束，然后使用如下标签注册属性文件 -->
+    <context:property-placeholder location="classpath:jdbc.properties" />
+    
     <!-- 注册SessionFactory -->
     <bean id="mySessionFactory" class="org.springframework.orm.hibernate5.LocalSessionFactoryBean">
         <!-- 配置数据源 -->
@@ -6158,25 +7533,7 @@ Spring的精髓是，所有的Bean均由Spring容器统一管理，所以在SPri
             </props>
         </property>
     </bean>
-
-（3） 配置数据源
-
-这里使用c3p0数据源。
-
-    <!-- 注册数据源：c3p0数据源 -->
-    <bean id="c3p0DataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource">
-        <!-- 数据库连接四要素 -->
-        <property name="driverClass" value="${jdbc.driver}" />
-        <property name="jdbcUrl" value="${jdbc.url}" />
-        <property name="user" value="${jdbc.user}" />
-        <property name="password" value="${jdbc.password}" />
-    </bean>
     
-    <!-- 添加context约束，然后使用如下标签注册属性文件 -->
-    <context:property-placeholder location="classpath:jdbc.properties" />
-
-（4） 注册事务管理器及AspectJ事务管理
-
     <!-- 注册事务管理器 -->
     <bean id="transactionManager" class="org.springframework.orm.hibernate5.HibernateTransactionManager">
         <property name="sessionFactory" ref="mySessionFactory" />
@@ -6196,9 +7553,7 @@ Spring的精髓是，所有的Bean均由Spring容器统一管理，所以在SPri
         <aop:pointcut expression="execution(* *..service.*.*(..))" id="myPointcut"/>
         <aop:advisor advice-ref="txAdvice" pointcut-ref="myPointcut"/>
     </aop:config>
-
-（5） 注册Dao及Service
-
+     
     <!-- 注册Dao -->
     <bean id="studentDao" class="tavish.bit.dao.StudentDaoHbnImpl" >
         <property name="sessionFactory" ref="mySessionFactory" />
@@ -6210,673 +7565,102 @@ Spring的精髓是，所有的Bean均由Spring容器统一管理，所以在SPri
         <property name="dao" ref="studentDao" />
     </bean>
 
-（6） 业务代码
-
-1）Service层：
-
-主业务接口：
-
-    package tavish.bit.service;
-
-    import java.util.List;
-
-    import tavish.bit.beans.Student;
-
-    public interface IStudentService {
-        void addStudent(Student student);
-
-        void removeStudent(Student student);
-
-        void modifyStudent(Student student);
-
-        List<Student> findAllStudents();
-
-        Student findStudentById(int id);
-    }
-
-实现类：
-
-    package tavish.bit.service;
-
-    import java.util.List;
-
-    import tavish.bit.beans.Student;
-    import tavish.bit.dao.IStudentDao;
-
-    public class StudentServiceImpl implements IStudentService {
-
-        private IStudentDao dao;
-
-        public void setDao(IStudentDao dao) {
-            this.dao = dao;
-        }
-
-        @Override
-        public void addStudent(Student student) {
-            dao.insertStudent(student);
-        }
-
-        @Override
-        public void removeStudent(Student student) {
-            dao.deleteStudent(student);
-        }
-
-        @Override
-        public void modifyStudent(Student student) {
-            dao.updateStudent(student);
-        }
-
-        @Override
-        public List<Student> findAllStudents() {
-            return dao.selectAllStudents();
-        }
-
-        @Override
-        public Student findStudentById(int id) {
-            return dao.selectStudentById(id);
-        }
-    }
-
-2）Dao层：
-
-Dao接口：
-
-    package tavish.bit.dao;
-
-    import java.util.List;
-
-    import tavish.bit.beans.Student;
-
-    public interface IStudentDao {
-        void insertStudent(Student student);
-
-        void deleteStudent(Student student);
-
-        void updateStudent(Student student);
-
-        List<Student> selectAllStudents();
-
-        Student selectStudentById(int id);
-    }
-
-实现类：
-
-    package tavish.bit.dao;
-
-    import java.util.List;
-
-    import org.hibernate.SessionFactory;
-
-    import tavish.bit.beans.Student;
-
-    public class StudentDaoHbnImpl implements IStudentDao {
-
-        private SessionFactory sessionFactory;
-        
-        public void setSessionFactory(SessionFactory sessionFactory) {
-            this.sessionFactory = sessionFactory;
-        }
-
-        @Override
-        public void insertStudent(Student student) {
-            sessionFactory.getCurrentSession().save(student);
-        }
-
-        @Override
-        public void deleteStudent(Student student) {
-            sessionFactory.getCurrentSession().delete(student);
-        }
-
-        @Override
-        public void updateStudent(Student student) {
-            sessionFactory.getCurrentSession().update(student);
-        }
-
-        @SuppressWarnings("unchecked")
-        @Override
-        public List<Student> selectAllStudents() {
-            String hql = "from Student";
-            return sessionFactory.getCurrentSession().createQuery(hql).list();
-        }
-
-        @Override
-        public Student selectStudentById(int id) {
-            return sessionFactory.getCurrentSession().get(Student.class, id);
-        }
-    }
-
-3）Bean类及映射文件：
-
-Bean类：
-
-    package tavish.bit.beans;
-
-    public class Student {
-        private Integer id;
-        private String name;
-        private int age;
-
-        public Student(String name, int age) {
-            super();
-            this.name = name;
-            this.age = age;
-        }
-
-        public Student() {
-            super();
-        }
-
-        public Integer getId() {
-            return id;
-        }
-
-        public void setId(Integer id) {
-            this.id = id;
-        }
-
-        public String getName() {
-            return name;
-        }
-
-        public void setName(String name) {
-            this.name = name;
-        }
-
-        public int getAge() {
-            return age;
-        }
-
-        public void setAge(int age) {
-            this.age = age;
-        }
-
-        @Override
-        public String toString() {
-            return "Student [id=" + id + ", name=" + name + ", age=" + age + "]";
-        }
-
-    }
-
-映射文件：
-
-    <?xml version="1.0" encoding="UTF-8"?>
-    <!DOCTYPE hibernate-mapping PUBLIC 
-        "-//Hibernate/Hibernate Mapping DTD 3.0//EN"
-        "http://www.hibernate.org/dtd/hibernate-mapping-3.0.dtd">
-
-    <hibernate-mapping package="tavish.bit.beans">
-
-        <class name="Student">
-            <id name="id">
-                <generator class="native" />
-            </id>
-            <property name="name" />
-            <property name="age" />
-        </class>
-        
-    </hibernate-mapping>
-
-4）测试类
-
-    package tavish.bit.test;
-
-    import java.util.List;
-
-    import org.junit.After;
-    import org.junit.Before;
-    import org.junit.Test;
-    import org.springframework.context.ApplicationContext;
-    import org.springframework.context.support.ClassPathXmlApplicationContext;
-
-    import tavish.bit.beans.Student;
-    import tavish.bit.service.IStudentService;
-
-    public class MyTest {
-        
-        private ApplicationContext context;
-        private IStudentService service;
-
-        @Before
-        public void before() {
-            context = new ClassPathXmlApplicationContext("applicationContext.xml");
-            service = (IStudentService) context.getBean("studentService");
-        }
-        
-        @After
-        public void After() {
-            ((ClassPathXmlApplicationContext)context).close();
-        }
-        
-        // 增
-        @Test
-        public void testAdd() {
-            Student student = new Student("张三", 20);
-            service.addStudent(student);
-        }
-        
-        // 删
-        @Test
-        public void testRemove() {
-            Student student = new Student();
-            student.setId(3);
-            service.removeStudent(student);
-        }
-        
-        // 改
-        @Test
-        public void testModify() {
-            Student student = new Student("李四", 24);
-            student.setId(1);
-            service.modifyStudent(student);
-        }
-        
-        // 查询所有学生
-        @Test
-        public void testFindAllStudents() {
-            List<Student> students = service.findAllStudents();
-            System.out.println(students);
-        }
-        
-        // 根据Id查询学生
-        @Test
-        public void testFindStudentById() {
-            Student student = service.findStudentById(1);
-            System.out.println(student);
-        }
-    }
-
-### 5.2 Spring在Web项目中的应用
-
-在Web项目中使用Spring框架，首先要解决在Servlet中（暂时不使用Struts2）获取
-到Spring容器的问题。只要在View层获取到了Spring容器，便可从容器中获取到Service对象。
-
-#### 5.2.1 Spring、Hibernate与Web整合的简单实现
-
-##### 5.2.1.1 在页面上提交表单对数据库进行插入
-
-*源代码在Spring-11-SSH-web下。*
-
-步骤一：创建实体及映射文件
-
-实体：
-
-    package tavish.bit.beans;
-
-    public class Student {
-        private Integer id;
-        private String name;
-        private int age;
-
-        public Student(String name, int age) {
-            super();
-            this.name = name;
-            this.age = age;
-        }
-
-        public Student() {
-            super();
-        }
-
-        public Integer getId() {
-            return id;
-        }
-
-        public void setId(Integer id) {
-            this.id = id;
-        }
-
-        public String getName() {
-            return name;
-        }
-
-        public void setName(String name) {
-            this.name = name;
-        }
-
-        public int getAge() {
-            return age;
-        }
-
-        public void setAge(int age) {
-            this.age = age;
-        }
-
-        @Override
-        public String toString() {
-            return "Student [id=" + id + ", name=" + name + ", age=" + age + "]";
-        }
-
-    }
-
-映射文件：
-
-    <?xml version="1.0" encoding="UTF-8"?>
-    <!DOCTYPE hibernate-mapping PUBLIC 
-        "-//Hibernate/Hibernate Mapping DTD 3.0//EN"
-        "http://www.hibernate.org/dtd/hibernate-mapping-3.0.dtd">
-
-    <hibernate-mapping package="tavish.bit.beans">
-
-        <class name="Student">
-            <id name="id">
-                <generator class="native" />
-            </id>
-            <property name="name" />
-            <property name="age" />
-        </class>
-        
-    </hibernate-mapping>
-
-步骤二：创建Service接口及实现类
-
-Service接口：
-
-    package tavish.bit.service;
-
-    import java.util.List;
-
-    import tavish.bit.beans.Student;
-
-    public interface IStudentService {
-        void addStudent(Student student);
-
-        void removeStudent(Student student);
-
-        void modifyStudent(Student student);
-
-        List<Student> findAllStudents();
-
-        Student findStudentById(int id);
-    }
-
-实现类：
-
-    package tavish.bit.service;
-
-    import java.util.List;
-
-    import tavish.bit.beans.Student;
-    import tavish.bit.dao.IStudentDao;
-
-    public class StudentServiceImpl implements IStudentService {
-
-        private IStudentDao dao;
-
-        public void setDao(IStudentDao dao) {
-            this.dao = dao;
-        }
-
-        @Override
-        public void addStudent(Student student) {
-            dao.insertStudent(student);
-        }
-
-        @Override
-        public void removeStudent(Student student) {
-            dao.deleteStudent(student);
-        }
-
-        @Override
-        public void modifyStudent(Student student) {
-            dao.updateStudent(student);
-        }
-
-        @Override
-        public List<Student> findAllStudents() {
-            return dao.selectAllStudents();
-        }
-
-        @Override
-        public Student findStudentById(int id) {
-            return dao.selectStudentById(id);
-        }
-    }
-
-步骤三：创建Dao接口及实现类
-
-接口：
-
-    package tavish.bit.dao;
-
-    import java.util.List;
-
-    import tavish.bit.beans.Student;
-
-    public interface IStudentDao {
-        void insertStudent(Student student);
-
-        void deleteStudent(Student student);
-
-        void updateStudent(Student student);
-
-        List<Student> selectAllStudents();
-
-        Student selectStudentById(int id);
-    }
-
-
-实现类：
-
-    package tavish.bit.dao;
-
-    import java.util.List;
-
-    import org.hibernate.SessionFactory;
-
-    import tavish.bit.beans.Student;
-
-    public class StudentDaoHbnImpl implements IStudentDao {
-
-        private SessionFactory sessionFactory;
-        
-        public void setSessionFactory(SessionFactory sessionFactory) {
-            this.sessionFactory = sessionFactory;
-        }
-
-        @Override
-        public void insertStudent(Student student) {
-            sessionFactory.getCurrentSession().save(student);
-        }
-
-        @Override
-        public void deleteStudent(Student student) {
-            sessionFactory.getCurrentSession().delete(student);
-        }
-
-        @Override
-        public void updateStudent(Student student) {
-            sessionFactory.getCurrentSession().update(student);
-        }
-
-        @SuppressWarnings("unchecked")
-        @Override
-        public List<Student> selectAllStudents() {
-            String hql = "from Student";
-            return sessionFactory.getCurrentSession().createQuery(hql).list();
-        }
-
-        @Override
-        public Student selectStudentById(int id) {
-            return sessionFactory.getCurrentSession().get(Student.class, id);
-        }
-    }
-
-步骤四：配置Spring容器
-
-Spring配置文件：
-
-    <?xml version="1.0" encoding="UTF-8"?>
-    <beans
-        xmlns="http://www.springframework.org/schema/beans"
-        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xmlns:context="http://www.springframework.org/schema/context"
-        xmlns:aop="http://www.springframework.org/schema/aop"
-        xmlns:tx="http://www.springframework.org/schema/tx"
-        xsi:schemaLocation="
-            http://www.springframework.org/schema/beans 
-            http://www.springframework.org/schema/beans/spring-beans.xsd
-            http://www.springframework.org/schema/context 
-            http://www.springframework.org/schema/context/spring-context.xsd
-            http://www.springframework.org/schema/tx 
-            http://www.springframework.org/schema/tx/spring-tx.xsd
-            http://www.springframework.org/schema/aop 
-            http://www.springframework.org/schema/aop/spring-aop.xsd">
-            
-        <!-- 注册数据源：c3p0数据源 -->
-        <bean id="c3p0DataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource">
-            <!-- 数据库连接四要素 -->
-            <property name="driverClass" value="${jdbc.driver}" />
-            <property name="jdbcUrl" value="${jdbc.url}" />
-            <property name="user" value="${jdbc.user}" />
-            <property name="password" value="${jdbc.password}" />
-        </bean>
-        
-        <!-- 添加context约束，然后使用如下标签注册属性文件 -->
-        <context:property-placeholder location="classpath:jdbc.properties" />
-        
-        <!-- 注册SessionFactory -->
-        <bean id="mySessionFactory" class="org.springframework.orm.hibernate5.LocalSessionFactoryBean">
-            <!-- 配置数据源 -->
-            <property name="dataSource" ref="c3p0DataSource" />
-            <!-- 配置映射文件所在文件夹 -->
-            <property name="mappingDirectoryLocations" value="tavish/bit/beans" />      
-            <!-- 配置Hibernate属性 -->
-            <property name="hibernateProperties">
-                <props>
-                    <!-- 配置方言 -->
-                    <prop key="hibernate.dialect">org.hibernate.dialect.MySQL5Dialect</prop>
-                    <!-- 配置session策略 -->
-                    <prop key="hibernate.current_session_context_class">org.springframework.orm.hibernate5.SpringSessionContext</prop>
-                    <!-- 配置自动建表 -->
-                    <prop key="hibernate.hbm2ddl.auto">update</prop>
-                    <!-- 显示SQL语句 -->
-                    <prop key="hibernate.show_sql">true</prop>
-                    <!-- sql语句格式化输出 -->
-                    <prop key="hibernate.format_sql">true</prop>
-                </props>
-            </property>
-        </bean>
-        
-        <!-- 注册事务管理器 -->
-        <bean id="transactionManager" class="org.springframework.orm.hibernate5.HibernateTransactionManager">
-            <property name="sessionFactory" ref="mySessionFactory" />
-        </bean> 
-        
-        <!-- 使用AspectJ的AOP事务管理 -->
-        <tx:advice id="txAdvice" transaction-manager="transactionManager">
-            <tx:attributes>
-                <tx:method name="add*" isolation="DEFAULT" propagation="REQUIRED"/>
-                <tx:method name="remove*" isolation="DEFAULT" propagation="REQUIRED"/>
-                <tx:method name="modify*" isolation="DEFAULT" propagation="REQUIRED"/>
-                <tx:method name="find*" isolation="DEFAULT" propagation="REQUIRED" read-only="true"/>
-            </tx:attributes>
-        </tx:advice>
-        
-        <aop:config>
-            <aop:pointcut expression="execution(* *..service.*.*(..))" id="myPointcut"/>
-            <aop:advisor advice-ref="txAdvice" pointcut-ref="myPointcut"/>
-        </aop:config>
-         
-        <!-- 注册Dao -->
-        <bean id="studentDao" class="tavish.bit.dao.StudentDaoHbnImpl" >
-            <property name="sessionFactory" ref="mySessionFactory" />
-        </bean>
-         
-        <!-- 注册Service -->
-        <bean id="studentService" class="tavish.bit.service.StudentServiceImpl" >
-            <!-- 配置设值注入 -->
-            <property name="dao" ref="studentDao" />
-        </bean>
-
-    </beans>
+</beans>
+```
 
 步骤五：创建Servlet及Jsp页面
 
 Servlet：
 
-    package tavish.bit.servlets;
+```java
+package tavish.bit.servlets;
 
-    import java.io.IOException;
-    import javax.servlet.ServletException;
-    import javax.servlet.annotation.WebServlet;
-    import javax.servlet.http.HttpServlet;
-    import javax.servlet.http.HttpServletRequest;
-    import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
-    import org.springframework.context.support.AbstractApplicationContext;
-    import org.springframework.context.support.ClassPathXmlApplicationContext;
+import org.springframework.context.support.AbstractApplicationContext;
+import org.springframework.context.support.ClassPathXmlApplicationContext;
 
-    import tavish.bit.beans.Student;
-    import tavish.bit.service.IStudentService;
+import tavish.bit.beans.Student;
+import tavish.bit.service.IStudentService;
 
-    @WebServlet(urlPatterns = { "/registerServlet" })
-    public class RegisterServlet extends HttpServlet {
-        private static final long serialVersionUID = 1L;
+@WebServlet(urlPatterns = { "/registerServlet" })
+public class RegisterServlet extends HttpServlet {
+    private static final long serialVersionUID = 1L;
 
-        public RegisterServlet() {
-            super();
-        }
-
-        protected void doGet(HttpServletRequest request, HttpServletResponse response)
-                throws ServletException, IOException {
-            request.setCharacterEncoding("utf-8");
-            // 获取页面提交的参数
-            String name = request.getParameter("name");
-            int age = Integer.parseInt(request.getParameter("age"));
-            // 创建实体
-            Student student = new Student(name, age);
-
-            // 1. 创建Spring容器
-            AbstractApplicationContext context = new ClassPathXmlApplicationContext("applicationContext.xml");
-            // 2. 从容器中获取Service对象
-            IStudentService service = (IStudentService) context.getBean("studentService");
-            // 3. Service对象调用addStudent()方法
-            service.addStudent(student);
-
-            request.getRequestDispatcher("/welcome.jsp").forward(request, response);
-
-            context.close();
-        }
-
-        protected void doPost(HttpServletRequest request, HttpServletResponse response)
-                throws ServletException, IOException {
-            doGet(request, response);
-        }
+    public RegisterServlet() {
+        super();
     }
+
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        request.setCharacterEncoding("utf-8");
+        // 获取页面提交的参数
+        String name = request.getParameter("name");
+        int age = Integer.parseInt(request.getParameter("age"));
+        // 创建实体
+        Student student = new Student(name, age);
+
+        // 1. 创建Spring容器
+        AbstractApplicationContext context = new ClassPathXmlApplicationContext("applicationContext.xml");
+        // 2. 从容器中获取Service对象
+        IStudentService service = (IStudentService) context.getBean("studentService");
+        // 3. Service对象调用addStudent()方法
+        service.addStudent(student);
+
+        request.getRequestDispatcher("/welcome.jsp").forward(request, response);
+
+        context.close();
+    }
+
+    protected void doPost(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        doGet(request, response);
+    }
+}
+```
 
 Jsp：
 
 register.jsp：
 
-    <%@ page language="java" contentType="text/html; charset=utf-8" pageEncoding="utf-8"%>
-    <!DOCTYPE html>
-    <html>
-    <head>
-    <meta charset="utf-8">
-    <title>Register</title>
-    </head>
-    <body>
-        <form action="registerServlet" method="post">
-            <label>姓名：<input type="text" name="name" /></label><br>
-            <label>年龄：<input type="text" name="age" id="age"/></label><br>
-            <input type="submit" value="注册"/>
-        </form>
-    </body>
-    </html>
+```jsp
+<%@ page language="java" contentType="text/html; charset=utf-8" pageEncoding="utf-8"%>
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Register</title>
+</head>
+<body>
+    <form action="registerServlet" method="post">
+        <label>姓名：<input type="text" name="name" /></label><br>
+        <label>年龄：<input type="text" name="age" id="age"/></label><br>
+        <input type="submit" value="注册"/>
+    </form>
+</body>
+</html>
+```
 
 welcome.jsp：
 
-    <%@ page language="java" contentType="text/html; charset=utf-8" pageEncoding="utf-8"%>
-    <!DOCTYPE html>
-    <html>
-    <head>
-    <meta charset="utf-8">
-    <title>Welcome</title>
-    </head>
-    <body>
-        Welcome Page!
-    </body>
-    </html>
+```jsp
+<%@ page language="java" contentType="text/html; charset=utf-8" pageEncoding="utf-8"%>
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Welcome</title>
+</head>
+<body>
+    Welcome Page!
+</body>
+</html>
+```
 
 **发布项目，测试结果正常。**
 
@@ -6884,74 +7668,77 @@ welcome.jsp：
 
 但上述实现有个很严重的问题：**每次访问这个Servlet时，都会创建一个Spring容器。这是不正确的，Spring容器应该在Web项目启动时只初始化一次。**
 
-**
-通过配置监听器解决这个问题：
-**
+**通过配置监听器解决这个问题：**
 
 *源代码在Spring-11-SSH-web-2下。*
 
 修改web.xml，注册监听器（需要导入spring-web-4.3.9.RELEASE.jar）：
 
-    <!-- 注册ServletContext监听器 -->
-    <listener>
-        <listener-class>org.springframework.web.context.ContextLoaderListener</listener-class>
-    </listener>
+```xml
+<!-- 注册ServletContext监听器 -->
+<listener>
+    <listener-class>org.springframework.web.context.ContextLoaderListener</listener-class>
+</listener>
+```
 
 **此时需要将Spring的配置文件放在WEB-INF下，并且文件名必须是applicationContext.xml。因为默认情况下会到WEB-INF下找名为applicationContext.xml的配置文件。**
 
 同时修改SessionFactory的配置属性，指明类路径：
 
-    <!-- 配置映射文件所在文件夹 -->
-    <property name="mappingDirectoryLocations" value="classpath:tavish/bit/beans" />       
+```xml
+<!-- 配置映射文件所在文件夹 -->
+<property name="mappingDirectoryLocations" value="classpath:tavish/bit/beans" />       
+```
 
 修改Servlet：
 
-    package tavish.bit.servlets;
+```java
+package tavish.bit.servlets;
 
-    import java.io.IOException;
+import java.io.IOException;
 
-    import javax.servlet.ServletContext;
-    import javax.servlet.ServletException;
-    import javax.servlet.annotation.WebServlet;
-    import javax.servlet.http.HttpServlet;
-    import javax.servlet.http.HttpServletRequest;
-    import javax.servlet.http.HttpServletResponse;
+import javax.servlet.ServletContext;
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
-    import org.springframework.web.context.WebApplicationContext;
+import org.springframework.web.context.WebApplicationContext;
 
-    import tavish.bit.beans.Student;
-    import tavish.bit.service.IStudentService;
+import tavish.bit.beans.Student;
+import tavish.bit.service.IStudentService;
 
-    @WebServlet(urlPatterns = { "/registerServlet" })
-    public class RegisterServlet extends HttpServlet {
-        private static final long serialVersionUID = 1L;
+@WebServlet(urlPatterns = { "/registerServlet" })
+public class RegisterServlet extends HttpServlet {
+    private static final long serialVersionUID = 1L;
 
-        protected void doGet(HttpServletRequest request, HttpServletResponse response)
-                throws ServletException, IOException {
-            request.setCharacterEncoding("utf-8");
-            // 获取页面提交的参数
-            String name = request.getParameter("name");
-            int age = Integer.parseInt(request.getParameter("age"));
-            // 创建实体
-            Student student = new Student(name, age);
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        request.setCharacterEncoding("utf-8");
+        // 获取页面提交的参数
+        String name = request.getParameter("name");
+        int age = Integer.parseInt(request.getParameter("age"));
+        // 创建实体
+        Student student = new Student(name, age);
 
-            // 1. 从ServletContext中获取Spring容器
-            ServletContext servletContext = this.getServletContext();
-            WebApplicationContext context = (WebApplicationContext) servletContext.getAttribute(WebApplicationContext.ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE);
-            // 2. 从容器中获取Service对象
-            IStudentService service = (IStudentService) context.getBean("studentService");
-            // 3. Service对象调用addStudent()方法
-            service.addStudent(student);
+        // 1. 从ServletContext中获取Spring容器
+        ServletContext servletContext = this.getServletContext();
+        WebApplicationContext context = (WebApplicationContext) servletContext.getAttribute(WebApplicationContext.ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE);
+        // 2. 从容器中获取Service对象
+        IStudentService service = (IStudentService) context.getBean("studentService");
+        // 3. Service对象调用addStudent()方法
+        service.addStudent(student);
 
-            request.getRequestDispatcher("/welcome.jsp").forward(request, response);
-        }
-
-        protected void doPost(HttpServletRequest request, HttpServletResponse response)
-                throws ServletException, IOException {
-            doGet(request, response);
-        }
-
+        request.getRequestDispatcher("/welcome.jsp").forward(request, response);
     }
+
+    protected void doPost(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        doGet(request, response);
+    }
+}
+```
 
 **发布项目，测试结果正常。**
 
@@ -6968,11 +7755,13 @@ welcome.jsp：
 
 修改web.xml文件：
 
-    <context-param>
-        <description>设置Spring配置文件位置及名称</description>
-        <param-name>contextConfigLocation</param-name>
-        <param-value>classpath:spring.xml</param-value>
-    </context-param>
+```xml
+<context-param>
+    <description>设置Spring配置文件位置及名称</description>
+    <param-name>contextConfigLocation</param-name>
+    <param-value>classpath:spring.xml</param-value>
+</context-param>
+```
 
 此时设置了Spring的配置文件位置为类路径，同时指定名字为Spring.xml。
 
@@ -6984,8 +7773,10 @@ welcome.jsp：
 
 将获取Spring容器的代码改为：
 
-    // 1. 使用工具获取Spring容器对象
-    WebApplicationContext context = WebApplicationContextUtils.getRequiredWebApplicationContext(this.getServletContext());
+```java
+// 1. 使用工具获取Spring容器对象
+WebApplicationContext context = WebApplicationContextUtils.getRequiredWebApplicationContext(this.getServletContext());
+```
 
 **发布项目，测试结果正常。**
 
@@ -7006,468 +7797,498 @@ Spring与Struts2整合的目的有两个：
 
 bean类：
 
-    package tavish.bit.beans;
+```java
+package tavish.bit.beans;
 
-    public class Student {
-        private Integer id;
-        private String name;
-        private int age;
+public class Student {
+    private Integer id;
+    private String name;
+    private int age;
 
-        public Student(String name, int age) {
-            super();
-            this.name = name;
-            this.age = age;
-        }
-
-        public Student() {
-            super();
-        }
-
-        public Integer getId() {
-            return id;
-        }
-
-        public void setId(Integer id) {
-            this.id = id;
-        }
-
-        public String getName() {
-            return name;
-        }
-
-        public void setName(String name) {
-            this.name = name;
-        }
-
-        public int getAge() {
-            return age;
-        }
-
-        public void setAge(int age) {
-            this.age = age;
-        }
-
-        @Override
-        public String toString() {
-            return "Student [id=" + id + ", name=" + name + ", age=" + age + "]";
-        }
-
+    public Student(String name, int age) {
+        super();
+        this.name = name;
+        this.age = age;
     }
+
+    public Student() {
+        super();
+    }
+
+    public Integer getId() {
+        return id;
+    }
+
+    public void setId(Integer id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public int getAge() {
+        return age;
+    }
+
+    public void setAge(int age) {
+        this.age = age;
+    }
+
+    @Override
+    public String toString() {
+        return "Student [id=" + id + ", name=" + name + ", age=" + age + "]";
+    }
+}
+```
 
 映射文件：
 
-    <?xml version="1.0" encoding="UTF-8"?>
-    <!DOCTYPE hibernate-mapping PUBLIC 
-        "-//Hibernate/Hibernate Mapping DTD 3.0//EN"
-        "http://www.hibernate.org/dtd/hibernate-mapping-3.0.dtd">
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE hibernate-mapping PUBLIC 
+    "-//Hibernate/Hibernate Mapping DTD 3.0//EN"
+    "http://www.hibernate.org/dtd/hibernate-mapping-3.0.dtd">
 
-    <hibernate-mapping package="tavish.bit.beans">
-        <class name="Student">
-            <id name="id">
-                <generator class="native" />
-            </id>
-            <property name="name" />
-            <property name="age" />
-        </class>
-    </hibernate-mapping>
+<hibernate-mapping package="tavish.bit.beans">
+    <class name="Student">
+        <id name="id">
+            <generator class="native" />
+        </id>
+        <property name="name" />
+        <property name="age" />
+    </class>
+</hibernate-mapping>
+```
 
 （2）Dao接口及实现类：
 
 接口：
 
-    package tavish.bit.dao;
+```java
+package tavish.bit.dao;
 
-    import java.util.List;
+import java.util.List;
 
-    import tavish.bit.beans.Student;
+import tavish.bit.beans.Student;
 
-    public interface IStudentDao {
-        void insertStudent(Student student);
+public interface IStudentDao {
+    void insertStudent(Student student);
 
-        void deleteStudent(Student student);
+    void deleteStudent(Student student);
 
-        void updateStudent(Student student);
+    void updateStudent(Student student);
 
-        List<Student> selectAllStudents();
+    List<Student> selectAllStudents();
 
-        Student selectStudentById(int id);
-    }
+    Student selectStudentById(int id);
+}
+```
 
 实现类：
 
-    package tavish.bit.dao;
+```java
+package tavish.bit.dao;
 
-    import java.util.List;
+import java.util.List;
 
-    import org.hibernate.SessionFactory;
+import org.hibernate.SessionFactory;
 
-    import tavish.bit.beans.Student;
+import tavish.bit.beans.Student;
 
-    public class StudentDaoHbnImpl implements IStudentDao {
+public class StudentDaoHbnImpl implements IStudentDao {
 
-        private SessionFactory sessionFactory;
-        
-        public void setSessionFactory(SessionFactory sessionFactory) {
-            this.sessionFactory = sessionFactory;
-        }
-
-        @Override
-        public void insertStudent(Student student) {
-            sessionFactory.getCurrentSession().save(student);
-        }
-
-        @Override
-        public void deleteStudent(Student student) {
-            sessionFactory.getCurrentSession().delete(student);
-        }
-
-        @Override
-        public void updateStudent(Student student) {
-            sessionFactory.getCurrentSession().update(student);
-        }
-
-        @SuppressWarnings("unchecked")
-        @Override
-        public List<Student> selectAllStudents() {
-            String hql = "from Student";
-            return sessionFactory.getCurrentSession().createQuery(hql).list();
-        }
-
-        @Override
-        public Student selectStudentById(int id) {
-            return sessionFactory.getCurrentSession().get(Student.class, id);
-        }
+    private SessionFactory sessionFactory;
+    
+    public void setSessionFactory(SessionFactory sessionFactory) {
+        this.sessionFactory = sessionFactory;
     }
+
+    @Override
+    public void insertStudent(Student student) {
+        sessionFactory.getCurrentSession().save(student);
+    }
+
+    @Override
+    public void deleteStudent(Student student) {
+        sessionFactory.getCurrentSession().delete(student);
+    }
+
+    @Override
+    public void updateStudent(Student student) {
+        sessionFactory.getCurrentSession().update(student);
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public List<Student> selectAllStudents() {
+        String hql = "from Student";
+        return sessionFactory.getCurrentSession().createQuery(hql).list();
+    }
+
+    @Override
+    public Student selectStudentById(int id) {
+        return sessionFactory.getCurrentSession().get(Student.class, id);
+    }
+}
+```
 
 （3）Service接口及实现类
 
 接口：
 
-    package tavish.bit.service;
+```java
+package tavish.bit.service;
 
-    import java.util.List;
+import java.util.List;
 
-    import tavish.bit.beans.Student;
+import tavish.bit.beans.Student;
 
-    public interface IStudentService {
-        void addStudent(Student student);
+public interface IStudentService {
+    void addStudent(Student student);
 
-        void removeStudent(Student student);
+    void removeStudent(Student student);
 
-        void modifyStudent(Student student);
+    void modifyStudent(Student student);
 
-        List<Student> findAllStudents();
+    List<Student> findAllStudents();
 
-        Student findStudentById(int id);
-    }
+    Student findStudentById(int id);
+}
+```
 
 实现类：
 
-    package tavish.bit.service;
+```java
+package tavish.bit.service;
 
-    import java.util.List;
+import java.util.List;
 
-    import tavish.bit.beans.Student;
-    import tavish.bit.dao.IStudentDao;
+import tavish.bit.beans.Student;
+import tavish.bit.dao.IStudentDao;
 
-    public class StudentServiceImpl implements IStudentService {
+public class StudentServiceImpl implements IStudentService {
 
-        private IStudentDao dao;
+    private IStudentDao dao;
 
-        public void setDao(IStudentDao dao) {
-            this.dao = dao;
-        }
-
-        @Override
-        public void addStudent(Student student) {
-            dao.insertStudent(student);
-        }
-
-        @Override
-        public void removeStudent(Student student) {
-            dao.deleteStudent(student);
-        }
-
-        @Override
-        public void modifyStudent(Student student) {
-            dao.updateStudent(student);
-        }
-
-        @Override
-        public List<Student> findAllStudents() {
-            return dao.selectAllStudents();
-        }
-
-        @Override
-        public Student findStudentById(int id) {
-            return dao.selectStudentById(id);
-        }
+    public void setDao(IStudentDao dao) {
+        this.dao = dao;
     }
+
+    @Override
+    public void addStudent(Student student) {
+        dao.insertStudent(student);
+    }
+
+    @Override
+    public void removeStudent(Student student) {
+        dao.deleteStudent(student);
+    }
+
+    @Override
+    public void modifyStudent(Student student) {
+        dao.updateStudent(student);
+    }
+
+    @Override
+    public List<Student> findAllStudents() {
+        return dao.selectAllStudents();
+    }
+
+    @Override
+    public Student findStudentById(int id) {
+        return dao.selectStudentById(id);
+    }
+}
+```
 
 （4）Action
 
-    package tavish.bit.actions;
+```java
+package tavish.bit.actions;
 
-    import tavish.bit.beans.Student;
-    import tavish.bit.service.IStudentService;
+import tavish.bit.beans.Student;
+import tavish.bit.service.IStudentService;
 
-    public class RegisterAction {
-        private String name;
-        private int age;
-        
-        // 要保证这里的Service属性名与Spring容器中该Bean的id名称相同
-        // 采用的是byName域属性的自动注入
-        private IStudentService studentService;
+public class RegisterAction {
+    private String name;
+    private int age;
+    
+    // 要保证这里的Service属性名与Spring容器中该Bean的id名称相同
+    // 采用的是byName域属性的自动注入
+    private IStudentService studentService;
 
-        public String getName() {
-            return name;
-        }
-
-        public void setName(String name) {
-            this.name = name;
-        }
-
-        public int getAge() {
-            return age;
-        }
-
-        public void setAge(int age) {
-            this.age = age;
-        }
-
-        public void setStudentService(IStudentService studentService) {
-            this.studentService = studentService;
-        }
-
-        public String execute() {
-            Student student = new Student(name, age);
-            studentService.addStudent(student);
-            return "success";
-        }
+    public String getName() {
+        return name;
     }
 
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public int getAge() {
+        return age;
+    }
+
+    public void setAge(int age) {
+        this.age = age;
+    }
+
+    public void setStudentService(IStudentService studentService) {
+        this.studentService = studentService;
+    }
+
+    public String execute() {
+        Student student = new Student(name, age);
+        studentService.addStudent(student);
+        return "success";
+    }
+}
+```
 
 （5）配置文件
 
 Spring：
 
-    <?xml version="1.0" encoding="UTF-8"?>
-    <beans
-        xmlns="http://www.springframework.org/schema/beans"
-        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xmlns:context="http://www.springframework.org/schema/context"
-        xmlns:aop="http://www.springframework.org/schema/aop"
-        xmlns:tx="http://www.springframework.org/schema/tx"
-        xsi:schemaLocation="
-            http://www.springframework.org/schema/beans 
-            http://www.springframework.org/schema/beans/spring-beans.xsd
-            http://www.springframework.org/schema/context 
-            http://www.springframework.org/schema/context/spring-context.xsd
-            http://www.springframework.org/schema/tx 
-            http://www.springframework.org/schema/tx/spring-tx.xsd
-            http://www.springframework.org/schema/aop 
-            http://www.springframework.org/schema/aop/spring-aop.xsd">
-            
-        <!-- 注册数据源：c3p0数据源 -->
-        <bean id="c3p0DataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource">
-            <!-- 数据库连接四要素 -->
-            <property name="driverClass" value="${jdbc.driver}" />
-            <property name="jdbcUrl" value="${jdbc.url}" />
-            <property name="user" value="${jdbc.user}" />
-            <property name="password" value="${jdbc.password}" />
-        </bean>
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans
+    xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:context="http://www.springframework.org/schema/context"
+    xmlns:aop="http://www.springframework.org/schema/aop"
+    xmlns:tx="http://www.springframework.org/schema/tx"
+    xsi:schemaLocation="
+        http://www.springframework.org/schema/beans 
+        http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/context 
+        http://www.springframework.org/schema/context/spring-context.xsd
+        http://www.springframework.org/schema/tx 
+        http://www.springframework.org/schema/tx/spring-tx.xsd
+        http://www.springframework.org/schema/aop 
+        http://www.springframework.org/schema/aop/spring-aop.xsd">
         
-        <!-- 添加context约束，然后使用如下标签注册属性文件 -->
-        <context:property-placeholder location="classpath:jdbc.properties" />
-         
-        
-        <!-- 注册SessionFactory -->
-        <bean id="mySessionFactory" class="org.springframework.orm.hibernate5.LocalSessionFactoryBean">
-            <!-- 配置数据源 -->
-            <property name="dataSource" ref="c3p0DataSource" />
-            <!-- 配置映射文件所在文件夹 -->
-            <property name="mappingDirectoryLocations" value="classpath:tavish/bit/beans" />        
-            <!-- 配置Hibernate属性 -->
-            <property name="hibernateProperties">
-                <props>
-                    <!-- 配置方言 -->
-                    <prop key="hibernate.dialect">org.hibernate.dialect.MySQL5Dialect</prop>
-                    <!-- 配置session策略 -->
-                    <prop key="hibernate.current_session_context_class">org.springframework.orm.hibernate5.SpringSessionContext</prop>
-                    <!-- 配置自动建表 -->
-                    <prop key="hibernate.hbm2ddl.auto">update</prop>
-                    <!-- 显示SQL语句 -->
-                    <prop key="hibernate.show_sql">true</prop>
-                    <!-- sql语句格式化输出 -->
-                    <prop key="hibernate.format_sql">true</prop>
-                </props>
-            </property>
-        </bean>
-        
-        <!-- 注册事务管理器 -->
-        <bean id="transactionManager" class="org.springframework.orm.hibernate5.HibernateTransactionManager">
-            <property name="sessionFactory" ref="mySessionFactory" />
-        </bean> 
-        
-        <!-- 使用AspectJ的AOP事务管理 -->
-        <tx:advice id="txAdvice" transaction-manager="transactionManager">
-            <tx:attributes>
-                <tx:method name="add*" isolation="DEFAULT" propagation="REQUIRED"/>
-                <tx:method name="remove*" isolation="DEFAULT" propagation="REQUIRED"/>
-                <tx:method name="modify*" isolation="DEFAULT" propagation="REQUIRED"/>
-                <tx:method name="find*" isolation="DEFAULT" propagation="REQUIRED" read-only="true"/>
-            </tx:attributes>
-        </tx:advice>
-        
-        <aop:config>
-            <aop:pointcut expression="execution(* *..service.*.*(..))" id="myPointcut"/>
-            <aop:advisor advice-ref="txAdvice" pointcut-ref="myPointcut"/>
-        </aop:config>
-         
-        <!-- 注册Dao -->
-        <bean id="studentDao" class="tavish.bit.dao.StudentDaoHbnImpl" >
-            <property name="sessionFactory" ref="mySessionFactory" />
-        </bean>
-         
-        <!-- 注册Service -->
-        <bean id="studentService" class="tavish.bit.service.StudentServiceImpl" >
-            <!-- 配置设值注入 -->
-            <property name="dao" ref="studentDao" />
-        </bean>
-    </beans>
+    <!-- 注册数据源：c3p0数据源 -->
+    <bean id="c3p0DataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource">
+        <!-- 数据库连接四要素 -->
+        <property name="driverClass" value="${jdbc.driver}" />
+        <property name="jdbcUrl" value="${jdbc.url}" />
+        <property name="user" value="${jdbc.user}" />
+        <property name="password" value="${jdbc.password}" />
+    </bean>
+    
+    <!-- 添加context约束，然后使用如下标签注册属性文件 -->
+    <context:property-placeholder location="classpath:jdbc.properties" />
+     
+    
+    <!-- 注册SessionFactory -->
+    <bean id="mySessionFactory" class="org.springframework.orm.hibernate5.LocalSessionFactoryBean">
+        <!-- 配置数据源 -->
+        <property name="dataSource" ref="c3p0DataSource" />
+        <!-- 配置映射文件所在文件夹 -->
+        <property name="mappingDirectoryLocations" value="classpath:tavish/bit/beans" />        
+        <!-- 配置Hibernate属性 -->
+        <property name="hibernateProperties">
+            <props>
+                <!-- 配置方言 -->
+                <prop key="hibernate.dialect">org.hibernate.dialect.MySQL5Dialect</prop>
+                <!-- 配置session策略 -->
+                <prop key="hibernate.current_session_context_class">org.springframework.orm.hibernate5.SpringSessionContext</prop>
+                <!-- 配置自动建表 -->
+                <prop key="hibernate.hbm2ddl.auto">update</prop>
+                <!-- 显示SQL语句 -->
+                <prop key="hibernate.show_sql">true</prop>
+                <!-- sql语句格式化输出 -->
+                <prop key="hibernate.format_sql">true</prop>
+            </props>
+        </property>
+    </bean>
+    
+    <!-- 注册事务管理器 -->
+    <bean id="transactionManager" class="org.springframework.orm.hibernate5.HibernateTransactionManager">
+        <property name="sessionFactory" ref="mySessionFactory" />
+    </bean> 
+    
+    <!-- 使用AspectJ的AOP事务管理 -->
+    <tx:advice id="txAdvice" transaction-manager="transactionManager">
+        <tx:attributes>
+            <tx:method name="add*" isolation="DEFAULT" propagation="REQUIRED"/>
+            <tx:method name="remove*" isolation="DEFAULT" propagation="REQUIRED"/>
+            <tx:method name="modify*" isolation="DEFAULT" propagation="REQUIRED"/>
+            <tx:method name="find*" isolation="DEFAULT" propagation="REQUIRED" read-only="true"/>
+        </tx:attributes>
+    </tx:advice>
+    
+    <aop:config>
+        <aop:pointcut expression="execution(* *..service.*.*(..))" id="myPointcut"/>
+        <aop:advisor advice-ref="txAdvice" pointcut-ref="myPointcut"/>
+    </aop:config>
+     
+    <!-- 注册Dao -->
+    <bean id="studentDao" class="tavish.bit.dao.StudentDaoHbnImpl" >
+        <property name="sessionFactory" ref="mySessionFactory" />
+    </bean>
+     
+    <!-- 注册Service -->
+    <bean id="studentService" class="tavish.bit.service.StudentServiceImpl" >
+        <!-- 配置设值注入 -->
+        <property name="dao" ref="studentDao" />
+    </bean>
+</beans>
+```
 
 Struts2：
 
-    <?xml version="1.0" encoding="UTF-8" ?>
+```xml
+<?xml version="1.0" encoding="UTF-8" ?>
 
-    <!DOCTYPE struts PUBLIC
-        "-//Apache Software Foundation//DTD Struts Configuration 2.5//EN"
-        "http://struts.apache.org/dtds/struts-2.5.dtd">
+<!DOCTYPE struts PUBLIC
+    "-//Apache Software Foundation//DTD Struts Configuration 2.5//EN"
+    "http://struts.apache.org/dtds/struts-2.5.dtd">
 
-    <struts>
-        <package name="myAction" namespace="/test" extends="struts-default">
-            <action name="register" class="tavish.bit.actions.RegisterAction">
-                <result>/welcome.jsp</result>
-            </action>
-        </package>
-    </struts>
+<struts>
+    <package name="myAction" namespace="/test" extends="struts-default">
+        <action name="register" class="tavish.bit.actions.RegisterAction">
+            <result>/welcome.jsp</result>
+        </action>
+    </package>
+</struts>
+```
 
 tomcat：
 
-    <?xml version="1.0" encoding="UTF-8"?>
-    <web-app
-        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xmlns="http://xmlns.jcp.org/xml/ns/javaee"
-        xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/javaee http://xmlns.jcp.org/xml/ns/javaee/web-app_3_1.xsd"
-        id="WebApp_ID"
-        version="3.1">
-        <display-name>Spring-12-SSH-Integration</display-name>
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns="http://xmlns.jcp.org/xml/ns/javaee"
+    xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/javaee http://xmlns.jcp.org/xml/ns/javaee/web-app_3_1.xsd"
+    id="WebApp_ID"
+    version="3.1">
+    <display-name>Spring-12-SSH-Integration</display-name>
 
-        <!-- 设置Spring配置文件位置及名称 -->
-        <context-param>
-            <param-name>contextConfigLocation</param-name>
-            <param-value>classpath:spring.xml</param-value>
-        </context-param>
+    <!-- 设置Spring配置文件位置及名称 -->
+    <context-param>
+        <param-name>contextConfigLocation</param-name>
+        <param-value>classpath:spring.xml</param-value>
+    </context-param>
 
-        <!-- 注册ServletContext监听器 -->
-        <listener>
-            <listener-class>org.springframework.web.context.ContextLoaderListener</listener-class>
-        </listener>
-        
-        <!-- 配置Struts2过滤器 -->
-        <filter>
-            <filter-name>Struts2</filter-name>
-            <filter-class>org.apache.struts2.dispatcher.filter.StrutsPrepareAndExecuteFilter</filter-class>
-        </filter>
-        <filter-mapping>
-            <filter-name>Struts2</filter-name>
-            <url-pattern>/*</url-pattern>
-        </filter-mapping>
-    </web-app>
+    <!-- 注册ServletContext监听器 -->
+    <listener>
+        <listener-class>org.springframework.web.context.ContextLoaderListener</listener-class>
+    </listener>
+    
+    <!-- 配置Struts2过滤器 -->
+    <filter>
+        <filter-name>Struts2</filter-name>
+        <filter-class>org.apache.struts2.dispatcher.filter.StrutsPrepareAndExecuteFilter</filter-class>
+    </filter>
+    <filter-mapping>
+        <filter-name>Struts2</filter-name>
+        <url-pattern>/*</url-pattern>
+    </filter-mapping>
+</web-app>
+```
 
 （6）View
 
 register.jsp：
 
-    <%@ page language="java" contentType="text/html; charset=utf-8" pageEncoding="utf-8"%>
-    <!DOCTYPE html>
-    <html>
-    <head>
-    <meta charset="utf-8">
-    <title>Register</title>
-    </head>
-    <body>
-        <form action="test/register.action" method="post">
-            <label>姓名：<input type="text" name="name" /></label><br>
-            <label>年龄：<input type="text" name="age" id="age"/></label><br>
-            <input type="submit" value="注册"/>
-        </form>
-    </body>
-    </html>
+```jsp
+<%@ page language="java" contentType="text/html; charset=utf-8" pageEncoding="utf-8"%>
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Register</title>
+</head>
+<body>
+    <form action="test/register.action" method="post">
+        <label>姓名：<input type="text" name="name" /></label><br>
+        <label>年龄：<input type="text" name="age" id="age"/></label><br>
+        <input type="submit" value="注册"/>
+    </form>
+</body>
+</html>
+```
 
 welcome.jsp：
 
-    <%@ page language="java" contentType="text/html; charset=utf-8" pageEncoding="utf-8"%>
-    <!DOCTYPE html>
-    <html>
-    <head>
-    <meta charset="utf-8">
-    <title>Welcome</title>
-    </head>
-    <body>
-        Welcome Page!
-    </body>
-    </html>
+```jsp
+<%@ page language="java" contentType="text/html; charset=utf-8" pageEncoding="utf-8"%>
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Welcome</title>
+</head>
+<body>
+    Welcome Page!
+</body>
+</html>
+```
 
 **测试成功，一切正常。**
 
 关于Action中IStudentService的注入问题：
 
-
 这个注入是由Struts2插件提供的：struts2-spring-plugin-2.5.13.jar。
 
 该Jar包下的struts-plugin.xml有如下设置：
 
-    <!--  Make the Spring object factory the automatic default -->
-    <constant name="struts.objectFactory" value="spring" />
+```xml
+<!--  Make the Spring object factory the automatic default -->
+<constant name="struts.objectFactory" value="spring" />
+```
 
 同时搭配struts2-core-2.5.13.jar的default.properties的设置：
 
-    struts.objectFactory.spring.autoWire = name
+```xml
+struts.objectFactory.spring.autoWire = name
+```
 
 这样就完成了byName注入。
-
 
 ##### 5.2.2.2 Action实例由Spring创建
 
 将Action交由Spring管理，需要在Spring的配置文件中注册：
 
-    <!-- 注册Action，必须指定scope="prototype" -->
-    <bean id="registerAction" class="tavish.bit.actions.RegisterAction" scope="prototype">
-        <!-- 配置设值注入 -->
-        <property name="service" ref="studentService" />
-    </bean>
+```xml
+<!-- 注册Action，必须指定scope="prototype" -->
+<bean id="registerAction" class="tavish.bit.actions.RegisterAction" scope="prototype">
+    <!-- 配置设值注入 -->
+    <property name="service" ref="studentService" />
+</bean>
+```
 
 此时Action类中service域的名字可以任意，只要和设置注入的属性名对应即可。
 
-    public class RegisterAction {
-        private String name;
-        private int age;
-        
-        private IStudentService service;
+```java
+public class RegisterAction {
+    private String name;
+    private int age;
+    
+    private IStudentService service;
 
-        // ...
-    }
+    // ...
+}
+```
 
 同时还需要更改struts2的配置文件：
 
-    <package name="myAction" namespace="/test" extends="struts-default">
-        <!-- byName自动注入，此时会自动去Spring的设置文件中找同名的bean -->
-        <!-- 此时class中的值称为“伪类” -->
-        <action name="register" class="registerAction">
-            <result>/welcome.jsp</result>
-        </action>
-    </package>
+```xml
+<package name="myAction" namespace="/test" extends="struts-default">
+    <!-- byName自动注入，此时会自动去Spring的设置文件中找同名的bean -->
+    <!-- 此时class中的值称为“伪类” -->
+    <action name="register" class="registerAction">
+        <result>/welcome.jsp</result>
+    </action>
+</package>
+```
 
 **测试成功，一切正常。**
 
@@ -7479,129 +8300,142 @@ welcome.jsp：
 
 queryById.jsp：
 
-    <form action="test/query.action" method="post">
-        <label>id：<input type="text" name="id" /></label><br>
-        <input type="submit" value="query"/>
-    </form>
+```xml
+<form action="test/query.action" method="post">
+    <label>id：<input type="text" name="id" /></label><br>
+    <input type="submit" value="query"/>
+</form>
+```
 
 queryresult.jsp：
 
-    查询结果：<s:property value="student" default="null" />
+```jsp
+查询结果：<s:property value="student" default="null" />
+```
 
 QueryAction.java：
 
-    package tavish.bit.actions;
+```java
+package tavish.bit.actions;
 
-    import tavish.bit.beans.Student;
-    import tavish.bit.service.IStudentService;
+import tavish.bit.beans.Student;
+import tavish.bit.service.IStudentService;
 
-    public class QueryAction {
-        private int id;
-        private IStudentService service;
-        
-        private Student student;
-        
-        public int getId() {
-            return id;
-        }
-        public void setId(int id) {
-            this.id = id;
-        }
-        public IStudentService getService() {
-            return service;
-        }
-        public void setService(IStudentService service) {
-            this.service = service;
-        }
-        
-        public Student getStudent() {
-            return student;
-        }
-        public void setStudent(Student student) {
-            this.student = student;
-        }
-        public String execute() {
-            student = service.findStudentById(id);
-            System.out.println(student);
-            return "success";
-        }
+public class QueryAction {
+    private int id;
+    private IStudentService service;
+    
+    private Student student;
+    
+    public int getId() {
+        return id;
     }
+    public void setId(int id) {
+        this.id = id;
+    }
+    public IStudentService getService() {
+        return service;
+    }
+    public void setService(IStudentService service) {
+        this.service = service;
+    }
+    
+    public Student getStudent() {
+        return student;
+    }
+    public void setStudent(Student student) {
+        this.student = student;
+    }
+    public String execute() {
+        student = service.findStudentById(id);
+        System.out.println(student);
+        return "success";
+    }
+}
+```
 
 Spring配置：
 
-    <bean id="queryAction" class="tavish.bit.actions.QueryAction" scope="prototype">
-        <!-- 配置设值注入 -->
-        <property name="service" ref="studentService" />
-    </bean>
+```xml
+<bean id="queryAction" class="tavish.bit.actions.QueryAction" scope="prototype">
+    <!-- 配置设值注入 -->
+    <property name="service" ref="studentService" />
+</bean>
+```
 
 struts2配置：
 
-    <action name="query" class="queryAction">
-        <result>/queryresult.jsp</result>
-    </action>
+```xml
+<action name="query" class="queryAction">
+    <result>/queryresult.jsp</result>
+</action>
+```
 
 测试查询id为3的Student，页面上输出：
 
-    查询结果：Student [id=3, name=Tavish, age=23]
+```text
+查询结果：Student [id=3, name=Tavish, age=23]
+```
 
 控制台输出：
 
-    Student [id=3, name=Tavish, age=23]
+```text
+Student [id=3, name=Tavish, age=23]
+```
 
-**
-下面根据上述代码来说明问题。
-**
+**下面根据上述代码来说明问题。**
 
 将Dao实现类的查询方法由get改为load。
 
-    @Override
-    public Student selectStudentById(int id) {
-        //return sessionFactory.getCurrentSession().get(Student.class, id);
-        return sessionFactory.getCurrentSession().load(Student.class, id);
-    }
+```java
+@Override
+public Student selectStudentById(int id) {
+    //return sessionFactory.getCurrentSession().get(Student.class, id);
+    return sessionFactory.getCurrentSession().load(Student.class, id);
+}
+```
 
 再次进行查询发生报错：
 
-    HTTP Status 500 – Internal Server Error
+```texgt
+HTTP Status 500 – Internal Server Error
+```
 
 原因为：
 
-    could not initialize proxy - no Session
+```text
+could not initialize proxy - no Session
+```
 
-**
-因为load方法返回的是一个代理，而非真正的Student对象。当使用输出语句对Student对象进行输出时，此时才会真正执行sql语句对Student对象进行查询。
-但是此时已经没有事务了，事务是由AOP织入到Service的find方法中的，该方法一旦返回，事务就结束了。同时，在由getCurrentSession得到的Session中进行CURD操作必须要有事务，所以此时load方法无法进行sql查询，导致出错。但是为什么报错为no Session？因为getCurrentSession获取的Session对象在事务提交或回滚后就被自动关闭了，也就是说在find方法返回后，此时既没有Session也没有事务。所以load方法也无法初始化代理，即could not initialize proxy。
-**
+**因为load方法返回的是一个代理，而非真正的Student对象。当使用输出语句对Student对象进行输出时，此时才会真正执行sql语句对Student对象进行查询。
+但是此时已经没有事务了，事务是由AOP织入到Service的find方法中的，该方法一旦返回，事务就结束了。同时，在由getCurrentSession得到的Session中进行CURD操作必须要有事务，所以此时load方法无法进行sql查询，导致出错。但是为什么报错为no Session？因为getCurrentSession获取的Session对象在事务提交或回滚后就被自动关闭了，也就是说在find方法返回后，此时既没有Session也没有事务。所以load方法也无法初始化代理，即could not initialize proxy。**
 
 修改方案：
 
-**
-在由OpenSession得到的Session中进行CURD操作无需事务。所以我们要在Action类中通过OpenSession创建一个Session来执行这次查询。
-这里我们增加一个过滤器---OpenSessionInViewFilter
-**
+**在由OpenSession得到的Session中进行CURD操作无需事务。所以我们要在Action类中通过OpenSession创建一个Session来执行这次查询。
+这里我们增加一个过滤器---OpenSessionInViewFilter**
 
 web.xml中注册filter：
 
-    <!-- 注册OpenSessionInViewFilter -->
-    <filter>
-        <filter-name>openSessionInView</filter-name>
-        <filter-class>org.springframework.orm.hibernate5.support.OpenSessionInViewFilter</filter-class>
-        <init-param>
-            <param-name>sessionFactoryBeanName</param-name>
-            <param-value>mySessionFactory</param-value>
-        </init-param>
-    </filter>
-    <filter-mapping>
-        <filter-name>openSessionInView</filter-name>
-        <url-pattern>/*</url-pattern>
-    </filter-mapping>
+```xml
+<!-- 注册OpenSessionInViewFilter -->
+<filter>
+    <filter-name>openSessionInView</filter-name>
+    <filter-class>org.springframework.orm.hibernate5.support.OpenSessionInViewFilter</filter-class>
+    <init-param>
+        <param-name>sessionFactoryBeanName</param-name>
+        <param-value>mySessionFactory</param-value>
+    </init-param>
+</filter>
+<filter-mapping>
+    <filter-name>openSessionInView</filter-name>
+    <url-pattern>/*</url-pattern>
+</filter-mapping>
+```
 
-**
-在这里需要为这个过滤器指定初始化参数sessionFactoryBeanName，其值应为Spring配置文件中的SessionFactory这个Bean的id。如果不指定这个初始化参数，需要Spring配置文件中sessionFactory这个Bean的id为"sessionFactory"，因为这个过滤器会默认地用这个名字去加载SessionFactory。
-**
-**
-重新发布，测试通过，使用load进行延迟加载没有问题。
-**
+**在这里需要为这个过滤器指定初始化参数sessionFactoryBeanName，其值应为Spring配置文件中的SessionFactory这个Bean的id。如果不指定这个初始化参数，需要Spring配置文件中sessionFactory这个Bean的id为"sessionFactory"，因为这个过滤器会默认地用这个名字去加载SessionFactory。**
+
+**重新发布，测试通过，使用load进行延迟加载没有问题。**
 
 #### 5.2.3 SSH全注解开发
 
@@ -7611,63 +8445,64 @@ web.xml中注册filter：
 
 去掉映射文件，使用Hibernate注解。
 
+```java
+package tavish.bit.beans;
 
-    package tavish.bit.beans;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.Id;
 
-    import javax.persistence.Entity;
-    import javax.persistence.GeneratedValue;
-    import javax.persistence.Id;
+import org.hibernate.annotations.GenericGenerator;
 
-    import org.hibernate.annotations.GenericGenerator;
+@Entity
+public class Student {
+    @Id
+    @GeneratedValue(generator="xxx")
+    @GenericGenerator(name="xxx", strategy="native")
+    private Integer id;
+    private String name;
+    private int age;
 
-    @Entity
-    public class Student {
-        @Id
-        @GeneratedValue(generator="xxx")
-        @GenericGenerator(name="xxx", strategy="native")
-        private Integer id;
-        private String name;
-        private int age;
-
-        public Student(String name, int age) {
-            super();
-            this.name = name;
-            this.age = age;
-        }
-
-        public Student() {
-            super();
-        }
-
-        public Integer getId() {
-            return id;
-        }
-
-        public void setId(Integer id) {
-            this.id = id;
-        }
-
-        public String getName() {
-            return name;
-        }
-
-        public void setName(String name) {
-            this.name = name;
-        }
-
-        public int getAge() {
-            return age;
-        }
-
-        public void setAge(int age) {
-            this.age = age;
-        }
-
-        @Override
-        public String toString() {
-            return "Student [id=" + id + ", name=" + name + ", age=" + age + "]";
-        }
+    public Student(String name, int age) {
+        super();
+        this.name = name;
+        this.age = age;
     }
+
+    public Student() {
+        super();
+    }
+
+    public Integer getId() {
+        return id;
+    }
+
+    public void setId(Integer id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public int getAge() {
+        return age;
+    }
+
+    public void setAge(int age) {
+        this.age = age;
+    }
+
+    @Override
+    public String toString() {
+        return "Student [id=" + id + ", name=" + name + ", age=" + age + "]";
+    }
+}
+```
 
 （2）组件---Action：
 
@@ -7675,294 +8510,302 @@ web.xml中注册filter：
 
 QueryAction：
 
-    package tavish.bit.actions;
+```java
+package tavish.bit.actions;
 
-    import org.apache.struts2.convention.annotation.Action;
-    import org.apache.struts2.convention.annotation.Namespace;
-    import org.apache.struts2.convention.annotation.ParentPackage;
-    import org.apache.struts2.convention.annotation.Result;
-    import org.springframework.beans.factory.annotation.Autowired;
-    import org.springframework.stereotype.Controller;
+import org.apache.struts2.convention.annotation.Action;
+import org.apache.struts2.convention.annotation.Namespace;
+import org.apache.struts2.convention.annotation.ParentPackage;
+import org.apache.struts2.convention.annotation.Result;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
 
-    import tavish.bit.beans.Student;
-    import tavish.bit.service.IStudentService;
+import tavish.bit.beans.Student;
+import tavish.bit.service.IStudentService;
 
-    @Namespace("/test")
-    @ParentPackage("struts-default")
-    @Controller("queryAction")
-    public class QueryAction {
+@Namespace("/test")
+@ParentPackage("struts-default")
+@Controller("queryAction")
+public class QueryAction {
 
-        private int id;
+    private int id;
 
-        @Autowired
-        private IStudentService service;
+    @Autowired
+    private IStudentService service;
 
-        private Student student;
+    private Student student;
 
-        public int getId() {
-            return id;
-        }
-
-        public void setId(int id) {
-            this.id = id;
-        }
-
-        public IStudentService getService() {
-            return service;
-        }
-
-        public void setService(IStudentService service) {
-            this.service = service;
-        }
-
-        public Student getStudent() {
-            return student;
-        }
-
-        public void setStudent(Student student) {
-            this.student = student;
-        }
-
-        @Action(value = "query", results = { @Result(location = "/queryresult.jsp") })
-        public String execute() {
-            student = service.findStudentById(id);
-            System.out.println(student);
-            return "success";
-        }
+    public int getId() {
+        return id;
     }
+
+    public void setId(int id) {
+        this.id = id;
+    }
+
+    public IStudentService getService() {
+        return service;
+    }
+
+    public void setService(IStudentService service) {
+        this.service = service;
+    }
+
+    public Student getStudent() {
+        return student;
+    }
+
+    public void setStudent(Student student) {
+        this.student = student;
+    }
+
+    @Action(value = "query", results = { @Result(location = "/queryresult.jsp") })
+    public String execute() {
+        student = service.findStudentById(id);
+        System.out.println(student);
+        return "success";
+    }
+}
+```
 
 RegisterAction：
 
-    package tavish.bit.actions;
+```java
+package tavish.bit.actions;
 
-    import org.apache.struts2.convention.annotation.Action;
-    import org.apache.struts2.convention.annotation.Namespace;
-    import org.apache.struts2.convention.annotation.ParentPackage;
-    import org.apache.struts2.convention.annotation.Result;
-    import org.springframework.beans.factory.annotation.Autowired;
-    import org.springframework.stereotype.Controller;
+import org.apache.struts2.convention.annotation.Action;
+import org.apache.struts2.convention.annotation.Namespace;
+import org.apache.struts2.convention.annotation.ParentPackage;
+import org.apache.struts2.convention.annotation.Result;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
 
-    import tavish.bit.beans.Student;
-    import tavish.bit.service.IStudentService;
+import tavish.bit.beans.Student;
+import tavish.bit.service.IStudentService;
 
-    @Namespace("/test")
-    @ParentPackage("struts-default")
-    @Controller("registerAction")
-    public class RegisterAction {
-        private String name;
-        private int age;
+@Namespace("/test")
+@ParentPackage("struts-default")
+@Controller("registerAction")
+public class RegisterAction {
+    private String name;
+    private int age;
 
-        @Autowired
-        private IStudentService service;
+    @Autowired
+    private IStudentService service;
 
-        public String getName() {
-            return name;
-        }
-
-        public void setName(String name) {
-            this.name = name;
-        }
-
-        public int getAge() {
-            return age;
-        }
-
-        public void setAge(int age) {
-            this.age = age;
-        }
-
-        public void setService(IStudentService service) {
-            this.service = service;
-        }
-
-        @Action(value = "register", results = { @Result(location = "/welcome.jsp") })
-        public String execute() {
-            Student student = new Student(name, age);
-            service.addStudent(student);
-            return "success";
-        }
+    public String getName() {
+        return name;
     }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public int getAge() {
+        return age;
+    }
+
+    public void setAge(int age) {
+        this.age = age;
+    }
+
+    public void setService(IStudentService service) {
+        this.service = service;
+    }
+
+    @Action(value = "register", results = { @Result(location = "/welcome.jsp") })
+    public String execute() {
+        Student student = new Student(name, age);
+        service.addStudent(student);
+        return "success";
+    }
+}
+```
 
 其中@Controller和@Autowired注解是Spring定义组件和byType注入使用的注解。
 
 （3）组件---Dao：
 
-    package tavish.bit.dao;
+```java
+package tavish.bit.dao;
 
-    import java.util.List;
+import java.util.List;
 
-    import org.hibernate.SessionFactory;
-    import org.springframework.beans.factory.annotation.Autowired;
-    import org.springframework.stereotype.Repository;
+import org.hibernate.SessionFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
 
-    import tavish.bit.beans.Student;
+import tavish.bit.beans.Student;
 
-    @Repository("studentDao")
-    public class StudentDaoHbnImpl implements IStudentDao {
+@Repository("studentDao")
+public class StudentDaoHbnImpl implements IStudentDao {
 
-        @Autowired // byType
-        private SessionFactory sessionFactory;
-        
-        public void setSessionFactory(SessionFactory sessionFactory) {
-            this.sessionFactory = sessionFactory;
-        }
-
-        @Override
-        public void insertStudent(Student student) {
-            sessionFactory.getCurrentSession().save(student);
-        }
-
-        @Override
-        public void deleteStudent(Student student) {
-            sessionFactory.getCurrentSession().delete(student);
-        }
-
-        @Override
-        public void updateStudent(Student student) {
-            sessionFactory.getCurrentSession().update(student);
-        }
-
-        @SuppressWarnings("unchecked")
-        @Override
-        public List<Student> selectAllStudents() {
-            String hql = "from Student";
-            return sessionFactory.getCurrentSession().createQuery(hql).list();
-        }
-
-        @Override
-        public Student selectStudentById(int id) {
-            //return sessionFactory.getCurrentSession().get(Student.class, id);
-            return sessionFactory.getCurrentSession().load(Student.class, id);
-        }
+    @Autowired // byType
+    private SessionFactory sessionFactory;
+    
+    public void setSessionFactory(SessionFactory sessionFactory) {
+        this.sessionFactory = sessionFactory;
     }
+
+    @Override
+    public void insertStudent(Student student) {
+        sessionFactory.getCurrentSession().save(student);
+    }
+
+    @Override
+    public void deleteStudent(Student student) {
+        sessionFactory.getCurrentSession().delete(student);
+    }
+
+    @Override
+    public void updateStudent(Student student) {
+        sessionFactory.getCurrentSession().update(student);
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public List<Student> selectAllStudents() {
+        String hql = "from Student";
+        return sessionFactory.getCurrentSession().createQuery(hql).list();
+    }
+
+    @Override
+    public Student selectStudentById(int id) {
+        //return sessionFactory.getCurrentSession().get(Student.class, id);
+        return sessionFactory.getCurrentSession().load(Student.class, id);
+    }
+}
+```
 
 其中@Repository和@Autowired注解是Spring定义组件和byType注入使用的注解。
 
 （4）组件---Service：
 
-    package tavish.bit.service;
+```java
+package tavish.bit.service;
 
-    import java.util.List;
+import java.util.List;
 
-    import org.springframework.beans.factory.annotation.Autowired;
-    import org.springframework.stereotype.Service;
-    import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-    import tavish.bit.beans.Student;
-    import tavish.bit.dao.IStudentDao;
+import tavish.bit.beans.Student;
+import tavish.bit.dao.IStudentDao;
 
-    @Service("studentService")
-    public class StudentServiceImpl implements IStudentService {
+@Service("studentService")
+public class StudentServiceImpl implements IStudentService {
 
-        @Autowired
-        private IStudentDao dao;
+    @Autowired
+    private IStudentDao dao;
 
-        public void setDao(IStudentDao dao) {
-            this.dao = dao;
-        }
-
-        @Override
-        @Transactional
-        public void addStudent(Student student) {
-            dao.insertStudent(student);
-        }
-
-        @Override
-        @Transactional
-        public void removeStudent(Student student) {
-            dao.deleteStudent(student);
-        }
-
-        @Override
-        @Transactional
-        public void modifyStudent(Student student) {
-            dao.updateStudent(student);
-        }
-
-        @Override
-        @Transactional(readOnly=true)
-        public List<Student> findAllStudents() {
-            return dao.selectAllStudents();
-        }
-
-        @Override
-        @Transactional
-        public Student findStudentById(int id) {
-            return dao.selectStudentById(id);
-        }
+    public void setDao(IStudentDao dao) {
+        this.dao = dao;
     }
+
+    @Override
+    @Transactional
+    public void addStudent(Student student) {
+        dao.insertStudent(student);
+    }
+
+    @Override
+    @Transactional
+    public void removeStudent(Student student) {
+        dao.deleteStudent(student);
+    }
+
+    @Override
+    @Transactional
+    public void modifyStudent(Student student) {
+        dao.updateStudent(student);
+    }
+
+    @Override
+    @Transactional(readOnly=true)
+    public List<Student> findAllStudents() {
+        return dao.selectAllStudents();
+    }
+
+    @Override
+    @Transactional
+    public Student findStudentById(int id) {
+        return dao.selectStudentById(id);
+    }
+}
+```
 
 其中@Service和@Autowired注解是Spring定义组件和byType注入使用的注解。
 @Transactional注解用于定义事务。默认值为isolation="DEFAULT" propagation="REQUIRED"。
 
 （5）Spring配置文件：
 
-    <?xml version="1.0" encoding="UTF-8"?>
-    <beans
-        xmlns="http://www.springframework.org/schema/beans"
-        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xmlns:context="http://www.springframework.org/schema/context"
-        xmlns:aop="http://www.springframework.org/schema/aop"
-        xmlns:tx="http://www.springframework.org/schema/tx"
-        xsi:schemaLocation="
-            http://www.springframework.org/schema/beans 
-            http://www.springframework.org/schema/beans/spring-beans.xsd
-            http://www.springframework.org/schema/context 
-            http://www.springframework.org/schema/context/spring-context.xsd
-            http://www.springframework.org/schema/tx 
-            http://www.springframework.org/schema/tx/spring-tx.xsd
-            http://www.springframework.org/schema/aop 
-            http://www.springframework.org/schema/aop/spring-aop.xsd">
-            
-        <!-- 注册数据源：c3p0数据源 -->
-        <bean id="c3p0DataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource">
-            <!-- 数据库连接四要素 -->
-            <property name="driverClass" value="${jdbc.driver}" />
-            <property name="jdbcUrl" value="${jdbc.url}" />
-            <property name="user" value="${jdbc.user}" />
-            <property name="password" value="${jdbc.password}" />
-        </bean>
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans
+    xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:context="http://www.springframework.org/schema/context"
+    xmlns:aop="http://www.springframework.org/schema/aop"
+    xmlns:tx="http://www.springframework.org/schema/tx"
+    xsi:schemaLocation="
+        http://www.springframework.org/schema/beans 
+        http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/context 
+        http://www.springframework.org/schema/context/spring-context.xsd
+        http://www.springframework.org/schema/tx 
+        http://www.springframework.org/schema/tx/spring-tx.xsd
+        http://www.springframework.org/schema/aop 
+        http://www.springframework.org/schema/aop/spring-aop.xsd">
         
-        <!-- 添加context约束，然后使用如下标签注册属性文件 -->
-        <context:property-placeholder location="classpath:jdbc.properties" />
-        
-        <!-- 注册SessionFactory -->
-        <bean id="mySessionFactory" class="org.springframework.orm.hibernate5.LocalSessionFactoryBean">
-            <!-- 配置数据源 -->
-            <property name="dataSource" ref="c3p0DataSource" />
-            <!-- 配置要扫描的包 -->
-            <property name="packagesToScan" value="tavish.bit.beans" />     
-            <!-- 配置Hibernate属性 -->
-            <property name="hibernateProperties">
-                <props>
-                    <!-- 配置方言 -->
-                    <prop key="hibernate.dialect">org.hibernate.dialect.MySQL5Dialect</prop>
-                    <!-- 配置session策略 -->
-                    <prop key="hibernate.current_session_context_class">org.springframework.orm.hibernate5.SpringSessionContext</prop>
-                    <!-- 配置自动建表 -->
-                    <prop key="hibernate.hbm2ddl.auto">update</prop>
-                    <!-- 显示SQL语句 -->
-                    <prop key="hibernate.show_sql">true</prop>
-                    <!-- sql语句格式化输出 -->
-                    <prop key="hibernate.format_sql">true</prop>
-                </props>
-            </property>
-        </bean>
-        
-        <!-- 注册事务管理器 -->
-        <bean id="transactionManager" class="org.springframework.orm.hibernate5.HibernateTransactionManager">
-            <property name="sessionFactory" ref="mySessionFactory" />
-        </bean> 
-        
-        <!-- 事务注解驱动 -->
-        <tx:annotation-driven transaction-manager="transactionManager"/>
-        
-        <!-- 组件扫描器 -->
-        <context:component-scan base-package="tavish.bit.*" />
-    </beans>
+    <!-- 注册数据源：c3p0数据源 -->
+    <bean id="c3p0DataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource">
+        <!-- 数据库连接四要素 -->
+        <property name="driverClass" value="${jdbc.driver}" />
+        <property name="jdbcUrl" value="${jdbc.url}" />
+        <property name="user" value="${jdbc.user}" />
+        <property name="password" value="${jdbc.password}" />
+    </bean>
+    
+    <!-- 添加context约束，然后使用如下标签注册属性文件 -->
+    <context:property-placeholder location="classpath:jdbc.properties" />
+    
+    <!-- 注册SessionFactory -->
+    <bean id="mySessionFactory" class="org.springframework.orm.hibernate5.LocalSessionFactoryBean">
+        <!-- 配置数据源 -->
+        <property name="dataSource" ref="c3p0DataSource" />
+        <!-- 配置要扫描的包 -->
+        <property name="packagesToScan" value="tavish.bit.beans" />     
+        <!-- 配置Hibernate属性 -->
+        <property name="hibernateProperties">
+            <props>
+                <!-- 配置方言 -->
+                <prop key="hibernate.dialect">org.hibernate.dialect.MySQL5Dialect</prop>
+                <!-- 配置session策略 -->
+                <prop key="hibernate.current_session_context_class">org.springframework.orm.hibernate5.SpringSessionContext</prop>
+                <!-- 配置自动建表 -->
+                <prop key="hibernate.hbm2ddl.auto">update</prop>
+                <!-- 显示SQL语句 -->
+                <prop key="hibernate.show_sql">true</prop>
+                <!-- sql语句格式化输出 -->
+                <prop key="hibernate.format_sql">true</prop>
+            </props>
+        </property>
+    </bean>
+    
+    <!-- 注册事务管理器 -->
+    <bean id="transactionManager" class="org.springframework.orm.hibernate5.HibernateTransactionManager">
+        <property name="sessionFactory" ref="mySessionFactory" />
+    </bean> 
+    
+    <!-- 事务注解驱动 -->
+    <tx:annotation-driven transaction-manager="transactionManager"/>
+    
+    <!-- 组件扫描器 -->
+    <context:component-scan base-package="tavish.bit.*" />
+</beans>
+```
 
 在“注册SessionFactory”这个配置中，不再配置映射文件存放位置，而是配置packagesToScan，这个包下放置Hibernate使用的实体类。
 
-**
-重新发布，测试成功。
-**
+**重新发布，测试成功。**
