@@ -174,7 +174,7 @@ ArrayList 底层的数据结构是数组，支持随机访问（实现了 Random
 
 *27. **ArrayList 和 Vector 的区别是什么？**
 
-ArrayLis和Vector`都是基于Object[]实现的，它们会在内存中开辟一块连续的空间来存储，由于数据存储是连续的，因此它们支持用序号对元素进行访问。由于这个特性，所以二者查询元素的速度很快，而插入元素比较慢，由于此时可能会涉及到对数组中元素的移动。
+ArrayLis和Vector都是基于Object[]实现的，它们会在内存中开辟一块连续的空间来存储，由于数据存储是连续的，因此它们支持用序号对元素进行访问。由于这个特性，所以二者查询元素的速度很快，而插入元素比较慢，由于此时可能会涉及到对数组中元素的移动。
 二者均有一个默认的初始化容量大小，当里面存储的元素超过这个大小时就会动态地扩充。Vector默认扩充为原来的2倍，并提供了设置扩充大小的方法，而ArrayList则是1.5倍，并且没有提供设置扩充大小的方法。二者的最大区别在于Vector是线程安全的，由于其绝大多数方法都是直接或间接同步的，而ArrayList则不是。
 
 *28. **数组和ArrayList有何区别？**
@@ -235,7 +235,7 @@ Java中的Iterator功能比较简单，通常只能单向移动：
 
 *36. **线程和进程的区别？**
 
-在操作系统级别上，程序的执行都是以进程为单位的，它程序运行和资源分配的基本单位，一个程序至少有一个进程，一个进程至少有一个线程。进程在执行过程中拥有独立的内存单元，而多个线程共享内存资源，减少切换次数，从而效率更高，并且线程的切换开销要比进程切换小。线程是进程的一个实体，是cpu调度和分派的基本单位，是比程序更小的能独立运行的基本单位。同一进程中的多个线程之间可以并发执行。
+在操作系统级别上，程序的执行都是以进程为单位的，它是程序运行和资源分配的基本单位，一个程序至少有一个进程，一个进程至少有一个线程。进程在执行过程中拥有独立的内存单元，而多个线程共享内存资源，减少切换次数，从而效率更高，并且线程的切换开销要比进程切换小。线程是进程的一个实体，是cpu调度和分派的基本单位，是比程序更小的能独立运行的基本单位。同一进程中的多个线程之间可以并发执行。
 
 *37. **守护线程是什么？**
 
@@ -287,7 +287,7 @@ sleep()方法是Thread的静态方法，让调用的线程进入指定时间睡�
 
 当线程处于上锁时，sleep()方法不会释放对象锁，即睡眠时也持有对象锁。只会让出CPU执行时间片，并不会释放同步资源锁。
 
-sleep()休眠时间满后，该线程不一定会立即执行，这是因为其他线程可能正在运行而起没有被调度为放弃执行，除非此线程具有更高的优先级。
+sleep()休眠时间满后，该线程不一定会立即执行，这是因为其他线程可能正在运行而且没有被调度为放弃执行，除非此线程具有更高的优先级。
 
 sleep()必须捕获异常，在sleep的过程中过程中有可能被其他对象调用它的interrupt()，产生InterruptedException异常，如果你的程序不捕获这个异常，线程就会异常终止，进入TERMINATED状态，如果你的程序捕获了这个异常，那么程序就会继续执行catch语句块(可能还有finally语句块)以及以后的代码。
 
@@ -399,7 +399,7 @@ run()方法是在本线程里的，只是线程里的一个函数,而不是多�
 *53. **synchronized和volatile的区别是什么？**
 
 - volatile本质是在告诉jvm当前变量在寄存器（工作内存）中的值是不确定的，需要从主存中读取；synchronized则是锁定当前变量，只有当前线程可以访问该变量，其他线程被阻塞住。
-- volatile仅能使用在变量级别；synchronized则可以使用在变量、方法、和类级别的。
+- volatile仅能使用在变量级别；synchronized则可以使用在方法级别的。
 - volatile仅能实现变量的修改可见性，不能保证原子性；而synchronized则可以保证变量的修改可见性和原子性。
 - volatile不会造成线程的阻塞；synchronized可能会造成线程的阻塞。
 
@@ -885,7 +885,7 @@ spring 中的 bean 默认是单例模式，spring 框架并没有对单例 bean 
 
 *98. **spring 事务实现方式有哪些？**
 
-- 声明式事务：声明式事务也有两种实现方式，基于xml配置文件的方式和注解方式（在类上添加@Transaction注解）。
+- 声明式事务：声明式事务也有两种实现方式，基于xml配置文件的方式和注解方式（在类上添加@Transactional注解）。
 - 编码方式：提供编码的形式管理和维护事务。
 
 *99. **说一下 spring 的事务隔离？**
@@ -1689,3 +1689,211 @@ System.out.println(list.size());
 - Statement的executeQuery(String query)接口用来执行select查询，并且返回ResultSet。即使查询不到记录返回的ResultSet也不会为null。我们通常使用executeQuery来执行查询语句，这样的话如果传进来的是insert或者update语句的话，它会抛出错误信息为 “executeQuery method can not be used for update”的java.util.SQLException。
 - Statement的executeUpdate(String query)方法用来执行insert或者update/delete（DML）语句，或者 什么也不返回，对于DDL语句，返回值是int类型，如果是DML语句的话，它就是更新的条数，如果是DDL的话，就返回0。 
 只有当你不确定是什么语句的时候才应该使用execute()方法，否则应该使用executeQuery或者executeUpdate方法。
+
+*5. **ThreadLocal保证线程安全的原理。** 
+
+ThreadLocal本身并没有承担存储每个线程中的数据的职责，它是通过操作每个线程内部的一个“副本”-ThreadLocalMap来实现线程之间的隔离，从而保证了线程安全。
+
+设值方法：
+
+```java
+public void set(T value) {
+    Thread t = Thread.currentThread();
+    ThreadLocalMap map = getMap(t);
+    if (map != null)
+        map.set(this, value);
+    else
+        createMap(t, value);
+}
+```
+
+getMap()方法：
+
+```java
+ThreadLocalMap getMap(Thread t) {
+    return t.threadLocals;
+}
+```
+
+可以看到ThreadLocal操作值的时候是取得当前线程的ThreadLocalMap对象，然后把值设置到了这个对象中，这样对于不同的线程得到的就是不同的ThreadLocalMap，那么向其中保存值或者修改值都只是会影响到当前线程，这样就保证了线程安全。
+
+*6. **如何判断两个整数异号？**
+
+将两个数进行异或，结果右移31位，如果结果是1，则说明二者异号。
+
+*7. **同步异步和阻塞非阻塞的关系？**
+
+![同步异步](images\同步异步.jpg)
+
+![阻塞非阻塞](images\阻塞非阻塞.jpg)
+
+- 同步：发送方发送请求之后，需要等接收方发回响应后才接着发下个请求。
+- 异步：发送方发送一个请求之后不等待接收方响应这个请求，就继续发送下个请求。
+- 阻塞：调用结果返回之前，当前线程会被挂起。调用线程只有在得到结果之后才会返回，该线程在此过程中不能进行其他处理。
+- 非阻塞：调用结果不能马上返回，当前线程也不会被挂起，而是立即返回执行下一个调用。
+
+同步和异步是针对应用程序而言的，关注的是程序中间的协作关系。
+阻塞和非阻塞关注的则是线程的执行状态。
+
+*8. **说说Linux中的epoll？**
+
+epoll是Linux内核为处理大批量文件描述符而作了改进的poll，是Linux下多路复用IO接口select/poll的增强版本，它能显著提高程序在大量并发连接中只有少量活跃的情况下的系统CPU利用率。另一点原因就是获取事件的时候，它无须遍历整个被侦听的描述符集，只要遍历那些被内核IO事件异步唤醒而加入Ready队列的描述符集合就行了。
+
+*9. **设计一个ip2Long(String ip)和long2Ip(long ip)方法？**
+
+```java
+public static long ip2Long(String stringIp) {
+    String[] ips = stringIp.split("\\.");
+    long[] longIps = new long[4];
+    for (int i = 0; i < 4; i++) {
+        longIps[i] = Long.valueOf(ips[i]);
+    }
+    return (longIps[0] << 24) +
+            (longIps[1] << 16) +
+            (longIps[2] << 8) +
+            longIps[3];
+}
+
+public static String long2Ip(long longIp) {
+    StringBuffer sbuffer = new StringBuffer();
+    sbuffer.append(longIp >>> 24);
+    sbuffer.append(".");
+    sbuffer.append((longIp & 0x00FFFFFF) >>> 16);
+    sbuffer.append(".");
+    sbuffer.append((longIp & 0x0000FFFF) >>> 8);
+    sbuffer.append(".");
+    sbuffer.append(longIp & 0x0000000F);
+    return sbuffer.toString();
+}
+```
+
+*10. **如何实现一个线程池？**
+
+```java
+public class MyThreadPool {
+    // 存放线程的集合
+    private List<MyThread> threads;
+    // 任务队列
+    private Queue<Runnable> taskQueue;
+    // 线程池初始大小
+    private int totalThreadCount;
+    // 已经工作的线程数目
+    private int workThreadCount;
+    // 锁
+    private final Lock lock = new ReentrantLock();
+
+    public MyThreadPool() {
+        this(16);
+    }
+
+    public MyThreadPool(int initPoolSize) {
+        totalThreadCount = initPoolSize;
+        threads = new ArrayList<>(initPoolSize);
+        taskQueue = new ArrayBlockingQueue<>(initPoolSize * 4);
+        workThreadCount = 0;
+    }
+
+    public void execute(Runnable r) {
+        try {
+            lock.lock();
+            if (workThreadCount < totalThreadCount) {
+                // 如果线程池未满，则没加入一个任务就开启一个新线程
+                MyThread thread = new MyThread(r);
+                thread.start();
+                threads.add(thread);
+                workThreadCount++;
+            } else {
+                // 线程池已满，放入任务队列，等待有空闲线程时执行
+                if (!taskQueue.offer(r)) {
+                    System.out.println("Task Queue is full.");
+                }
+            }
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    private class MyThread extends Thread {
+
+        private Runnable r;
+
+        private MyThread(Runnable r) {
+            this.r = r;
+        }
+
+        @Override
+        public void run() {
+            while (true) {
+                if (r != null) {
+                    r.run();
+                    r = null;
+                } else {
+                    Runnable queueTask = taskQueue.poll();
+                    if (queueTask != null) {
+                        r = queueTask;
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+*11. **进程间通信的方式？**
+
+- **管道**：管道是一种半双工的通信方式，数据只能单向流动。管道的问题在于他们没有名字，只能在具有亲缘关系（父子进程间）的进程间使用。
+- **命名管道**：命名管道也是半双工的通信方式。提供单向数据流。克服了管道没有名字的限制，因此允许无亲缘关系的进程间通信，解决了管道的上述问题。
+- **消息队列**：消息队列是消息的链表，包括Posix消息队列systemV消息队列。有足够权限的进程都可以向队列中添加消息，有足够读权限的进程都可以读走队列中的消息。消息队列克服了信号承载信息量少，管道只能承载无格式字节流以及缓冲区大小受限等缺点。
+- **信号量**：进程间通信处理同步互斥的机制。信号量是一个计数器，可以用来控制多个进程对共享资源的访问。它常作为一种锁机制，防止某进程正在访问共享资源时，其他进程也访问该资源。
+- **共享内存**：指两个或多个进程共享一个给定的存储区。共享内存是最快的一种 IPC，因为进程是直接对内存进行存取。因为多个进程可以同时操作，所以需要进行同步。信号量+共享内存通常结合在一起使用，信号量用来同步对共享内存的访问。
+
+*12. **两个超大文件（其中各存有50亿个URL），如何求交集？**
+
+**方法一：Hash法**
+
+思路：通过对url求hash值，把hash值相同的url放到一个单独的文件中，这样就可以把50亿个url分解成url存放数量较少的文件。然后一次读入内存进行处理。
+
+实现：
+
+- 首先，遍历文件a，对每个url求其hash值并散列到1000个文件中。方法为文件角标i=hash(url)%1000，通过散列，a文件中的所有url将会分布在（fa0，fa1，fa2，...，fa999）1000个文件中。
+- 同理，对文件b也进行如上操作。b文件中的所有url将会分布在（fb0，fb1，fb2，...，fb999）1000个文件中。
+- 最后，只需要分别找出文件fai与fbi（i=0，1，2，3，...，999）中相同的url即可。
+
+**Bloom Filter法**
+
+Bloom Filter是一种空间效率和时间效率很高的随机数据结构。用来检测一个元素是否属于一个集合。但它同样带来一个问题：牺牲了正确率。
+
+Bloom Filter以牺牲正确率为前提，来换取空间效率与时间效率的提高：
+
+- 当它判断某元素不属于这个集合时，该元素一定不属于这个集合。
+- 当它判断某元素属于这个集合时，该元素不一定属于这个集合。
+
+具体而言，查询结果有两种可能，即“不属于这个集合（绝对正确）”和“属于这个集合（可能错误）”。所以，Bloom Filter适合引用在对于低错误率可以容忍的场合。
+
+基本原理：位数组与Hash函数的联合使用。具体而言，首先，Bloom Filter是一个包含了m位的位数组，数组的每一位都初始化为0，然后定义k个不同的Hash函数，每个函数都可以将集合中的元素映射到位数组的某一位。当向集合中插入一个元素时，根据k个Hash函数可以得到位数组中的k个位，将这些位设置为1。如果查询某个元素是否属于集合，那么根据k个Hash函数可以得到位数组中的k个位，查看这个k个位中的值，如果有的位不为1，那么该元素勘定不在此集合中；如果这k个位全部为1，那么该元素可能在此集合中（在插入其他元素时，可能会将这些位置为1，这样就产生了错误）。
+
+所以，使用Bloom Filter的难点是如何根据输入元素个数n，来确定位数组m的大小以及Hash函数。当Hash函数个数k=(ln2)*(m/n)时错误率最小，在错误率不大于E的情况下，m至少要等于n\*lg(1/E)才能表示任意n个元素的集合。但m还应该更大些，因为还要保证位数组里至少一半为0，则m应该大于等于n\*lg(1/E)\*lge大约为n\*lg(1/E)的1.44倍。
+
+Bloom Filter可以用来实现数据字典、进行数据的判重或者集合求交集。
+
+对于本题而言：4GB内存可以表示340亿bit，把文件a中的url采用Bloom Filter方法映射到这340亿bit上，然后遍历文件b，判断是否存在。但是采用这种方法会有一定的错误率只有当允许有一定的错误率的时候才可以使用这种方法。
+
+*13. **JDK8的新特性有哪些？**
+
+- Lambda表达式
+- Stream函数式操作流元素集合
+- 接口新增默认方法与静态方法
+- 方法引用，与Lambda表达式联合使用
+- 引入重复注解
+- 类型注解
+- 最新的Date/Time API (JSR 310)
+- 新增base64加解密API
+- 数组并行（parallel）操作
+- JVM的PermGen空间被移除，取代它的是Metaspace（JEP 122）元空间
+
+*14. **为什么要让接口中的方法可以具备默认实现？**
+
+以前创建了一个接口，并且已经被大量的类实现。
+如果需要再扩充这个接口的功能加新的方法，就会导致所有已经实现的子类需要重写这个方法。
+如果在接口中使用默认方法就不会有这个问题。
+所以从 JDK8 开始新加了接口默认方法，便于接口的扩展。
