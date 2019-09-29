@@ -1885,7 +1885,7 @@ Bloom Filter可以用来实现数据字典、进行数据的判重或者集合�
 - 接口新增默认方法与静态方法
 - 方法引用，与Lambda表达式联合使用
 - 引入重复注解
-- 类型注解
+- 引入类型注解
 - 最新的Date/Time API (JSR 310)
 - 新增base64加解密API
 - 数组并行（parallel）操作
@@ -1897,3 +1897,133 @@ Bloom Filter可以用来实现数据字典、进行数据的判重或者集合�
 如果需要再扩充这个接口的功能加新的方法，就会导致所有已经实现的子类需要重写这个方法。
 如果在接口中使用默认方法就不会有这个问题。
 所以从 JDK8 开始新加了接口默认方法，便于接口的扩展。
+
+*15. **MySQL各种索引的区别？**
+
+- 普通索引：最基本的索引，没有任何限制
+- 唯一索引：与"普通索引"类似，不同的就是，索引列的值必须唯一，但允许有空值。
+- 主键索引：它是一种特殊的唯一索引，不允许有空值。 
+- 全文索引：仅可用于MyISAM表，针对较大的数据，生成全文索引很耗时好空间。
+- 组合索引：为了更多的提高MySQL效率可建立组合索引，遵循“最左前缀”原则。
+
+*16. **Http2.0新特性？**
+
+- 增加二进制分帧
+- 首部压缩
+- 多路复用
+- 请求优先级
+- 服务器推送
+
+*17. **开启3个线程，实现顺序打印ABCABCABC...。**
+
+使用Semaphore实现：
+
+```java
+public class PrintABC {
+    public static Semaphore s1 = new Semaphore(1);
+    public static Semaphore s2 = new Semaphore(0);
+    public static Semaphore s3 = new Semaphore(0);
+    public static void printABC() {
+        ExecutorService executorService = Executors.newCachedThreadPool();
+        executorService.execute(() -> {
+            while (true) {
+                try {
+                    s1.acquire();//获取信号量，s1 - 1
+                    System.out.print("A");
+                    s2.release();//释放信号量，s2 + 1
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+        executorService.execute(() -> {
+            while (true) {
+                try {
+                    s2.acquire();//获取信号量，s2 - 1
+                    System.out.print("B");
+                    s3.release();//释放信号量，s3 + 1
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+        executorService.execute(() -> {
+            while (true) {
+                try {
+                    s3.acquire();//获取信号量，s3 - 1
+                    System.out.print("C");
+                    s1.release();//释放信号量，s1 + 1
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+    }
+
+    public static void main(String[] args) {
+        PrintABC.printABC();
+    }
+}
+```
+
+*18. **构造线程池的各个参数？**
+
+方法签名：
+
+```java
+public ThreadPoolExecutor(int corePoolSize,
+            　　　　　　　　　  int maximumPoolSize,
+                              long keepAliveTime,
+                              TimeUnit unit,
+                              BlockingQueue<Runnable> workQueue,
+　　　　　　　　　　　　　　　　 ThreadFactory threadFactory,
+                              RejectedExecutionHandler handler) {
+
+}
+```
+
+参数意义:
+
+- corePoolSize：线程池核心线程数
+- maximumPoolSize：线程池最大数
+- keepAliveTime：空闲线程存活时间
+- unit：时间单位
+- workQueue：线程池所使用的缓冲队列
+- threadFactory：线程池创建线程使用的工厂
+- handler：线程池对拒绝任务的处理策略
+
+特性：
+
+- 当池中正在运行的线程数（包括空闲线程）小于corePoolSize时，新建线程执行任务。
+- 当池中正在运行的线程数大于等于corePoolSize时，新插入的任务进入workQueue排队（如果workQueue长度允许），等待空闲线程来执行。
+- 当队列里的任务数达到上限，并且池中正在运行的线程数小于maximumPoolSize，对于新加入的任务，新建线程。
+- 当队列里的任务数达到上限，并且池中正在运行的线程数等于maximumPoolSize，对于新加入的任务，执行拒绝策略（线程池默认的拒绝策略是抛异常）。
+
+*19. **以下代码的输出是什么？**
+
+```java
+@Test
+public void testCase() {
+    Integer a = 128;
+    Integer b = 128;
+    System.out.println(a == b);
+}
+```
+
+输出false，Integer缓存范围为-128 ~ 127。
+
+*20. **以下代码的输出是什么？**
+
+```java
+@Test
+public void testCase() {
+    String a = "programming";
+    String b = new String("programming");
+    String c = "prog" + "ramming";
+    System.out.println(a == b);
+    System.out.println(a == c);
+    System.out.println(c == b.intern());
+}
+```
+
+输出false、true、true。
