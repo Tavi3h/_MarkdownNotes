@@ -8,7 +8,7 @@
 
 #### 1.1.1 `main`方法
 
-Java中`main`方法是Java应用程序的入口。它的定于通常如下：
+Java中`main`方法是Java应用程序的入口。它的定义通常如下：
 
 ```java
 public static void main(String[] args) {
