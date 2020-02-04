@@ -55,7 +55,6 @@ N-->|1|AD[1111]
 ```
 
 <center><B>图 2-1 二进制树</B></center>
-
 图 2-1描述了如何用1位、2位、3位和4位得到一个二进制的值序列。我们可以看到，每当数字增加1位时，路径的总数就会翻一倍。依此类推，一个$n$位的字将得到$2^n$条不同的路径或位模式。即为了用二进制数表示一个拥有最多n个值的量，应当找到一个使不等式$n<=2^m$成立得最小位数$m$。即要表示0~100这101个值则m应该等于7，因为$101<=2^7$。 
 
 
@@ -96,7 +95,6 @@ $$N=a_{n-1}b^{n-1}+···+a_1b^1+a_0b^0+a_{-1}b^{-1}+a_{-2}b^{-2}+···+a_{-m}b
 为了区分十进制数、二进制数和十六进制数，我们分别用下标10、2和16表示基数（例如$1234_{10}，1010011_2，12A3_{16}$）。表2-2为每种数制用到的数字：
 
 <center><b>表 2-2 四种数制用到的数字</b></center>
-
 数制|基数|数字集合
 -----|-----|-----
 十进制|b=10|a={0,1,2,3,4,5,6,7,8,9}
@@ -274,7 +272,6 @@ n位二进制补码数的表示范围$-2^{n-1}$~$2^{n-1}-1$。如果破坏了这
 ![ 算术移位运算-左移](_image\算术移位运算.JPG)
 
 <center><b>图 2-2 算术移位运算</b></center>
-
 如图2-2所示，左移操作时，最低位补0，最高位被复制到进位标志中。**进位标志是计算机中的一个位存储单元，保存了进位位的状态。**
 
 二进制补码系统中，左移一位等价于将该数乘2。例如39的二进制表示为00100111，左移一位得到01001110，对应于78。而有符号的二进制数11000101（-29）左移一位得到10001010（-58）。
@@ -317,7 +314,6 @@ n位二进制补码数的表示范围$-2^{n-1}$~$2^{n-1}-1$。如果破坏了这
 - 步骤f：将计数器的值减1，重复步骤c直到n个周期后计数器的值变为0。此时部分积寄存器的内容就是乘积。
 
 <center><b>表 2-3 用上述方法计算无符号数乘法</b></center>
-
 <table>
  <col class=xl65 width=64 span=5 style='width:48pt'>
  <tr height=20 style='height:15.0pt'>
@@ -462,7 +458,6 @@ n位二进制补码数的表示范围$-2^{n-1}$~$2^{n-1}-1$。如果破坏了这
 表 2-4 给出了使用布斯乘法计算+15（01111）乘以-13（10011）的过程：
 
 <center><b>表 2-4 布斯乘法实例</b></center>
-
 <table>
  <col class=xl65 width=64 span=2 style='width:48pt'>
  <col class=xl65 width=145 style='mso-width-source:userset;mso-width-alt:5302;
@@ -540,6 +535,372 @@ n位二进制补码数的表示范围$-2^{n-1}$~$2^{n-1}-1$。如果破坏了这
 
 ##### 2.5.4 除法
 
+除法是通过被除数不断地减去除数直到结果为0或小于除数来实现的。减去除数的次数称为”商“，最后一次减法的差称为”余数“，即：被除数/除数=商+余数/除数。
+
+我们首先来看十进制除法575除以25的过程：
+
+```
+             23   
+            ———
+         25|575
+            50
+            ---
+             75
+             75
+             --
+              0
+```
+
+第一步是比较除数和被除数的最高两位，看看被除数的最高两位中有几个除数。这个例子中答案为2，然后使用57减去$2\times25$。在商的最高位上写下数字2。将被除数的下一个数字5移下到7的后面，并比较除数和75。由于75正好是25的整数倍，所以商的下一位写下数字3。除法结束，商为23，余数为0。上述除法过程的难点在于估计部分被除数中用多少个除数。
+
+下面考虑无符号二进制除法的例子，25=11001，575=1000111111：
+
+```
+               010111
+           ----------
+     11001|1000111111   
+            11001
+           ------
+            0101011
+              11001
+              -----
+              100101
+               11001
+               -----
+               011001
+                11001
+                -----
+                00000
+```
+
+被除数的前5位比除数小，因此商的最高位写0，并将除数与被除数的前6位比较。被除数的前6位中有一个除数，减法后得到新的部分被除数01010。新的被除数小于除数，因此商的下一位是0。依次类推，整个除法的过程如上所示，商为10111，余数是0。
+
+**恢复余数除法**
+
+在对除数和部分被除数比较时，人们使用心算进行比较，而计算机做减法并检测结果的符号位。如果减法的结果为正，则商1，若结果为负，则商0，并将部分被除数与除数相加，将其恢复为原先的值。
+
+算法如下：
+
+1. 将除数的最高位与被除数的最高位对齐。
+
+2. 从部分被除数中减去除数，得到新的部分被除数。
+
+	- a. 若新的部分被除数为负，则商左移1位，最低为补0并用新的部分被除数加上除数，恢复原先的部分被除数。
+
+	- b. 若新的部分被除数为正，则商左移1位，最低为补1。
+
+3. 判断除法是否结束。若除数的最低位与**被除数**最低位对齐，则除法结束。最后的部分被除数就是余数。否则向下执行。
+4. 将除数右移一位，并执行第二步。
+
+图 2-4 描述了上述算法的流程图：
+
+```mermaid
+graph TD
+A[开始]-->B[将除数的最高位于被除数的最高位对齐]
+B-->C[部分被除数减去除数]
+C-->condition1{结果为正}
+condition1-->|否|D[商左移1位最低位补0]
+D-->E[将除数与被除数相加以恢复部分被除数]
+condition1-->|是|F[商左移1位最低位补1]
+F-->condition2{除数最低位与被除数最低位对齐}
+E-->condition2
+condition2-->|否|G[除数右移1位]
+condition2-->|是|H[结束]
+G-->C
+```
+
+<center><b>图 2-4 恢复余数除法流程</b></center>
+
+表 2-5 展示了恢复余数除法实例，01100111除以1001，结果商1011，余100。
+
+<center><b>表 2-5 上述算法计算01100111除以1001</b></center>
+
+<table>
+ <col class=xl65 width=64 span=5 style='width:48pt'>
+ <tr height=20 style='height:15.0pt'>
+  <td rowspan=2 height=40 class=xl65 width=64 style='height:30.0pt;width:48pt'>步骤</td>
+  <td rowspan=2 class=xl65 width=64 style='width:48pt'>描述</td>
+  <td class=xl65 width=64 style='width:48pt'>部分被除数</td>
+  <td class=xl65 width=64 style='width:48pt'>除数</td>
+  <td class=xl65 width=64 style='width:48pt'>商</td>
+ </tr>
+ <tr height=20 style='height:15.0pt'>
+  <td height=20 class=xl65 style='height:15.0pt'>01100111</td>
+  <td class=xl65>00001001</td>
+  <td class=xl65>00000000</td>
+ </tr>
+ <tr height=20 style='height:15.0pt'>
+  <td height=20 class=xl65 style='height:15.0pt'>1</td>
+  <td class=xl65>除数最高位与被除数最高位对齐</td>
+  <td class=xl65>01100111</td>
+  <td class=xl65>01001000</td>
+  <td class=xl65>00000000</td>
+ </tr>
+ <tr height=20 style='height:15.0pt'>
+  <td height=20 class=xl65 style='height:15.0pt'>2</td>
+  <td class=xl65>部分被除数减去除数</td>
+  <td class=xl65>00011111</td>
+  <td class=xl65>01001000</td>
+  <td class=xl65>00000000</td>
+ </tr>
+ <tr height=20 style='height:15.0pt'>
+  <td height=20 class=xl65 style='height:15.0pt'>2.b</td>
+  <td class=xl65>结果为正，商左移一位，最低位补1</td>
+  <td class=xl65>00011111</td>
+  <td class=xl65>01001000</td>
+  <td class=xl65>00000001</td>
+ </tr>
+ <tr height=20 style='height:15.0pt'>
+  <td height=20 class=xl65 style='height:15.0pt'>3</td>
+  <td class=xl65>除法未结束</td>
+  <td class=xl65></td>
+  <td class=xl65></td>
+  <td class=xl65></td>
+ </tr>
+ <tr height=20 style='height:15.0pt'>
+  <td height=20 class=xl65 style='height:15.0pt'>4</td>
+  <td class=xl65>除数右移1位</td>
+  <td class=xl65>00011111</td>
+  <td class=xl65>00100100</td>
+  <td class=xl65>00000001</td>
+ </tr>
+ <tr height=20 style='height:15.0pt'>
+  <td height=20 class=xl65 style='height:15.0pt'>2</td>
+  <td class=xl65>部分被除数减去除数</td>
+  <td class=xl65>-00000101(11111011)</td>
+  <td class=xl65>00100100</td>
+  <td class=xl65>00000001</td>
+ </tr>
+ <tr height=20 style='height:15.0pt'>
+  <td height=20 class=xl65 style='height:15.0pt'>2.a</td>
+  <td class=xl65>结果为负，恢复被除数，商左移1位，最低位补0</td>
+  <td class=xl65>00011111</td>
+  <td class=xl65>00100100</td>
+  <td class=xl65>00000010</td>
+ </tr>
+ <tr height=20 style='height:15.0pt'>
+  <td height=20 class=xl65 style='height:15.0pt'>3</td>
+  <td class=xl65>除法未结束</td>
+  <td class=xl65></td>
+  <td class=xl65></td>
+  <td class=xl65></td>
+ </tr>
+ <tr height=20 style='height:15.0pt'>
+  <td height=20 class=xl65 style='height:15.0pt'>4</td>
+  <td class=xl65>除数右移1为</td>
+  <td class=xl65>00011111</td>
+  <td class=xl65>00010010</td>
+  <td class=xl65>00000010</td>
+ </tr>
+ <tr height=20 style='height:15.0pt'>
+  <td height=20 class=xl65 style='height:15.0pt'>2</td>
+  <td class=xl65>部分被除数减去除数</td>
+  <td class=xl65>00001101</td>
+  <td class=xl65>00010010</td>
+  <td class=xl65>00000010</td>
+ </tr>
+ <tr height=20 style='height:15.0pt'>
+  <td height=20 class=xl65 style='height:15.0pt'>2.b</td>
+  <td class=xl65>结果为正，商左移一位，最低位补1</td>
+  <td class=xl65>00001101</td>
+  <td class=xl65>00010010</td>
+  <td class=xl65>00000101</td>
+ </tr>
+ <tr height=20 style='height:15.0pt'>
+  <td height=20 class=xl65 style='height:15.0pt'>3</td>
+  <td class=xl65>除法未结束</td>
+  <td class=xl65></td>
+  <td class=xl65></td>
+  <td class=xl65></td>
+ </tr>
+ <tr height=20 style='height:15.0pt'>
+  <td height=20 class=xl65 style='height:15.0pt'>4</td>
+  <td class=xl65>除数右移1位</td>
+  <td class=xl65>00001101</td>
+  <td class=xl65>00001001</td>
+  <td class=xl65>00000101</td>
+ </tr>
+ <tr height=20 style='height:15.0pt'>
+  <td height=20 class=xl65 style='height:15.0pt'>2</td>
+  <td class=xl65>部分被除数减去除数</td>
+  <td class=xl65>00000100</td>
+  <td class=xl65>00001001</td>
+  <td class=xl65>00000101</td>
+ </tr>
+ <tr height=20 style='height:15.0pt'>
+  <td height=20 class=xl65 style='height:15.0pt'>2.b</td>
+  <td class=xl65>结果为正，商左移一位，最低位补1</td>
+  <td class=xl65>00000100</td>
+  <td class=xl65>00001101</td>
+  <td class=xl65>00001011</td>
+ </tr>
+ <tr height=20 style='height:15.0pt'>
+  <td height=20 class=xl65 style='height:15.0pt'>3</td>
+  <td class=xl65>除法结束</td>
+  <td class=xl65></td>
+  <td class=xl65></td>
+  <td class=xl65></td>
+ </tr>
+</table>
 
 
-二进制补码数胸痛
+
+**不恢复余数除法**
+
+改进上述恢复余数除法可以减少除法的延迟。不恢复余数除法与恢复余数除法基本相同，唯一的区别在于它取消了恢复余数的操作。
+
+下述流程给出了不恢复余数除法的流程图。部分被除数减去除数之后，将检测新的部分被除数的符号位。若为负则商左移1位，最低位补0，并将部分被除数加上除数的二分之一。若为正，则商左移1位，最低位补1，并将部分被除数减去除数的二分之一。
+
+```mermaid
+graph TD
+A[开始]-->B[将除数的最高位与被除数最高位对齐]
+B-->C[部分被除数减去除数]
+C-->D[除数右移1位]
+D-->condition1{检测部分被出示是正还是负}
+condition1-->|为正|E[商左移1位最低位补1部分被除数减去除数]
+condition1-->|为负|F[商左移1位最低位补0部分被除数加上除数]
+E-->condition2{除数小于原除数}
+F-->condition2
+condition2-->|是|G[修正以得到正确的余数]
+condition2-->|否|D
+G-->H[结束]
+```
+
+<center><b>图 2-5 不恢复余数除法流程</b></center>
+
+表 2-6 展示了不恢复余数除法实例，01100111除以1001，结果商1011，余100。
+
+<center><b>表 2-6 上述算法计算01100111除以1001</b></center>
+
+<table>
+ <tr height=20 style='height:15.0pt'>
+  <td rowspan=2 height=40 class=xl65 width=174 style='height:30.0pt;width:131pt'>描述</td>
+  <td class=xl65 width=183 style='width:137pt'>部分被除数</td>
+  <td class=xl65 width=161 style='width:121pt'>除数</td>
+  <td class=xl65 width=122 style='width:92pt'>商</td>
+ </tr>
+ <tr height=20 style='height:15.0pt'>
+  <td height=20 class=xl65 style='height:15.0pt'>01100111</td>
+  <td class=xl65>00001001</td>
+  <td class=xl65>00000000</td>
+ </tr>
+ <tr height=20 style='height:15.0pt'>
+  <td height=20 class=xl65 style='height:15.0pt'>除数最高位与被除数最高位对齐</td>
+  <td class=xl65>01100111</td>
+  <td class=xl65>01001000</td>
+  <td class=xl65>00000000</td>
+ </tr>
+ <tr height=20 style='height:15.0pt'>
+  <td height=20 class=xl65 style='height:15.0pt'>部分被除数减去除数</td>
+  <td class=xl65>00011111</td>
+  <td class=xl65>01001000</td>
+  <td class=xl65>00000000</td>
+ </tr>
+ <tr height=20 style='height:15.0pt'>
+  <td height=20 class=xl65 style='height:15.0pt'>除数右移一位</td>
+  <td class=xl65>00011111</td>
+  <td class=xl65>00100100</td>
+  <td class=xl65>00000000</td>
+ </tr>
+ <tr height=20 style='height:15.0pt'>
+  <td height=20 class=xl65 style='height:15.0pt'>检测部分被除数的符号。商左移1位，最低位补1。部分被除数减去除数</td>
+  <td class=xl65>-00000101(11111011)</td>
+  <td class=xl65>00100100</td>
+  <td class=xl65>00000001</td>
+ </tr>
+ <tr height=20 style='height:15.0pt'>
+  <td height=20 class=xl65 style='height:15.0pt'>除法未结束</td>
+  <td class=xl65></td>
+  <td class=xl65></td>
+  <td class=xl65></td>
+ </tr>
+ <tr height=20 style='height:15.0pt'>
+  <td height=20 class=xl65 style='height:15.0pt'>除数右移1位</td>
+  <td class=xl65>-00000101(11111011)</td>
+  <td class=xl65>00010010</td>
+  <td class=xl65>00000001</td>
+ </tr>
+ <tr height=20 style='height:15.0pt'>
+  <td height=20 class=xl65 style='height:15.0pt'>检测部分被除数的符号。商左移1位，最低位补0。部分被除数加上除数</td>
+  <td class=xl65>00001101</td>
+  <td class=xl65>00010010</td>
+  <td class=xl65>00000010</td>
+ </tr>
+ <tr height=20 style='height:15.0pt'>
+  <td height=20 class=xl65 style='height:15.0pt'>除法未结束</td>
+  <td class=xl65></td>
+  <td class=xl65></td>
+  <td class=xl65></td>
+ </tr>
+ <tr height=20 style='height:15.0pt'>
+  <td height=20 class=xl65 style='height:15.0pt'>除数右移1位</td>
+  <td class=xl65>00001101</td>
+  <td class=xl65>00001001</td>
+  <td class=xl65>00000010</td>
+ </tr>
+ <tr height=20 style='height:15.0pt'>
+  <td height=20 class=xl65 style='height:15.0pt'>检测部分被除数的符号。商左移1位，最低位补1。部分被除数减去除数</td>
+  <td class=xl65>00000100</td>
+  <td class=xl65>00001001</td>
+  <td class=xl65>00000101</td>
+ </tr>
+ <tr height=20 style='height:15.0pt'>
+  <td height=20 class=xl65 style='height:15.0pt'>除法未结束</td>
+  <td class=xl65></td>
+  <td class=xl65></td>
+  <td class=xl65></td>
+ </tr>
+ <tr height=20 style='height:15.0pt'>
+  <td height=20 class=xl65 style='height:15.0pt'>除数右移1位</td>
+  <td class=xl65>00000100</td>
+  <td class=xl65>00000100.1</td>
+  <td class=xl65>00000101</td>
+ </tr>
+ <tr height=20 style='height:15.0pt'>
+  <td height=20 class=xl65 style='height:15.0pt'>检测部分被除数的符号。商左移1位，最低位补1。部分被除数减去除数</td>
+  <td class=xl65>-00000000.1</td>
+  <td class=xl65>00000100.1</td>
+  <td class=xl65>00001011</td>
+ </tr>
+ <tr height=20 style='height:15.0pt'>
+  <td height=20 class=xl65 style='height:15.0pt'>除法进入结束阶段</td>
+  <td class=xl65></td>
+  <td class=xl65></td>
+  <td class=xl65></td>
+ </tr>
+ <tr height=20 style='height:15.0pt'>
+  <td height=20 class=xl65 style='height:15.0pt'>修正余数</td>
+  <td class=xl65>00000100</td>
+  <td class=xl65>00000100.1</td>
+  <td class=xl65>00001011</td>
+ </tr>
+ <tr height=20 style='height:15.0pt'>
+  <td height=20 class=xl65 style='height:15.0pt'>除法结束</td>
+  <td class=xl65></td>
+  <td class=xl65></td>
+  <td class=xl65></td>
+ </tr>
+</table>
+
+
+
+#### 2.6 浮点数
+
+在介绍整数之后，下一步就是讨论浮点运算，即实数之间的运算。实数是所有有理数和无理数的集合。浮点运算能够让人们处理科学应用（与金融或商业应用相对）中很大的和很小的数。浮点运算不像整数运算，它的计算结果一般是不确定的。**一块芯片上的浮点计算结果也许与另一块芯片上的不同。**
+
+n位字长的计算机能够处理值为$0$~$2^n-1$的单字长无符号整数。更大的整数可以通过将多个字链接在一起来表示。例如，一台32位的计算机可以将两个32位的字拼接在一起以处理64位数（一个表示64位数的高半部分，另一个表示它的低半部分）。科学家和工程师经常会处理值范围极大的数，这些数被表示为浮点数并进行处理。之所以称为浮点数是因为小数点在数中的位置并不是固定的。**一个浮点数值分为两个部分存储：数值以及小数点在数值中的位置。**
+
+浮点数也被称作“科学家计数法”，例如$1.2345\times10^{20}$、$0.4599\times10^{-39}$等都是十进制浮点数。在十进制运算中，科学计数法表示的数字被写成$尾数\times10^{指数}$的形式，这里“尾数”表示这个数，而“指数”则以10的整数幂为倍数将其扩大或缩小。
+
+二进制浮点数则被表示为$尾数\times2^{指数}$的形式。例如$101010.111110_2$可以表示为$1.01010111110\times2^5$，这里尾数是1.01010111110，指数为5（8位二进制表示为00000101）。由于浮点数被定义为两个值的积，所以浮点数的表示并不唯一，例如$10.110\times2^4=1.0110\times2^5$。
+
+目前，IEEE754浮点数标准提供了3种浮点数表示：
+
+- 32位单精度浮点数
+- 64位双精度浮点数
+- 128位四精度浮点数
+
+**规格化浮点数**
+
+IEEE754的浮点数的尾数总是规格化（除非它等于0），其范围为$1.000...0\times2^e$到$1.111...1\times2^e$，这里e表示指数。**规格化浮点数的最高位总是1。**规格化使得尾数的所有位都是有效的。
+
