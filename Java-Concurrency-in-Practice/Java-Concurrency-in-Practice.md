@@ -164,5 +164,162 @@ class ExpensiveObject {
 
 ##### 2.2.3 复合操作
 
-`LazyInitRace`和`UnsafeCountingFactorizer`都包含一组需要以原子方式执行的操作。要避免竞态条件问题，就必须在某个线程修改该变量时，通过某种方式防止其他线程使用这个变量，从而确保其他线程只能在修改操作完成之前或之后读取和修改状态，而不时在修改状态过程中。
+`LazyInitRace`和`UnsafeCountingFactorizer`都包含一组需要以原子方式执行的操作。要避免竞态条件问题，就必须在某个线程修改该变量时，通过某种方式防止其他线程使用这个变量，从而确保其他线程只能在修改操作完成之前或之后读取和修改状态，而不是在修改状态过程中。
 
+**假定有两个操作A和B，如果从执行A的线程来看，当另一个线程执行B时，要么将B全部执行完，要么完全不执行B，那么A和B对彼此来说是原子的。原子操作是指，对于访问同一个状态的所有操作（包括该操作本身）来说，这个操作是一个以原子方式执行的操作。**
+
+如果`UnsafeSequence`中的递增操作是原子操作，那么竞态条件就不会发生，并且递增操作在每次执行时都会把计数器增加1。为了确保线程安全性，“先检查后执行”（例如延迟初始化）和“读取-修改-写入”（例如递增运算）等操作必须时原子的。我们将“先检查后执行”以及“读取-修改-写入”等操作统称为复合操作：**包含了一组必须以原子方式执行的操作以确保线程安全性。**
+
+在2.3节中，我们将介绍加锁机制，这是Java中确保原子性的内置机制。就目前而言，我们先采用另一种方式修正这个问题，即使用现有的线程安全类，如程序清单2-4所示：
+
+```java
+package pers.tavish.jcip.ch2threadsafety;
+
+import net.jcip.annotations.ThreadSafe;
+
+import javax.servlet.ServletRequest;
+import javax.servlet.ServletResponse;
+import java.math.BigInteger;
+import java.util.concurrent.atomic.AtomicLong;
+
+// 程序清单2-4
+@ThreadSafe
+public class CountingFactorizer {
+
+    private final AtomicLong count = new AtomicLong(0);
+
+    public long getCount() {
+        return count.get();
+    }
+
+    public void service(ServletRequest req, ServletResponse resp) {
+        BigInteger i = extractFromRequest(req);
+        BigInteger[] factors = factor(i);
+        count.incrementAndGet();
+        encodeIntoResponse(resp, factors);
+    }
+
+    private void encodeIntoResponse(ServletResponse res, BigInteger[] factors) {
+
+    }
+
+    private BigInteger extractFromRequest(ServletRequest req) {
+        return new BigInteger("7");
+    }
+
+    private BigInteger[] factor(BigInteger i) {
+        return new BigInteger[]{i};
+    }
+}
+```
+
+在`java.util.concurrent.atomic`包中包含了一些原子变量类，用于实现在数值和对象引用上的原子状态转换。通过用`AtomicLong`来代替`long`类型的计数器，能够确保所有对计数器状态的访问操作都是原子的。由于Servlet的状态就是计数器的状态，并且计数器是线程安全的，因此这里的Servlet也是线程安全的。
+
+**在无状态的类中添加一个状态时，如果该状态完全由线程安全的对象来管理，那么这个类仍然是线程安全的。**然而，当状态变量的数量由一个变为多个时，并不会像状态变量数量由零个变为一个那样简单。
+
+**在实际情况中，应尽可能地使用先用的线程安全对象来管理类的状态。与非线程安全的对象相比，判断线程安全对象的可能状态及其状态转换情况要更为容易，从而也更容易维护和验证线程安全性。**
+
+#### 2.3 加锁机制
+
+当在Servlet中添加一个状态变量时，可以通过线程安全的对象来管理Servlet的状态以维护Servlet的线程安全性。但如果想在Servlet中添加更多的状态，那么是否只需要添加更多的线程安全状态变量就足够了？
+
+现在假设我们希望提升Servlet的性能：将最近的计算结果缓存起来，当两个连续的请求对相同的数值进行因数分解时，可以直接使用上一次的计算结果，而无需重新计算。要实现该缓存策略（实际上该策略并不好），需要保存两个状态：最近执行引述分解的数值，以及分解结果。
+
+我们从通过`AtomicLong`以线程安全的方式来管理计数器的状态。那么，在这里是否可以使用类似的`AtomicReference`来管理最近执行因数分解的数值及其结果呢？如下程序禽蛋2-5所示：
+
+```java
+// 程序清单2-5
+@NotThreadSafe
+public class UnSafeCachingFactorizer extends GenericServlet {
+
+    private final AtomicReference<BigInteger> lastNumber = new AtomicReference<BigInteger>();
+    private final AtomicReference<BigInteger[]> lastFactors = new AtomicReference<BigInteger[]>();
+
+    public void service(ServletRequest req, ServletResponse resp) {
+        BigInteger i = extractFromRequest(req);
+        if(i.equals(lastNumber.get())) {
+            encodeIntoResponse(resp, lastFactors.get());
+        } else {
+            BigInteger[] factors = factor(i);
+            lastNumber.set(i);
+            lastFactors.set(factors);
+            encodeIntoResponse(resp, factors);
+        }
+    }
+
+    private void encodeIntoResponse(ServletResponse resp, BigInteger[] factors) {
+
+    }
+
+    private BigInteger extractFromRequest(ServletRequest req) {
+        return new BigInteger("7");
+    }
+
+    private BigInteger[] factor(BigInteger i) {
+        return new BigInteger[]{i};
+    }
+}
+```
+
+然而，这种方法并不正确。尽管这些原子引用本身都是线程安全的，但在`UnSafeCachingFactorizer`中存在着竞态条件，这可能产生错误的结果。
+
+在线程安全性的定义中要求，多个线程之间的操作无论采用何种执行时序或交替方式，都要保证不变性条件不被破坏。`UnSafeCachingFactorizer`的不变性条件之一是：在`lastFactors`中缓存的因数之积应该等于在`lastNumber`中缓存的数值。只有确保了这个不变性条件不被破坏，上面的Servlet才是正确的。当在不变性条件中涉及多个变量时，各个变量之间并不是彼此独立的，而是某个变量的值会对其他变量的值产生约束。因此，**当更新某一个变量时，需要在同一个原子操作中对其他变量同时进行更新。**
+
+在某些执行时序中，`UnSafeCachingFactorizer`可能会破坏这个不变性条件。在使用原子引用的情况下，尽管对`set`方法的调用是原子的，但仍然无法同时更新`lastNumber`和`lastFactors`。如果只修改了其中一个变量，那么在这两次修改操作之间，其他线程将发现不变性条件被破坏了。同样地，我们也不能保证会同时获取这两个值：在线程A获取这两个值的过程中，线程B可能修改了它们，这样线程A也会发现不变性条件被破坏了。
+
+**要保持状态的一致性，就需要在单个原子操作中更新所有相关的状态变量。**
+
+##### 2.3.1 内置锁
+
+Java提供了一种内置的锁机制来支持原子性：同步代码块（Synchronized Block）。
+
+同步代码块包括两个部分：一个作为锁的对象引用，一个作为由这个锁保护的代码块。以关键字`synchroized`来修饰的方法就是一种横跨整个方法体的同步代码块，其中该同步代码块的锁就是方法调用所在的对象。静态的`synchroized`方法以`Class`对象作为锁。
+
+每个Java对象都可以用做一个实现同步的锁，这些锁被称为内置锁或监视器锁。线程在进入同步代码块之前会自动获得锁，并且在退出同步代码块时自动释放锁。**获得内置锁的唯一途径就是进入由这个锁保护的同步代码块或方法。**
+
+**Java的内置锁相当于一种互斥体（互斥锁），这意味着最多只有一个线程能持有这种锁。当线程A尝试获取一个由线程B持有的锁时，线程A必须等待或者阻塞，知道线程B释放这个锁。如果线程B永远不会释放锁，那么A也将永远地等下去。**
+
+由于每次只能有一个线程执行内置锁保护的代码块，因此，由这个锁保护的同步代码块会以原子方式执行，多个线程在执行该代码块时也不会相互干扰。并发环境中的原子性与事务应用程序中的原子性有着相同的含义————一组语句作为一个不可分割的单元被执行。任何一个执行同步代码块的线程，都不可能看到有其他线程正在执行由同一个锁保护的同步代码块。
+
+上述机制使得要确保因数分解Servlet的线程安全性变得简单，如下程序清单2-6所示：
+
+```java
+// 程序清单2-6
+@ThreadSafe
+public class SynchronizedFactorizer extends GenericServlet {
+
+    @GuardedBy("this")
+    private BigInteger lastNumber;
+
+    @GuardedBy("this")
+    private BigInteger[] lastFactors;
+
+    public synchronized void service(ServletRequest req, ServletResponse resp) throws ServletException, IOException {
+        BigInteger i = extractFromRequest(req);
+        if (i.equals(lastNumber)) {
+            encodeIntoResponse(resp, lastFactors);
+        } else {
+            BigInteger[] factors = factor(i);
+            lastNumber = i;
+            lastFactors = factors;
+            encodeIntoResponse(resp, factors);
+        }
+    }
+
+    private void encodeIntoResponse(ServletResponse resp, BigInteger[] factors) {
+
+    }
+
+    private BigInteger extractFromRequest(ServletRequest req) {
+        return new BigInteger("7");
+    }
+
+    private BigInteger[] factor(BigInteger i) {
+        return new BigInteger[]{i};
+    }
+}
+```
+
+使用`synchroinzed`修饰`service`方法可以确保在同一时刻只有一个线程可以执行该方法。现在`SynchronizedFactorizer`是线程安全的。然而，这种方法却过于极端，因为多个客户端无法同时使用因数分解Servlet，服务的响应性很低。这是一个性能问题，而不是线程安全问题。
+
+##### 2.3.2 重入
