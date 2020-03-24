@@ -323,3 +323,58 @@ public class SynchronizedFactorizer extends GenericServlet {
 使用`synchroinzed`修饰`service`方法可以确保在同一时刻只有一个线程可以执行该方法。现在`SynchronizedFactorizer`是线程安全的。然而，这种方法却过于极端，因为多个客户端无法同时使用因数分解Servlet，服务的响应性很低。这是一个性能问题，而不是线程安全问题。
 
 ##### 2.3.2 重入
+
+当某个线程请求一个由其他线程持有的锁时，发出请求的线程会阻塞。然而，由于内置锁是可重入的，因此如果某个线程试图获得一个已经由它自己持有的锁，那么这个请求就会成功。**“重入”意味着获取锁的操作的粒度是“线程”，而不是“调用”。**
+
+重入的一种实现方法是为每个锁关联一个获取计数值和一个所有者线程。当计数值为0时，这个锁就被认为是没有被任何线程持有。当线程请求一个未被持有的锁时，JVM将记下锁的持有者，并且将获取计数器置为1。如果同一个线程再次获取这个锁，计数值将递增。而当线程退出同步代码块时，计数器会相应地递减。当计数值为0时，这个锁将释放。
+
+如下程序手动实现了一个可重入锁：
+
+```java
+public class Lock {
+
+    private boolean isLocked;
+    private Thread lockedBy; 
+    private int lockedCount;
+
+    public synchronized void lock() throws InterruptedException {
+        Thread thread = Thread.currentThread();
+        while (isLocked && lockedBy != thread) {
+            wait();
+        }
+        isLocked = true;
+        lockedCount++;
+        lockedBy = thread;
+    }
+
+    public synchronized void unlock() {
+        if (Thread.currentThread() == this.lockedBy) {
+            lockedCount--;
+            if(lockedCount == 0) {
+                isLocked = false;
+                notify();
+            }
+        }
+    }
+}
+```
+
+在程序清单2-7中，子类重写了父类的`doSometing()`方法，然后调用父类中的方法，此时如果没有可重入的锁，那么这段代码将发生死锁。
+
+```java
+class Widget {
+    public synchronized void doSomething() {
+        // ...
+    }
+}
+
+public class LoggingWidget extends Widget {
+    @Override
+    public synchronized void doSomething() {
+        // ...
+        super.doSomething();
+    }
+}
+```
+
+由于`Widget`和`LoggingWidget`中`doSomething()`方法都是`synchronized`方法，因此每个`doSomething`方法在执行前都会获取`Widget`上的锁。如果内置锁是不可重入的，那么在调用`super.doSomething`时将会无法获得`Widget`上的锁，因为这个锁已被持有了，从而线程将永远停顿下去，发生死锁。重入则避免了这种死锁情况的发生。
