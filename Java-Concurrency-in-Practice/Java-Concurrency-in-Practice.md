@@ -378,3 +378,125 @@ public class LoggingWidget extends Widget {
 ```
 
 由于`Widget`和`LoggingWidget`中`doSomething()`方法都是`synchronized`方法，因此每个`doSomething`方法在执行前都会获取`Widget`上的锁。如果内置锁是不可重入的，那么在调用`super.doSomething`时将会无法获得`Widget`上的锁，因为这个锁已被持有了，从而线程将永远停顿下去，发生死锁。重入则避免了这种死锁情况的发生。
+
+#### 2.4 用锁来保护状态
+
+由于锁能使其保护的代码路径以串行形式（意味着多个线程依次以独占的方式访问对象，而不是并发地访问）来访问，因此可以通过锁来构造一些协议来实现对共享状态的独占访问。
+
+**如果在复合操作的执行过程中持有一个锁，那么会使复合操作成为原子操作。如果用同步来协调对某个变量的访问，那么在访问这个变量的所有位置都需要使用同步。当使用锁协调对某个变量访问时，在访问变量的所有位置都要使用同一个锁。**
+
+在`SynchronizedFactorizer`中，`lastNumber`和`lastFactors`着两个变量都是由这个Servlet对象的内置锁来保护的，标注的`@GuardedBy`也说明了这一点。
+
+**一种常见的加锁约定是，将所有的可变状态都封装在对象内部，并通过对象的内置锁对所有访问可变状态的代码路径进行同步，使得在该对象上不会发生并发访问。**
+
+许多线程安全类中都使用了这种模式，例如`Vector`和其他的同步集合类。在这种情况下，对象状态中的所有变量都由对象的内置锁保护起来。但是这种模式并没有什么特殊之处，编译器或运行时都不会强制检查并使用这种模式。也就是说如果添加新的方法或代码路径时忘记了使用同步，那么这种加锁协议就可能会被破坏。
+
+**当类的不变性条件涉及多个状态变量时，那么在不变性条件中的每个变量都必须由同一个锁来保护。因此可以在单个原子操作中访问或更新这些变量，从而确保不变性条件不被破坏。**
+
+事实上如果不加区别地滥用`synchronized`，可能会导致程序中出现过多的同步。此外，如果只是将每个方法都作为同步方法，例如`Vector`，那么并不足以确保`Vector`上复合操作都是原子的。例如：
+
+```java
+if (!vector.contains(element)) {
+    vector.add(element);
+}
+```
+
+虽然`contains`和`add`均为原子方法，但在上述代码中仍然存在竞态条件（A线程执行完上述代码中的`contains`方法后，B线程执行）。虽然`synchronized`方法可以确保单个操作的原子性，但如果要把多个操作合并为一个复合操作，还是需要额外的加锁机制。
+
+此外，将每个方法都作为同步方法还可能导致活跃性问题（Liveness）或性能问题（Performance）。
+
+#### 2.5 活跃性与性能
+
+在`UnsafeCachingFactorizer`中，我们通过在因数分解Servlet中引入缓存机制来提升性能。在缓存中需要使用共享状态，因此需要通过同步来维护状态的完整性。然而如果使用`SynchronizedFactorizer`中的同步方式，那么代码的执行性将非常糟糕。该策略的实现方式也就是对整个`service`方法进行同步。虽然这种简单且粗粒度的方法能确保线程安全性，但付出的代价却很高。
+
+由于`service`是一个同步方法，因此每次只有一个线程可以执行该方法，如图2-1所示。这就背离了Servlet框架的初衷，即Servlet需要能同时处理多个请求。尤其在高负载形况下将带来糟糕的用户体验，因为这些请求将排队等待处理。
+
+![图2-1-SynchronizedFactorizer中的不良并发](_images\图2-1-SynchronizedFactorizer中的不良并发.PNG)
+<center><b>图2-1 SynchronizedFactorizer中的不良并发</b></center>
+
+这种应用程序被称为不良并发（Poor Concurrency）应用程序：可同时调用的数量不仅受到可用处理资源的限制，还受到应用程序本身结构的限制。
+
+通过缩小同步代码块的作用范围，我们可以做到既确保Servlet的并发性，同时又维护线程安全性。要确保同步代码块不要过小，并且不要将本应是原子的操作拆分到多个同步代码块中。应该尽量将不影响共享状态且执行时间较长的操作从同步代码块中分离出去，从而在这些操作的执行过程中，其他线程可以访问共享状态。
+
+程序清单2-8中的`CachedFactorizer`将Servlet的代码修改为使用两个独立的同步代码块，每个同步代码块都只包含一小段代码。其中一个同步代码块负责保护判断是否只需返回缓存结果“先检查后执行”操作序列，另一个同步代码块则负责确保对缓存的数值和因数分解结果进行同步更新。此外，还重新引入了“命中计数器”，添加了一个“缓存命中”计数器，并在第一个同步代码块中更新这两个变量。由于这两个计数器也是共享可变状态的一部分，因此必须在所有访问它们的位置都使用同步。
+
+```java
+package pers.tavish.jcip.ch2threadsafety;
+
+import net.jcip.annotations.GuardedBy;
+import net.jcip.annotations.ThreadSafe;
+
+import javax.servlet.GenericServlet;
+import javax.servlet.ServletRequest;
+import javax.servlet.ServletResponse;
+import java.math.BigInteger;
+
+// 程序清单2-8
+@ThreadSafe
+public class CachedFactorizer extends GenericServlet {
+
+    @GuardedBy("this")
+    private BigInteger lastNumber;
+
+    @GuardedBy("this")
+    private BigInteger[] lastFactors;
+
+    @GuardedBy("this")
+    private long hits;
+
+    @GuardedBy("this")
+    private long cacheHits;
+
+    public synchronized long getHits() {
+        return hits;
+    }
+
+    public synchronized double getCacheHitRatio() {
+        return (double) cacheHits / (double) hits;
+    }
+
+    public void service(ServletRequest req, ServletResponse resp) {
+        BigInteger i = extractFromRequest(req);
+        BigInteger[] factors = null;
+        synchronized (this) {
+            ++hits;
+            if (i.equals(lastNumber)) {。。
+                factors = lastFactors.clone();
+            }
+        }
+
+        if (factors == null) {
+            factors = factor(i);
+            synchronized (this) {
+                lastNumber = i;
+                lastFactors = factors.clone();
+            }
+        }
+        encodeIntoResponse(resp, factors);
+    }
+
+    private void encodeIntoResponse(ServletResponse resp, BigInteger[] factors) {
+
+    }
+
+    private BigInteger extractFromRequest(ServletRequest req) {
+        return new BigInteger("7");
+    }
+
+    private BigInteger[] factor(BigInteger i) {
+        return new BigInteger[]{i};
+    }
+}
+```
+
+`CachedFactorizer`中不再使用`AtomicLong`类型的计数器，而是使用`long`类型的变量。这是由于我们已经使用同步代码块来构造原子操作，同时使用两种不同的同步机制不仅会带来混乱，而且也不会对性能和安全性带来额外的好处。
+
+重构的`CachedFactorizer`实现了在简单性（对整个方法进行同步）与并发性（对尽可能短的代码路径进行同步）之间的平衡。由于获取与释放锁等操作都需要一定开销，因此如果将同步代码块分解得过细（例如将`++hits`分解到自己的同步代码块中），那么通常可能会带来性能问题，尽管不会破坏原子性。当访问状态变量或者在复合操作的执行期间，`CachedFactorizer`需要持有锁，但在执行较长的因数分解运算之前需要释放锁。这样既确保了线程安全性，也不会过多地影响并发性，而且在每个同步代码块中的代码路径都“足够短”。
+
+判断同步代码块的合理大小需要在各种设计需求之间进行权衡，包括安全性、简单性和性能。
+
+*通常，在简单性与性能之间存在着相互制约的因素。当实现某个同步策略时，一定不要盲目地追求性能而牺牲简单性，因为这样可能会破坏安全性。**
+
+当使用锁时，我们应该清除代码块实现的功能，以及在执行该代码块时是否需要很长时间。无论是执行计算密集型操作，还是执行某个可能阻塞的操作，如果持有锁的时间过长，那么都会带来活跃性或性能问题。
+
+**当执行时间较长的计算或者可能无法快速完成的操作时（例如网络I/O），一定不要持有锁。**
