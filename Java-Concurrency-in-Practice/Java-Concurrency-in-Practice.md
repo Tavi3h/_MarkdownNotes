@@ -413,7 +413,6 @@ if (!vector.contains(element)) {
 
 ![图2-1-SynchronizedFactorizer中的不良并发](_images\图2-1-SynchronizedFactorizer中的不良并发.PNG)
 <center><b>图2-1 SynchronizedFactorizer中的不良并发</b></center>
-
 这种应用程序被称为不良并发（Poor Concurrency）应用程序：可同时调用的数量不仅受到可用处理资源的限制，还受到应用程序本身结构的限制。
 
 通过缩小同步代码块的作用范围，我们可以做到既确保Servlet的并发性，同时又维护线程安全性。要确保同步代码块不要过小，并且不要将本应是原子的操作拆分到多个同步代码块中。应该尽量将不影响共享状态且执行时间较长的操作从同步代码块中分离出去，从而在这些操作的执行过程中，其他线程可以访问共享状态。
@@ -495,8 +494,60 @@ public class CachedFactorizer extends GenericServlet {
 
 判断同步代码块的合理大小需要在各种设计需求之间进行权衡，包括安全性、简单性和性能。
 
-*通常，在简单性与性能之间存在着相互制约的因素。当实现某个同步策略时，一定不要盲目地追求性能而牺牲简单性，因为这样可能会破坏安全性。**
+**通常，在简单性与性能之间存在着相互制约的因素。当实现某个同步策略时，一定不要盲目地追求性能而牺牲简单性，因为这样可能会破坏安全性。**
 
 当使用锁时，我们应该清除代码块实现的功能，以及在执行该代码块时是否需要很长时间。无论是执行计算密集型操作，还是执行某个可能阻塞的操作，如果持有锁的时间过长，那么都会带来活跃性或性能问题。
 
 **当执行时间较长的计算或者可能无法快速完成的操作时（例如网络I/O），一定不要持有锁。**
+
+### 第3章 对象的共享
+
+#### 3.1 可见性
+
+在单线程环境中，如果向某个变量先写入值，然后在没有其他写入操作的情况下读取这个变量，那么总能得到相同的值。然而，当读写操作在不同的线程执行时，情况就并非如此了。通常，我们无法确保执行读操作的线程能适时地看到其他线程写入的值，有时候甚至是不可能的。为了确保多个线程之间对内存写入操作的可见性，必须使用同步机制。
+
+程序清单3-1中的`NoVisibility`说明了当多个线程在某有同步的情况下共享数据时出现的错误。
+
+```java
+package pers.tavish.jcip.ch3sharingobjects;
+
+import net.jcip.annotations.NotThreadSafe;
+
+// 程序清单3-1
+@NotThreadSafe
+public class NoVisibility {
+
+    private static boolean ready;
+    private static int number;
+
+    public static void main(String[] args) {
+        new ReaderThread().start();
+        number = 42;
+        ready = true;
+    }
+
+    private static class ReaderThread extends Thread {
+
+        @Override
+        public void run() {
+            while (!ready) {
+                Thread.yield();
+            }
+            System.out.println(number);
+        }
+    }
+}
+```
+
+在上述这段代码中，主线程和读线程都将访问共享变量`ready`和`number`。这里主线程启动读线程，然后将`number`设为42，将`ready`设为true。读线程一直循环直到发现`ready`的值变为`true`，然后输出`number`的值。
+
+虽然`NoVisibility`看起来会输出42，但事实上可能会输出0，或者根本无法终止。这是因为代码中没有足够的同步机制，因此无法保证主线程写入的`ready`值和`number`值对于读线程来说是可见的。
+
+`NoVisibility`可能无法看到`ready`的值被设置为了`true`，从而持续循环下去。另一种情况`NoVisibility`可能会输出0，因为读线程可能看到了`ready`的值，但却没有看到写入`number`的值，这种现象被称为“重排序（Reordering）”。
+
+**在没有同步的情况下，编译器、处理器以及运行时等都可能对操作的执行顺序进行一些意想不到的调整。在缺乏足够同步的多线程程序中，要对内存操作的执行顺序进行判断，几乎无法得出正确的结论。**
+
+例如，主线程首先写入`number`，然后在没有同步的情况下写入`ready`，那么读线程看到的顺序可能与写入顺序完全相反。
+
+##### 3.1.1 失效数据
+
