@@ -609,7 +609,7 @@ public class SynchronizedInteger {
 
 当线程在没有同步的情况下读取变量时，可能会得到一个失效值，但至少这个失效值是由之前某个线程设置的值，而不是一个随机值。这种安全性保证也被称为最低安全性（out-of-thin-air safety）。
 
-最低安全性适用于绝大多数变量，但是存在一个例外：非`violate`类型的64位数值变量（`double`和`long`）。**Java内存模型要求，变量的读取操作和写入操作都必须是原子操作，但对于非`violate`类型的`long`和`double`变量，JVM允许将64位的读操作或写操作分解为两个位操作。**当读取一个非`violate`类型的`long`变量时，如果对该变量的读操作和写操作在不同的线程中执行，那么很可能会读取到某个值的高32位和另一个值的低32位。因此，即使不考虑失效数据问题，在多线程程序中使用共享的可变的`long`和`double`等类型的变量也是不安全的，除非用`violate`声明它们或者用锁保护起来。
+最低安全性适用于绝大多数变量，但是存在一个例外：非`volatile`类型的64位数值变量（`double`和`long`）。**Java内存模型要求，变量的读取操作和写入操作都必须是原子操作，但对于非`volatile`类型的`long`和`double`变量，JVM允许将64位的读操作或写操作分解为两个位操作。**当读取一个非`volatile`类型的`long`变量时，如果对该变量的读操作和写操作在不同的线程中执行，那么很可能会读取到某个值的高32位和另一个值的低32位。因此，即使不考虑失效数据问题，在多线程程序中使用共享的可变的`long`和`double`等类型的变量也是不安全的，除非用`volatile`声明它们或者用锁保护起来。
 
 ##### 3.1.3 加锁与可见性
 
@@ -637,15 +637,15 @@ JMM关于`synchronized`的两条规定：
 
 Java语言提供了一种稍弱的同步机制，即`volatile`变量。**该关键字用来确保将变量的更新操作通知到其他线程。当把变量声明为`volatile`类型后，编译器与运行时都会注意到这个变量是共享的，因此不会将该变量上的操作与其他内存操作一起重排序。`volatile`变量不会被缓存在寄存器或者对其他处理器不可见的地方，因此在读取`volatile`类型的变量时总会返回最新写入的值。**
 
-**访问`violate`变量时不会执行加锁操作，也就不会使执行线程阻塞，因此`violate`变量是一种比`synchronized`关键字更轻量级的同步机制。**
+**访问`volatile`变量时不会执行加锁操作，也就不会使执行线程阻塞，因此`volatile`变量是一种比`synchronized`关键字更轻量级的同步机制。**
 
-`violate`变量的正确使用方式包括：
+`volatile`变量的正确使用方式包括：
 
 - 确保它们自身状态的可见性
 - 确保它们所以用对象的状态的可见性
 - 标识一些重要的程序声明周期时间的发生
 
-程序清单3-4给出了`violate`变量的一种典型用法：检查某个状态标记以判断是否退出循环。
+程序清单3-4给出了`volatile`变量的一种典型用法：检查某个状态标记以判断是否退出循环。
 
 ```java
 package pers.tavish.jcip.ch3sharingobjects;
@@ -669,9 +669,9 @@ public class CountingSheep {
 
 我们也可以使用锁来确保`asleep`更新操作的可见性，但这将使代码变得更加复杂。
 
-需要注意的是，尽管`violate`变量可以用于表示状态信息，但它的语义不足以确保递增操作的原子性，除非我们能确保只有一个线程对变量执行写操作。
+需要注意的是，尽管`volatile`变量可以用于表示状态信息，但它的语义不足以确保递增操作的原子性，除非我们能确保只有一个线程对变量执行写操作。
 
-当且仅当满足以下所有条件时，才应该使用`violate`变量：
+当且仅当满足以下所有条件时，才应该使用`volatile`变量：
 
 - 对变量的写入操作不依赖变量的当前值，或者能够确保只有一个线程更新变量的值。
 - 该变量不会与其他状态变量一起纳入不变性条件中。
@@ -871,3 +871,383 @@ public class SafeListener {
 Ad-hoc线程封闭是指，维护线程封闭性的职责完全由程序实现来承担。
 
 Ad-hoc线程封闭是比较脆弱的，因为没有一种寓言特性，例如可见性修饰符或局部变量能将对象封闭到目标线程上。事实上，对线程封闭对象的引用通常保存在公有变量。
+
+**当决定使用线程封闭技术时，通常是因为要将某个特定的子系统实现为一个单线程子系统。在某些情况下，单线程子系统提供的简便性要胜过Ad-hoc线程封闭技术的脆弱性。**
+
+在`volatile`变量上存在一种特殊的线程封闭。只有你能确保只有单个线程对共享`volatile`变量执行写入操作，那么就可以安全地在这些共享的`volatile`变量上执行“读取-修改-写入”的操作。在这种情况下，相当于将修改操作封闭在单个线程中以防止发生竞态条件，并且`volatile`变量的可见性保证还确保了其他线程能看到最新的值。
+
+由于Ad-hoc线程封闭技术的脆弱性，因此在程序中尽量少用它，在可能的情况下，应该使用更强的线程封闭技术。
+
+##### 3.3.2 栈封闭
+
+**栈封闭是线程封闭的一种特例，在栈封闭中，只能通过局部变量才能访问对象。**
+
+局部变量的固有属性之一就是封闭在执行线程中。它们位于执行线程的栈中，其他线程无法访问这个栈。栈封闭比Ad-hoc线程封闭更易于维护，也更加健壮。
+
+对于基本类型的局部变量，如下程序清单3-9中的`loadTheArk`方法中的`numPairs`，无论如何都不会破坏栈封闭性。由于任何方法都无法获得对基本类型的引用，因此Java语言的这种语义就确保了基本类型的局部变量始终封闭在线程中。
+
+```java
+public int loadTheArk(Collection<Animal> candidates) {
+    SortedSet<Animal> animals;
+    int numPairs = 0;
+    Animal candidate = null;
+
+    animals = new TreeSet<Animal>(new SpeciesGenderComparator());
+    animals.addAll(candidates);
+    for (Animal a : animals) {
+        if (candidate == null || !candidate.isPotentialMate(a))
+            candidate = a;
+        else {
+            ark.load(new AnimalPair(candidate, a));
+            ++numPairs;
+            candidate = null;
+        }
+    }
+    return numPairs;
+}
+```
+
+在上述方法中只有一个引用指向`animals`集合，这个引用被封闭在局部变量中，因此也被封闭在执行线程中。然而如果发布了对集合`animals`的引用，那么封闭性将遭到破坏，并导致对象`animals`逸出。
+
+如果在线程内部上下文中使用非线程安全的对象，那么该对象仍然是线程安全的。
+
+##### 3.3.3 ThreadLocal类
+
+维持先锋封闭性的一种更规范的方法是使用`ThreadLocal`，这个类能使线程中的某个值与保持值的对象关联起来。 `ThreadLocal`提供了`get`和`set`等访问接口或方法，这些方法为每个使用该变量的线程都存有一份独立的副本，因此`get`总是返回由当前执行线程在调用`set`时设置的最新值。
+
+`ThreadLocal`对象通常用于防止对可变的单实例变量或全局变量进行共享。例如，由于JDBC链接对象不一是线程安全的，因此多线程应用程序在没有协同的情况下使用全局变量时就不是线程安全的。通过将JDBC链接对象保存到`ThreadLocal`对象中，每个线程都会拥有自己的连接，如下所示：
+
+```java
+package pers.tavish.jcip.ch3sharingobjects;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+
+public class ConnectionDispenser {
+
+    private static String DB_URL = "jdbc:mysql://localhost:3306/test?user=root&password=mysql";
+
+    private static ThreadLocal<Connection> connectionHolder = ThreadLocal.withInitial(() -> {
+        try {
+            return DriverManager.getConnection(DB_URL);
+        } catch (SQLException e) {
+            throw new RuntimeException("Unable to acquire Connection, e");
+        }
+    });
+
+    public static Connection getConnection() {
+        return connectionHolder.get();
+    }
+}
+```
+
+当一个线程调用`ConnectionDispenser.getConnection()`时就会获得只属于当前线程的`Connection`对象：
+
+```java
+    @Test
+    public void testConnectionDispenser() throws InterruptedException {
+
+        int threads = 2;
+        CountDownLatch countDownLatch = new CountDownLatch(2);
+
+        for (int i = 0; i < threads; i++) {
+            new Thread(() -> {
+                Connection connection1 = ConnectionDispenser.getConnection();
+                Connection connection2 = ConnectionDispenser.getConnection();
+                System.out.println(Thread.currentThread().getName() + " connection1: " + connection1);
+                System.out.println(Thread.currentThread().getName() + " connection2: " + connection2);
+                countDownLatch.countDown();
+            }).start();
+        }
+        countDownLatch.await();
+    }
+```
+
+输出：
+
+```text
+Thread-1 connection1: com.mysql.jdbc.JDBC4Connection@418167a6
+Thread-1 connection2: com.mysql.jdbc.JDBC4Connection@418167a6
+Thread-2 connection1: com.mysql.jdbc.JDBC4Connection@3d9e530d
+Thread-2 connection2: com.mysql.jdbc.JDBC4Connection@3d9e530d
+```
+
+当某个线程初次调用`ThreadLocal`的`get`方法时，就会调用`initial`来获取初始值（没有覆盖`initialValue()`方法的话将得到`null`）。
+
+#### 3.4 不变性
+
+**满足同步需求的另一种方式是使用不可变对象（Immutable Object）。**如果对象的状态不可变，那么所有线程观察到对象的状态就是一致的了，那么前述所有的问题与复杂性也就自然消失了。
+
+如果某个对象在被创建之后其状态就不能被修改，那么这个对象就称为不可变对象。线程安全性是不可变对象的固有属性之一，它的不变性条件是由构造函数创建的，只要它们的状态不变，那么这些不变性条件就能得到维持。
+
+虽然Java语言规范和Java内存模型中都没有给出不变性的正式定义，但不可变性并不等于将对象中所有的域都声明为`final`类型。即使此时对象中所有的域都是`final`类型的，这个对象也仍然是可变的，因为`final`域中可以保存对可变对象的引用。
+
+**当满足下述条件时，对象将成为不可变对象：**
+
+- 对象创建以后其状态就不能修改。
+- 对象的所有域都是`final`的（技术角度来看其实并不需要）。
+- 对象是正确创建的（即在构造期间`this`引用没有逸出）。
+
+在不可变对象内部我们仍然可以使用可变对象来管理它们的状态，如程序清单3-11所示：
+
+```java
+package pers.tavish.jcip.ch3sharingobjects;
+
+import net.jcip.annotations.Immutable;
+
+import java.util.HashSet;
+import java.util.Set;
+
+// 程序清单3-11
+@Immutable
+public class ThreeStooges {
+
+    private final Set<String> stooges = new HashSet<>();
+
+    public ThreeStooges() {
+        stooges.add("Moe");
+        stooges.add("Larry");
+        stooges.add("Curly");
+    }
+
+    public boolean isStooge(String name) {
+        return stooges.contains(name);
+    }
+}
+
+```
+
+尽管`Set`对象是可变的，但从代码的设计上可以看到，在对象构造完毕后无法对其进行修改。
+
+##### 3.4.1 `final`域
+
+`final`类型的域具有不可变性。这里的不可变指的是引用的不可变，即它只能指向初始时指向的那个对象，而不关心指向对象内容的变化。
+
+在Java内存模型中，`final`域还有着特殊的语义。`final`能确保初始化过程的安全性，从而可以不受限制地访问不可变对象，并在共享这些对象时无需同步。
+
+**除非需要更高的可见性，否则应将所有域都声明为私有域。除非需要某个域是可变的，否则应将其声明为`final`域。**
+
+##### 3.4.2 示例：使用`volatile`类型来发布不可变对象
+
+在`UnsafeCachingFactorizer`中，我们使用两个`AtomicReference`来保存最新的数值及其因数分解结果，但这种方式并非线程安全的，因为我们无法以原子方式同时读取或更新两个变量。同样使用`volatile`类型的变量来保存这些值也是不安全的。然而，在某些情况下，不可变对象可以提供一种弱形式的原子性。
+
+例如程序清单3-12：
+
+```java
+package pers.tavish.jcip.ch3sharingobjects;
+
+import net.jcip.annotations.Immutable;
+
+import java.math.BigInteger;
+import java.util.Arrays;
+
+// 程序清单3-12
+@Immutable
+public class OneValueCache {
+    private final BigInteger lastNumber;
+    private final BigInteger[] lastFactors;
+
+    public OneValueCache(BigInteger i, BigInteger[] factors) {
+        lastNumber = i;
+        lastFactors = Arrays.copyOf(factors, factors.length);
+    }
+
+    public BigInteger[] getFactors(BigInteger i) {
+        return lastNumber == null || !lastNumber.equals(i) ? null : Arrays.copyOf(lastFactors, lastFactors.length);
+    }
+}
+```
+
+对于在访问和更新多个相关变量时出现的竞态条件问题，可以通过将这些变量全部保存在一个不可变对象中来消除。如果是一个可变对象，那么就必须使用锁来确保原子性。如果是一个不可变对象，那么当线程获得了对该对象的引用后，就不必担心另一个线程会修改对象的状态。如果要更新这些变量，那么可以创建一个新得容器对象，但其他使用原有对象的线程仍然会看到处于一致的状态。
+
+如下程序清单3-13中的`VolatileCachedFactorizer`使用了`OneValueCache`来保存缓存的数值及其因数：
+
+```java
+package pers.tavish.jcip.ch3sharingobjects;
+
+import net.jcip.annotations.ThreadSafe;
+
+import javax.servlet.GenericServlet;
+import javax.servlet.ServletRequest;
+import javax.servlet.ServletResponse;
+import java.math.BigInteger;
+
+// 程序清单3-13
+@ThreadSafe
+public class VolatileCachedFactorizer extends GenericServlet {
+
+    private volatile OneValueCache cache = new OneValueCache(null, null);
+
+    @Override
+    public void service(ServletRequest req, ServletResponse resp) {
+        BigInteger i = extractFromRequest(req);
+        BigInteger[] factors = cache.getFactors(i);
+        if (factors == null) {
+            factors = factor(i);
+            cache = new OneValueCache(i, factors);
+        }
+    }
+
+    private void encodeIntoResponse(ServletResponse resp, BigInteger[] factors) {
+
+    }
+
+    private BigInteger extractFromRequest(ServletRequest req) {
+        return new BigInteger("7");
+    }
+
+    private BigInteger[] factor(BigInteger i) {
+        return new BigInteger[]{i};
+    }
+}
+
+```
+
+与`cache`相关的操作不会互相干扰，因为`OneValueCache`是不可变的，并且在每条相应的代码路径中只会访问它一次（即使这里存在代码会对`factors`对象进行修改，`cache`对象也会保持不变，这也就保证了`cache`对象的`lastNumber`和`lastFactors`之间永远不会存在不一致的情况）。通过使用包含多个状态变量的不可变容器来维持不变性条件，并使用一个`volatile`类型的引用来确保可见性，使得`VolatileCachedFactorizer`在没有显式地使用锁的情况下仍然是线程安全的。
+
+#### 3.5 安全发布
+
+前述中我们讨论了如何确保对象不被发布。当然在某些情况下我们希望在多个线程间共享对象，此时必须确保安全地共享。
+
+如果只是像程序清单3-14那样将对象引用保存到共有域中，那么还不足以安全地发布这个对象。
+
+```java
+package pers.tavish.jcip.ch3sharingobjects;
+
+// 程序清单3-14
+// Don't do this.
+public class StuffIntoPublic {
+
+    public Holder holder;
+
+    public void initialize() {
+        holder = new Holder(42);
+    }
+}
+```
+
+这里由于存在可见性问题，其他线程看到`holder`对象将处于不一致的状态。
+
+##### 3.5.1 不正确的发布：正确的对象被破坏
+
+我们不能指望一个尚未被完全创建的对象拥有完整性。
+
+如果程序清单3-15中的`Holder`使用程序清单3-14中不安全发布方式，那么另一个线程调用`assertSanity`时可能抛出`AssertionError`：
+
+```java
+// 程序清单3-15
+public class Holder {
+
+    private int n;
+
+    public Holder(int n) {
+        this.n = n;
+    }
+
+    public void assertSanity(int n) {
+        if (this.n != n) {
+            throw new AssertionError("This statement is false.");
+        }
+    }
+}
+```
+
+假设我们有语句`Holder holder = new Holder(1);`则实际执行动作如下：
+
+```text
+// 1. 分配空间
+tmpRef = allocate(Holder.class)
+// 2. 执行构造函数 
+invokeConstructor(tmpRef) 
+// 3. 赋值
+holder = tmpRef 
+```
+
+但是由于指令重排，可能是先执行3，再执行2。这就会导致此时`holder`对象已经非空了，但是其`n`还是默认值0。这样，当另一个线程此时调用`assertSanity()`方法时就会抛出错误。
+
+##### 3.5.2 不可变对象与初始化安全性
+
+我们已经知道，即使某个对象的引用对其他线程是可见的，也不意味着对象状态对于使用该对象的线程来说一定是可见的。为了确保对象状态能呈现出一致的视图，就必须使用同步。
+
+即使在发布不可变对象的引用时没有使用同步，也仍然可以安全地访问该对象。为了维持这种初始化安全性的保证，必须满足不可变性的所有需求：
+
+- 状态不可修改
+- 所有域都是`final`类型
+- 正确的构造方式
+
+将`Holder`类的`n`声明为`final`，则`Holder`将不可变，从而避免出现不正确发布的问题。
+
+这是因为JLS（Java Language Specification，Java语言规范） 17.5中规定：在对象的构造器中设置`final`域，并且不要在另一个线程可以在该对象的构造器执行完成之前看到它的覅那个，对该对象的引用执行写操作。如果遵循了这一点，那么当该对象被另一个线程看到时，这个线程就总是会看到该对象的`final`域的正确构造版本。
+
+也就是说，对象的构造函数结束，就认为这个对象已经被完全初始化了。 为了保证这个对象的final字段有正确的初始值，只有在这个对象被完全初始化后，这个对象的引用才能被其他线程看到。
+
+**任何线程都可以在不需要额外同步的情况下安全地访问不可变对象，即使在发布这些对象时没有使用同步。**
+
+然而，如果`final`类型的域所指向的是可变对象，那么在访问这些域所指向的对象的状态时仍然需要同步。
+
+##### 3.5.3 安全发布的常用模式
+
+可变对象必须通过安全的方式来发布，这通常意味着在发布和使用该对象都必须使用同步。现在我们将重点说明如何确保使用对象的线程能够看到该对象处于已发布的状态。
+
+一个正确构造的对象可以通过以下方式来安全地发布：
+
+- 在静态初始化函数中初始化一个对象引用
+- 将对象的引用保存到`volatile`类型的域或者`AtomicReference`对象中
+- 将对象的引用保存到某个正确构造对象的`final`类型域中
+- 将对象的引用保存到一个由锁保护的域中
+
+在线程安全容器内部的同步意味着，在将对象放入到某个容器，例如`Vector`或`synchronizedList`时将满足上述最后一条需求。如果线程A将对象X放入一个线程安全的容器，随后线程B读取这个对象，那么可以确保B看到A设置的X状态，即便在这段读写X的代码中没有包含显式的同步。
+
+线程安全库中的容器类提供了以下的安全发布保证：
+
+- 通过将一个键或值放入`Hashtable`、`synchronizedMap`或者`ConcurrentMap`中们可以安全地将它发布给任何从这些容器中访问它的线程（无论是直接访问还是通过迭代器访问）。
+- 通过将元素放入`Vector`、`CopyOnWriteArrayList`、`CopyOnWriteArraySet`、`synchronizedList`、`synchronizedSet`中，可以将该元素安全地发布到任何从这些容器中访问该元素的线程。
+- 通过将某个元素放入`BlockingQueue`或者`ConcurrentLinkedQueue`中，可以将该元素安全地发布到任何从这些队列中访问该元素的线程。
+
+juc类库中得其他数据传递机制（例如`Future`和`Exchanger`）同样可以实现安全发布。
+
+通常而言，要发布一个静态构造的对象，最简单和最安全的方式是使用静态的初始化器，例如：
+
+```java
+public static Holder holder = new Holder(1);
+```
+
+静态初始化器由JVM在类的初始化阶段执行。由于JVM内部存在同步机制，因此通过这种方式初始化的任何对象都可以被安全地发布。
+
+##### 3.5.4 事实不可变对象
+
+如果对象在发布后不会被修改，那么对于其他没有额外同步的情况下安全地访问这些对象的线程来说，安全发布是足够的。所有的安全发布机制都能保证，当对象的引用对所有访问该对象的线程可见时，对象发布时的状态对于所有线程也将是可见的，并且如果对象状态不会再改变，那么就足以保证任何访问都是安全的。
+
+如果对象从技术上看是可以改变的，但其状态在发布后不会再改变，那么把这种对象成为“事实不可变对象（Effectively Immutable Object）”。这些对象不需要满足不可变性的严格定义。
+
+**在没有额外同步的情况下，任何线程都可以安全地使用被安全发布的事实不可变对象。**
+
+例如，`Date`对象本身是可变的，但如果将它作为不可变对象来使用，那么在多个线程之间共享`Date`对象时，就可以省去对锁的使用。假设需要维护一个`Map`对象，其中保存了每位用户的最近登录时间：
+
+```java
+public Map<String, Date> lastLogin = Collections.synchronizedMap(new HashMap<String, Date>());
+```
+
+如果`Date`对象的值在放入`Map`中后就不再改变，那么`synchronizedMap`的同步机制就足以使`Date`值被安全的发布，并且在访问`Date`值时不需要额外同步。
+
+##### 3.5.5 可变对象
+
+如果对象在构造后可以修改，那么安全发布只能确保“发布当时”状态的可见性。**对于可变对象，不仅在发布对象时需要使用同步，而且在每次对象访问时同样需要使用同步来确保后续修改操作的可见性。**要安全地共享可变对象，这些对象就必须被安全地发布，并且必须时线程安全的或者由某个锁保护起来。
+
+对象的发布需求取决于它的可变性：
+
+- 不可变对象可以通过任意机制来发布。
+- 事实不可变对象必须通过安全方式来发布。
+- 可变对象必须通过安全方式来发布，并且必须是线程安全的或者由某个锁保护起来。
+
+##### 3.5.6 安全地共享对象
+
+当获得一个对象的引用时，我们需要知道在这个引用上可以执行哪些操作。在使用它之前是否需要获得一个锁？是否可以修改它的状态，或者只能读取它？许多并发错误都是由于没有理解共享对象这些“既定规则”而导致的。当发布一个对象时，必须明确地说明对象的访问方式。
+
+在并发陈序中使用和共享对象时，可以使用一些策略：
+
+- **线程封闭。**线程封闭的对象只能由一个线程拥有，对象被封闭在该线程中，并且只能由这个线程修改。
+- **只读共享。**在没有额外同步的情况下，共享的只读对象可以由多个线程并发访问，但任何线程都不能修改它。共享的只读对象包括不可变对象和事实不可变对象。
+- **线程安全共享。**线程安全的对象在其内部实现同步，因此多个线程可以通过 对象的公有接口来进行访问而不需要进一步的同步。
+- **保护对象。**被保护的对象只能通过持有特定的锁来访问。保护对象包括封装在其他线程安全对象中的对象，以及已发布的并且由某个特定锁保护的对象。
