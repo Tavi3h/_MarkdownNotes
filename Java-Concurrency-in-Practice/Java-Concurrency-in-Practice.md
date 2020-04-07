@@ -1251,3 +1251,43 @@ public Map<String, Date> lastLogin = Collections.synchronizedMap(new HashMap<Str
 - **只读共享。**在没有额外同步的情况下，共享的只读对象可以由多个线程并发访问，但任何线程都不能修改它。共享的只读对象包括不可变对象和事实不可变对象。
 - **线程安全共享。**线程安全的对象在其内部实现同步，因此多个线程可以通过 对象的公有接口来进行访问而不需要进一步的同步。
 - **保护对象。**被保护的对象只能通过持有特定的锁来访问。保护对象包括封装在其他线程安全对象中的对象，以及已发布的并且由某个特定锁保护的对象。
+
+### 第4章 对象的组合
+
+本章将介绍一些组合模式，这些模式能使一个类更容易成为线程安全的，并且在维护这些类时不会无意中破坏类的安全性。
+
+#### 4.1 设计线程安全的类
+
+在设计线程安全类的过程中，需要包含以下三个基本要素：
+
+- 找出构成对象状态的所有变量
+- 找出约束状态变量的不变性条件
+- 建立对象状态的并发访问管理策略
+
+要分析对象的状态，首先从对象的域开始。如果对象中所有的域都是基本类型的变量，那么这些域将构成对象的全部状态。例如程序清单4-1：
+
+```java
+package pers.tavish.jcip.ch4composingobjects;
+
+import net.jcip.annotations.GuardedBy;
+import net.jcip.annotations.ThreadSafe;
+
+// 程序清单4-1
+@ThreadSafe
+public final class Counter {
+
+    @GuardedBy("this")
+    private long value = 0;
+
+    public synchronized long getValue() {
+        return value;
+    }
+
+    public synchronized long increment() {
+        if (value == Long.MAX_VALUE) {
+            throw new IllegalStateException("counter overflow");
+        }
+        return ++value;
+    }
+}
+```
