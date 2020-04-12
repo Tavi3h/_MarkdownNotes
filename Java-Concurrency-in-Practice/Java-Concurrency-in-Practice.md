@@ -366,12 +366,14 @@ public class Lock {
 在程序清单2-7中，子类重写了父类的`doSometing()`方法，然后调用父类中的方法，此时如果没有可重入的锁，那么这段代码将发生死锁。
 
 ```java
-class Widget {
+// 程序清单2-7
+public class Widget {
     public synchronized void doSomething() {
         // ...
     }
 }
 
+// 程序清单2-7
 public class LoggingWidget extends Widget {
     @Override
     public synchronized void doSomething() {
@@ -1298,7 +1300,7 @@ public final class Counter {
 
 同步策略（Synchronized Policy）定义了如何在不违背对象不变性条件或后验条件下对其状态的访问操作进行协同。同步策略规定了如何将不可变性、线程封闭与加锁机制等结合起来以维护线程的安全性，并且还规定了哪些变量由哪些锁来保护。
 
-#### 4.1.1 收集同步需求
+##### 4.1.1 收集同步需求
 
 对象与变量都有一个状态空间，即所有可能的取值。状态空间越小，就越容易判断线程的状态。`final`类型的域使用得越多，就越能简化对象可能状态的分析过程。
 
@@ -1312,7 +1314,7 @@ public final class Counter {
 
 **如果不了解对象的不变性条件与后验条件，那么就不能确保线程安全性。要满足在状态变量的有效值或状态转换上的各种约束条件，就需要借助于原子性与封装性。**
 
-#### 4.1.2 依赖状态的操作
+##### 4.1.2 依赖状态的操作
 
 类的不变性条件与后验条件约束了在对象上有哪些状态和状态转换是有效的。在某些对象的方法中还包含一些基于状态的先验条件(Precondition)。例如，不能从空队列中移除一个元素，在删除元素前，队列必须处于“非空的”状态。如果在某个操作中包含有基千状态的先验条件，那么这个操作就称为依赖状态的操作。
 
@@ -1320,7 +1322,7 @@ public final class Counter {
 
 在Java中，等待某个条件为真的各种内置机制（包括等待和通知等机制）都与内置加锁机制紧密关联，要想正确地使用它们并不容易。 要想实现某个等待先验条件为真时才执行的操作，一种更简单的方法是通过现有库中的类（例如阻塞队列[`Blocking Queue`]或信号量[`Semaphore`])来实现依赖状态的行为。第5章将介绍一些阻塞类，例如`BlockingQueue`、`Semaphore`以及其他的同步工具类。第14章将介绍如何使用在平台与类库中提供的各种底层机制来创建依赖状态的类
 
-#### 4.1.3 状态的所有权
+##### 4.1.3 状态的所有权
 
 在定义哪些变量将构成对象的状态时，只考虑对象拥有的数据。所有权（Ownership）在Java中并没有得到充分的体现，而是属于类设计中的一个要素。如果分配并填充了一个HashMap对象，那么就相当于创建了多个对象：`HashMap`对象，在`HashMap`对象中包含的多个对象，以及在`Map.Entry`中可能包含的内部对象。`HashMap`对象的逻辑状态包括所有的`Map.Entry`对象以及内部对象，即使这些对象都是一些独立的对象。
 
@@ -1330,7 +1332,7 @@ public final class Counter {
 
 容器类通常表现出一种“所有权分离”的形式，其中容器类拥有其自身的状态，而客户代码则拥有容器中各个对象的状态。Servlet框架中的`ServletContext`就是其中一个示例。`ServletContext`为Servlet提供了类似于Map形式的对象容器服务，在`ServletContext`中可以通过名称来注册（`setAttribute`）或获取（`getAttribute`）应用程序对象。由Servlet容器实现的`ServletContext`对象必须是线程安全的，因为它肯定会被多个线程同时访问。当调用`setAttribute`和`getAttribute`时，Servlet不需要使用同步，但当使用保存在`ServletContext`中的对象时，则可能需要使用同步。这些对象由应用程序拥有，Servlet容器只是替应用程序保管它们。与所有共享对象一样，它们必须安全地被共享。为了防止多个线程在并发访问同一个对象时产生的相互干扰，这些对象应该要么是线程安全的对象，要么是事实不可变的对象，或者由锁来保护的对象。
 
-### 4.2 实例封闭
+#### 4.2 实例封闭
 
 如果某对象不是线程安全的，那么可以通过多种技术使其在多线程程序中安全地使用。我们可以确保该对象只能由单个线程访问（线程封闭），或者通过一个锁来保护对该线程的所有访问。
 
@@ -1372,3 +1374,122 @@ Java类库中还有很多线程封闭的示例，其中有些类的唯一用途�
 
 当然，如果将一个本该被封闭的对象发布出去，那么也能破坏封装性。如果一个对象本应该封闭在特定的作用域内，那么让该对象逸出作用域就是一个错误。当发布其他对象时（例如迭代器或内部类实例），可能会间接地发布被封闭对象，同样会使被封闭对象逸出。
 
+##### 4.2.1 Java监视器模式
+
+从线程封闭原则及其逻辑推论可以得出Java监视器模式。遵循Java监视器模式的对象会把对象的所有可变状态都封装起来，并由对象自己的内置锁来保护。
+
+程序清单4-1中的`Counter`给出了这种模式的一个示例。在`Counter`中封装了一个状态变量`value`，对该变量的所有访问都需要通过`Counter`的方法来执行，并且这些方法都是同步的。
+
+监视器模式仅仅是一种编写代码的约定，对于任何一种锁对象，只要自始至终都使用该锁对象，都可以用来保护对象状态，例如程序清单4-3给出的如果使用私有锁来保护状态：
+
+```java
+package pers.tavish.jcip.ch4composingobjects;
+
+import net.jcip.annotations.GuardedBy;
+import pers.tavish.jcip.ch2threadsafety.Widget;
+
+// 程序清单4-3
+public class PrivateLock {
+    private final Object myLock = new Object();
+
+    @GuardedBy("myLock")
+    private Widget widget;
+
+    void someMethod() {
+        synchronized (myLock) {
+            // Access or modify the state of widget
+        }
+    }
+}
+```
+
+使用私有的锁对象而不是对象的内置锁，有许多优点。私有的锁对象可以将锁封闭起来，使客户代码无法得到锁，但客户代码可以通过公有方法来访问锁，以便参与到同步策略中。如果客户代码错误地获得了另一个对象锁，那么可能会产生活跃性问题。
+
+##### 4.2.2 车辆追踪
+
+我们来看一个用于调度车辆的“车辆追踪器”，例如出租车、警车、货车等。首先使用监视器模式来构建车辆追踪器，然后再尝试放宽某些封装性需求同时又保持线程安全性。
+
+每台车都由一个`String`对象来标识，并且拥有一个相应的位置坐标(x, y)。在`VehicleTracker`类中封装了车辆的标识和位置，并且该模型将由一个视图线程和多个执行更新操作的线程共享。视图线程会读取车辆的名字和位置，并将它们显示在界面上：
+
+```java
+Map<String, Point> locations = vehicles.getLocations();
+for (String key : locations.keySet()) {
+    renderVehicle(key, locations.get(key));
+}
+```
+
+类似地，执行更新操作的线程通过从GPS设备上获取的数据或者调度员从GUI界面上输入的数据来修改车辆的位置：
+
+```java
+void vehicleMoved(VehicleMovedEvent evt) {
+    Point loc = evt.getNewLocation();
+    vehicles.setLocation(evt.getVehicleId(), loc.x, loc.y);
+}
+```
+
+视图线程与执行更新操作的线程将并发地访问数据模型，因此该模型必须是线程安全的。程序清单4-4给出了一个基于Java监视器模型实现的“车辆追踪器”，其中使用了程序清单4-5中的`MutablePoint`来表示车辆的位置。
+
+```java
+// 程序清单4-4
+@ThreadSafe
+public class MonitorVehicleTracker {
+
+    @GuardedBy("this")
+    private final Map<String, MutablePoint> locations;
+
+    public MonitorVehicleTracker(Map<String, MutablePoint> locations) {
+        this.locations = deepCopy(locations);
+    }
+
+    public synchronized Map<String, MutablePoint> getLocations() {
+        return deepCopy(locations);
+    }
+
+    public synchronized MutablePoint getLocation(String id) {
+        MutablePoint loc = locations.get(id);
+        return loc == null ? null : new MutablePoint(loc);
+    }
+
+    public synchronized void setLocation(String id, int x, int y) {
+        MutablePoint loc = locations.get(id);
+        if (loc == null) {
+            throw new IllegalArgumentException("No such ID: " + id);
+        }
+        loc.x = x;
+        loc.y = y;
+    }
+
+    private static Map<String, MutablePoint> deepCopy(Map<String, MutablePoint> m) {
+        Map<String, MutablePoint> result = new HashMap<String, MutablePoint>();
+
+        for (String id : m.keySet()) {
+            result.put(id, new MutablePoint(m.get(id)));
+        }
+
+        return Collections.unmodifiableMap(result);
+    }
+}
+```
+
+虽然`MutablePoint`不是线程安全的，但追踪器类是线程安全的。它所包含的`Map`对象和可变的`Point`对象都未曾发布。当需要返回车辆的位置时，通过`MutablePoint`拷贝构造函数或者`deepCopy`方法来复制正确的值，从而生成一个新的`Map`对象，并且该对象中的值与原有`Map`对象中的`key`值和`value`值都相同。
+
+```java
+// 程序清单4-5
+// Don't do this.
+@NotThreadSafe
+public class MutablePoint {
+    public int x, y;
+
+    public MutablePoint() {
+        this.x = 0;
+        this.y = 0;
+    }
+
+    public MutablePoint(MutablePoint p) {
+        this.x = p.x;
+        this.y = p.y;
+    }
+}
+```
+
+通常情况下上述程序不存在性能问题，但在车辆容器非常大的情况下加ing极大地降低性能问题。
