@@ -1492,4 +1492,70 @@ public class MutablePoint {
 }
 ```
 
-通常情况下上述程序不存在性能问题，但在车辆容器非常大的情况下加ing极大地降低性能问题。
+通常情况下上述程序不存在性能问题，但在车辆容器非常大的情况下将极大地降低性能。
+
+#### 4.3 线程安全性的委托
+
+大多数对象都是组合对象。当从头开始构建一个类，或者将多个非线程安全的类组合成一个类时，Java监视器模式是非常有用的。但是，如果类中的各个组件都已经是线程安全的，会是什么情况呢？我们是否需要再增加一个额外的线程安全层？答案是“视情况而定”。在某些情况下，通过多个线程安全类组合而成的类是线程安全的，而在某些情况下，这仅仅是一个好的开端。
+
+##### 4.3.1 示例：基于委托的车辆追踪器
+
+下面构造一个委托给线程安全类的车辆追踪器。我们将车辆的位置保存到一个`Map`对象中，因此首先要实现一个线程安全的`Map`类，`ConcurrentHashMap`。我们还可以用一个不可变的`Point`类来代替`MutablePoint`以保存位置，如下程序清单4-6所示：
+
+```java
+// 程序清单4-6
+@Immutable
+public class Point {
+    public final int x, y;
+
+    public Point(int x, int y) {
+        this.x = x;
+        this.y = y;
+    }
+}
+```
+
+由于`Point`类是不可变的，因而是线程安全的。不可变的值可以被自由地共享与发布，因此在返回`locations`时不需要复制。
+
+程序清单4-7的`DelegatingVehicleTracker`中没有使用任何显式的同步，所有对状态的访问都由`ConcurrentHashMap`来管理，且其`key`和`value`均是不可变的。
+
+```java
+package pers.tavish.jcip.ch4composingobjects;
+
+import net.jcip.annotations.ThreadSafe;
+
+import java.util.Collections;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
+// 程序清单4-7
+@ThreadSafe
+public class DelegatingVehicleTracker {
+
+    private final ConcurrentMap<String, Point> locations;
+    private final Map<String, Point> unmodifiableMap;
+
+    public DelegatingVehicleTracker(Map<String, Point> points) {
+        locations = new ConcurrentHashMap<>(points);
+        unmodifiableMap = Collections.unmodifiableMap(locations);
+    }
+
+    public Map<String, Point> getLocations() {
+        return unmodifiableMap;
+    }
+
+    public Point getLocation(String id) {
+        return locations.get(id);
+    }
+
+    public void setLocations(String id, int x, int y) {
+        if (locations.replace(id, new Point(x, y)) == null) {
+            throw new IllegalArgumentException("invalid vehicle name: " + id);
+        }
+    }
+}
+```
+
+如果使用最初的`MutablePoint`类而不是`Point`类就会破坏封装性，因为`getLocations`会发布一个指向可变状态的引用，而这个引用不是线程安全的。需要注意的是，我们稍微改变了车辆追踪器类的行为。在使用监视器模式的车辆追踪器中返回的是车辆位置的快照，而在使用委托的车辆追踪器中时返回的是一个不可修改但却实时的车辆位置试图。这意味着，如果线程A调用`getLocations`，而线程B随后修改了某些点的位置，那么在返回给线程A的`Map`中将反映出这些变化。
+
