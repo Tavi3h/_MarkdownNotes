@@ -630,7 +630,6 @@ JMM关于`synchronized`的两条规定：
 
 ![图3-1-同步的可见性](_images\图3-1-同步的可见性.PNG)
 <center><b>图3-1 同步的可见性</b></center>
-
 现在，我们可以进一步理解为什么在访问某个共享且可变的变量时要求所有线程在同一个锁上同步，就是**为了确保某个线程写入该变量的值对于其他线程来说都是可见的。**否则，如果一个线程在未持有正确锁的情况下读取某个变量，那么读到的可能是一个失效值。
 
 **加锁的含义不仅仅局限于互斥行为，还包括内存的可见性。为了确保所有线程都能看到共享变量的最新值，所有执行读操作或者写操作的线程都必须在同一个锁上同步。**
@@ -1559,3 +1558,185 @@ public class DelegatingVehicleTracker {
 
 如果使用最初的`MutablePoint`类而不是`Point`类就会破坏封装性，因为`getLocations`会发布一个指向可变状态的引用，而这个引用不是线程安全的。需要注意的是，我们稍微改变了车辆追踪器类的行为。在使用监视器模式的车辆追踪器中返回的是车辆位置的快照，而在使用委托的车辆追踪器中时返回的是一个不可修改但却实时的车辆位置试图。这意味着，如果线程A调用`getLocations`，而线程B随后修改了某些点的位置，那么在返回给线程A的`Map`中将反映出这些变化。
 
+如果需要一个不发生变化的车辆视图，那么`getLocations`可以返回对`locations`这个`Map`对象的一个浅拷贝（Shallow Copy），如程序清单4-8所示：
+
+```java
+// 程序清单4-8
+public Map<String, Point> getLocationsAsStatic() {
+    return Collections.unmodifiableMap(new HashMap<>(locations));
+}
+```
+
+##### 4.3.2 独立的状态变量
+
+到目前为止，这些委托示例都仅仅委托给了单个线程安全的状态变量。我们还可以将线程安全性委托给多个状态变量，只要这些变量是彼此独立的，即组合而成的类并不会仔其包含的多个状态变量上增加任何不变性条件。
+
+程序清单4-9中的`VisualComponent`是一个图形组件，允许客户程序注册监控鼠标和键盘等事件的监听器。它为每种类型的事件都备有一个已注册监听器列表，因此当某个事件发生时，就会调用响应的监听器。然而，在鼠标事件建通器与键盘事件监听器之间不存在任何关联，二者是彼此独立的，因此`VisualComponent`可以将其线程安全性委托给这两个线程安全的监听器列表。
+
+```java
+package pers.tavish.jcip.ch4composingobjects;
+
+import java.awt.event.KeyListener;
+import java.awt.event.MouseListener;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+
+// 程序清单4-9
+public class VisualComponent {
+    
+    private final List<KeyListener> keyListeners = new CopyOnWriteArrayList<>();
+    private final List<MouseListener> mouseListeners = new CopyOnWriteArrayList<>();
+
+    public void addKeyListener(KeyListener listener) {
+        keyListeners.add(listener);
+    }
+
+    public void addMouseListener(MouseListener listener) {
+        mouseListeners.add(listener);
+    }
+
+    public void removeKeyListener(KeyListener listener) {
+        keyListeners.remove(listener);
+    }
+
+    public void removeMouseListener(MouseListener listener) {
+        mouseListeners.remove(listener);
+    }
+}
+```
+
+`VisualComponent`使用`CopyOnWriteArrayList`来保存各个监听器列表。该列表是线程安全的。由于每个列表都是线程安全的，此外，由于各个状态之间不存在耦合关系，因此`VisualComponent`可以将它的线程安全性委托给`mouseListeners`和`keyListeners`对象。
+
+##### 4.3.3 当委托失效时
+
+大多数组合对象都不会像`VisualComponent`这样简单：在它们的状态变量之间存在着某些不变性条件。程序清单4-10中的`NumberRange`使用了两个`AtomicInteger`来管理状态，并且含有一个约束条件，即第一个数值要小于或等于第二个数值。
+
+```java
+package pers.tavish.jcip.ch4composingobjects;
+
+import java.util.concurrent.atomic.AtomicInteger;
+
+// 程序清单4-10
+// Don't do this.
+public class NumberRange {
+
+    // 不变性条件 lower <= upper
+    private final AtomicInteger lower = new AtomicInteger(0);
+    private final AtomicInteger upper = new AtomicInteger(0);
+
+    public void setLower(int i) {
+        // 注意，不安全的“先检查后执行”
+        if (i > upper.get()) {
+            throw new IllegalArgumentException("can't set lower to " + i + " > upper");
+        }
+        lower.set(i);
+    }
+
+    public void setUpper(int i) {
+        if (i < lower.get()) {
+            throw new IllegalArgumentException("can't set upper to " + i + " < lower");
+        }
+        upper.set(i);
+    }
+
+    public boolean isInRange(int i) {
+        return i >= lower.get() && i <= upper.get();
+    }
+}
+```
+
+`NumberRange`不是线程安全的，没有维持对下界和上界进行约束的不变性条件。`setLower`和`setUpper`等方法都在尝试维持不变性条件，但却无法做到。因为二者都是“先检查后执行”的操作，但它们没有足够的加锁机制来保证这些操作的原子性。假设取值范围为(0, 10)，如果一个线程调用`setLower(5)`，另一个线程调用`setUpper(4)`，那么在一些错误的执行时序中，这两个调用将通过检查并设置成功，此时就将得到一个无效的范围(5, 4)。由于`lower`和`upper`不是彼此独立的，因此`NumberRange`不能将线程安全性委托给它的线程安全变量。
+
+如果某个类含有复合操作，例如`NumberRange`，那么仅靠委托并不足以实现线程安全性。在这种情况下，这个类必须提供自己的加锁机制以保证这些复合操作都是原子操作，除非整个符合操作都可以委托给状态变量。
+
+**如果一个类是由多个独立且线程安全的状态变量组成，并且在所有的操作中都不包含无效状态转转换，那么可以将线程安全性委托给底层的状态变量。**
+
+##### 4.3.4 发布底层的状态变量
+
+当把线程安全性委托给某个对象的底层状态变量时，在什么条件下才可以发布这些变量从而使其他类能修改它们？这取决于在类中对这些变量施加了哪些不变性条件。虽然`Counter`中的`value`域可以为任何整数值，但`Counter`施加的约束条件是只能取正整数，此外递增操作同样约束了下一个状态的有效取值范围。如果将`value`声明为一个公有域，那么客户代码可以将它修改为一个无效值，因此发布`value`会导致这个类出错。另一方面，如果某个变量表示的是当前温度或者最近登录用户的ID，那么即使另一个类在某个时刻修改了这个值，也不会破坏任何不变性条件，因此发布这个变量也是可以接受的。
+
+**如果一个状态变量是线程安全的，并且没有任何不变性条件来约束它的值，在变量的操作上也不存在任何不允许的状态转换，那么就可以安全地发布这个变量。**
+
+##### 4.3.5 示例：发布状态的车辆追踪器
+
+现在我们来构造车辆追踪器的另一个版本，并在这个版本中发布底层的可变状态。我们需要修改接口以适应这种变化，即使用可变且线程安全的`SafePoint`类。
+
+```java
+package pers.tavish.jcip.ch4composingobjects;
+
+import net.jcip.annotations.GuardedBy;
+import net.jcip.annotations.ThreadSafe;
+
+// 程序清单4-11
+@ThreadSafe
+public class SafePoint {
+
+    @GuardedBy("this")
+    private int x, y;
+
+    private SafePoint(int[] a) {
+        this(a[0], a[1]);
+    }
+
+    public SafePoint(SafePoint p) {
+        this(p.get());
+    }
+
+    public SafePoint(int x, int y) {
+        this.x = x;
+        this.y = y;
+    }
+
+    public synchronized int[] get() {
+        return new int[]{x, y};
+    }
+
+    public synchronized void set(int x, int y) {
+        this.x = x;
+        this.y = y;
+    }
+}
+```
+
+程序清单4-11中的`SafePoint`提供的`get`方法同事获得`x`和`y`的值，并将二者放在一个数组中返回。如果分别为二者提供`get`方法，那么在获得这两个不同坐标的操作之间，它们的值可能发生变化，从而导致调用者看到不一致的值：车辆从来没有到达过位置(x, y)。通过使用`SafePoint`，可以构造一个发布其底层可变状态的车辆追踪器，还能确保其线程安全性不被破坏，如程序清单4-12所示：
+
+```java
+package pers.tavish.jcip.ch4composingobjects;
+
+import net.jcip.annotations.ThreadSafe;
+
+import java.util.Collections;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+@ThreadSafe
+public class PublishingVehicleTracker {
+
+    private final Map<String, SafePoint> locations;
+    private final Map<String, SafePoint> unmodifiableMap;
+
+    public PublishingVehicleTracker(Map<String, SafePoint> locations) {
+        this.locations = new ConcurrentHashMap<>(locations);
+        this.unmodifiableMap = Collections.unmodifiableMap(this.locations);
+    }
+
+    public Map<String, SafePoint> getLocations() {
+        return unmodifiableMap;
+    }
+
+    public SafePoint getLocation(String id) {
+        return locations.get(id);
+    }
+
+    public void setLocation(String id, int x, int y) {
+        if (!locations.containsKey(id)) {
+            throw new IllegalArgumentException("invalid vehicle name: " + id);
+        }
+        locations.get(id).set(x, y);
+    }
+}
+```
+
+`PublishingVehicleTracker`将其线程安全性委托给底层的`ConcurrentHashMap`，只是`Map`中的元素是线程安全的且可变的`SafePoint`，而并非不可变的。`getLocations`方法返回底层`Map`对象的一个不可变的副本。调用者不能增加或删除车辆，但却可以通过修改返回`Map`中的`SafePoint`值来改变车辆的位置。
+
+#### 4.4 在现有的线程安全类中添加功能
