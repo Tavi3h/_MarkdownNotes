@@ -276,7 +276,7 @@ public class UnSafeCachingFactorizer extends GenericServlet {
 
 Java提供了一种内置的锁机制来支持原子性：同步代码块（Synchronized Block）。
 
-同步代码块包括两个部分：一个作为锁的对象引用，一个作为由这个锁保护的代码块。以关键字`synchroized`来修饰的方法就是一种横跨整个方法体的同步代码块，其中该同步代码块的锁就是方法调用所在的对象。静态的`synchroized`方法以`Class`对象作为锁。
+同步代码块包括两个部分：一个作为锁的对象引用，一个作为由这个锁保护的代码块。以关键字`synchronized`来修饰的方法就是一种横跨整个方法体的同步代码块，其中该同步代码块的锁就是方法调用所在的对象。静态的`synchronized`方法以`Class`对象作为锁。
 
 每个Java对象都可以用做一个实现同步的锁，这些锁被称为内置锁或监视器锁。线程在进入同步代码块之前会自动获得锁，并且在退出同步代码块时自动释放锁。**获得内置锁的唯一途径就是进入由这个锁保护的同步代码块或方法。**
 
@@ -324,7 +324,7 @@ public class SynchronizedFactorizer extends GenericServlet {
 }
 ```
 
-使用`synchroinzed`修饰`service`方法可以确保在同一时刻只有一个线程可以执行该方法。现在`SynchronizedFactorizer`是线程安全的。然而，这种方法却过于极端，因为多个客户端无法同时使用因数分解Servlet，服务的响应性很低。这是一个性能问题，而不是线程安全问题。
+使用`synchronized`修饰`service`方法可以确保在同一时刻只有一个线程可以执行该方法。现在`SynchronizedFactorizer`是线程安全的。然而，这种方法却过于极端，因为多个客户端无法同时使用因数分解Servlet，服务的响应性很低。这是一个性能问题，而不是线程安全问题。
 
 ##### 2.3.2 重入
 
@@ -1740,3 +1740,139 @@ public class PublishingVehicleTracker {
 `PublishingVehicleTracker`将其线程安全性委托给底层的`ConcurrentHashMap`，只是`Map`中的元素是线程安全的且可变的`SafePoint`，而并非不可变的。`getLocations`方法返回底层`Map`对象的一个不可变的副本。调用者不能增加或删除车辆，但却可以通过修改返回`Map`中的`SafePoint`值来改变车辆的位置。
 
 #### 4.4 在现有的线程安全类中添加功能
+
+有时候某个现有的线程安全类能支持我们所需要的所有操作，但更多时候，现有的类只能支持大部分的操作，此时就需要在不破坏线程安全的情况下添加一个新的操作。
+
+例如，假设需要为一个线程安全的列表提供一个原子操作-----“若没有则添加（Put-If- Absent）”的操作。同步的`List`类已经实现了大部分功能，我们可以根据它提供的`contains`方法和`add`方法来构造一个“若没有则添加”的操作。
+
+“若没有则添加”的概念很简单，在向容器添加元素前，首先检查该元素是否已经存在，如果存在就不再添加。由于这个类必须是线程安全的，因此就隐含地增加另一个需求，即该操作必须是原子操作。因为如果不是原子操作，那么在某些执行时序下，有两个线程都将看到元素X不在容器中，并且都执行了添加X的操作，从而使容器中包含两个相同的X对象。
+
+要添加一个新的原子操作，最安全的方法是修改原始的类，但这通常无法做到，因为我们可能无法访问或修改类的源代码。另一种方法是扩展这个类，并假定在这几这个类的时候考虑了可扩展性。
+
+程序清单4-13中的`BetterVector`对`Vector`进行了扩展：
+
+```java
+package pers.tavish.jcip.ch4composingobjects;
+
+import net.jcip.annotations.ThreadSafe;
+
+import java.util.Vector;
+
+// 程序清单4-13
+@ThreadSafe
+public class BetterVector<E> extends Vector<E> {
+    public synchronized boolean putIfAbsent(E x) {
+        boolean absent = !contains(x);
+        if (absent) {
+            add(x);
+        }
+        return absent;
+    }
+}
+```
+
+“扩展3”方法比直接将代码添加到类中更加脆弱，因为现在的同步策略实现被分布到多个单独维护的源代码文件中。如果底层的类改变了同步策略并选择了不同的锁来保护它的状态变量，那么子类会被破坏，因为在同步策略改变后无法再使用正确的锁来控制对基类状态的并发访问。
+
+##### 4.4.1 客户端加锁机制
+
+程序清单4-14实现了一个包含“若没有则添加”操作的辅助类，用于读线程安全的`List`执行操作，但其中的代码是错误的。
+
+```java
+package pers.tavish.jcip.ch4composingobjects;
+
+import net.jcip.annotations.NotThreadSafe;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+// 程序清单4-14
+@NotThreadSafe
+public class ListHelper<E> {
+
+    public List<E> list = Collections.synchronizedList(new ArrayList<>());
+
+    public synchronized boolean putIfAbsent(E x) {
+        boolean absent = !list.contains(x);
+        if (absent) {
+            list.add(x);
+        }
+        return absent;
+    }
+}
+```
+
+为什么这种方式不能实现线程安全性？毕竟，`putIfAbsent`已经声明了`synchronized`。问题在于在错误的锁上进行了同步。无论`List`使用哪一个锁来保护它的状态，可以确定的是，这个锁并不是`ListHelper`的内置锁。尽管所有的列表操作都被声明为`synchronized`，但却使用了不同的锁，这意味着`putIfAbsent`相对于`List`的其他操作来说并不是原子的，因此就无法确保当`putIfAbsent`执行时另一个线程不会修改列表。
+
+要使这个方法正确执行，必须使`List`在实现客户端加锁或外部加锁时使用同一个锁。客户端加锁是指，对于使用某个对象X的客户端代码，使用X本身用于保护其状态的锁来保护这段客户代码。**要使用客户端加锁，你必须知道对象X使用的是哪一个锁。**
+
+在`Vecotr`和同步封装器类的文档中指出，它们通过使用`Vector`或封装器容器的内置锁来支持客户端加锁。程序清单4-15给出了在线程安全的`List`上执行`putIfAbsent`操作，其中使用了正确的客户端加锁。
+
+```java
+package pers.tavish.jcip.ch4composingobjects;
+
+import net.jcip.annotations.ThreadSafe;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+// 程序清单4-15
+@ThreadSafe
+public class ListHelperCorrect<E> {
+    
+    public List<E> list = Collections.synchronizedList(new ArrayList<>());
+
+    public boolean putIfAbsent(E x) {
+        synchronized (list) {
+            boolean absent = !list.contains(x);
+            if (absent) {
+                list.add(x);
+            }
+            return absent;
+        }
+    }
+}
+```
+
+通过添加一个原子操作来扩展类是脆弱的，因为它将类的加锁代码分布到多个类中。客户端加锁则更加脆弱，因为它将类C的加锁代码放到与C完全无关的其他类中。
+
+客户端加锁机制与扩展类机制有许多共同点，二者都是将派生类的行为与基类的实现耦合在一起。正如扩展会破坏实现的封装性，客户端加锁同样会破坏同步策略的封装性。
+
+##### 4.4.2 组合
+
+当为现有的类添加一个原子操作时，有一个更好的方法：组合（Composition）。程序清单4-16中的`ImprovedList`通过将操作委托给底层的`List`实例来实现`List`操作，同时还添加了一个`putIfAbsent`方法。
+
+```java
+package pers.tavish.jcip.ch4composingobjects;
+
+import net.jcip.annotations.ThreadSafe;
+
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.List;
+import java.util.ListIterator;
+
+// 程序清单4-16
+@ThreadSafe
+public class ImprovedList<T> implements List<T> {
+
+    private final List<T> list;
+
+    public ImprovedList(List<T> list) { this.list = list; }
+
+    public synchronized boolean putIfAbsent(T x) {
+        boolean contains = list.contains(x);
+        if (!contains) {
+            list.add(x);
+        }
+        return !contains;
+    }
+
+    // ...
+}
+```
+
+`ImprovedList`通过自身的内置锁增加了一层额外的加锁。它并不关心底层的`List`是否是线程安全的。即使`List`不是线程安全的或者修改了它的加锁实现，`ImprovedList`也会提供一致的加锁机制来实现线程安全性。`ImprovedList`更为健壮，事实上，我们使用了Java监视器模式来封装现有的`List`，并且只要在类中拥有指向底层`List`的唯一外部引用，就能确保线程安全性。（我们假设将列表对象传给构造函数后，客户代码不会再直接使用这个对象，而只能通过`ImprovedList`来访问它。）
+
+### 第5章 基础构建模块
