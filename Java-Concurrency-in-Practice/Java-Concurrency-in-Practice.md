@@ -1876,3 +1876,45 @@ public class ImprovedList<T> implements List<T> {
 `ImprovedList`通过自身的内置锁增加了一层额外的加锁。它并不关心底层的`List`是否是线程安全的。即使`List`不是线程安全的或者修改了它的加锁实现，`ImprovedList`也会提供一致的加锁机制来实现线程安全性。`ImprovedList`更为健壮，事实上，我们使用了Java监视器模式来封装现有的`List`，并且只要在类中拥有指向底层`List`的唯一外部引用，就能确保线程安全性。（我们假设将列表对象传给构造函数后，客户代码不会再直接使用这个对象，而只能通过`ImprovedList`来访问它。）
 
 ### 第5章 基础构建模块
+
+Java平台类库包含了丰富的并发基础构建模块，例如线程安全容器类以及各种用于协调多个相互协作的线程控制流的同步工具类（`Synchronizer`）。本章将介绍一些有用的构建模块，以及在使用这些模块来构建并发应用程序时的一些常用模式。
+
+#### 5.1 同步容器类
+
+同步容器类包括`Vector`和`Hashtable`，二者是早期JDK的一部分，还包括`Collections.synchronizedXxx`等工厂方法创建的容器类。这些类实现线程安全的方式是：将它们的状态封装起来，并对每个共有方法都进行同步，使得每次只有一个线程能访问容器的状态。
+
+#### 5.1.1 同步容器类的问题
+
+同步容器类都是线程安全的，但在某些情况下可能需要额外的客户端加锁来保护复合操作。容器上常见的复合操作包括：迭代（反复访问元素，直到遍历完容器中所有元素）、跳转（根据指定顺序找到当前元素的下一个元素）以及条件运算（例如，“若没有则添加”）。在同步容器类中，这些复合操作在没有客户端加锁的情况下仍然是线程安全的，但当其他线程并发地修改容器时，它们可能出现意料之外的行为。
+
+例如程序清单5-1：
+
+```java
+package pers.tavish.jcip.ch5buildingblocks;
+
+import java.util.Vector;
+
+// 程序清单5-1
+public class UnsafeVectorHelpers {
+    public static Object getLast(Vector list) {
+        int lastIndex = list.size() - 1;
+        return list.get(lastIndex);
+    }
+
+    public static void deleteLast(Vector list) {
+        int lastIndex = list.size() - 1;
+        list.remove(lastIndex);
+    }
+}
+```
+
+这两个方法都会执行“先检查再运行”操作，每个方法首先都会获取到列表大小，然后通过结果来获取或删除最后一个元素。
+
+这些方法看似没有任何问题，从某种程度上来看也确实如此，无论多少个线程同时调用它们，也不会破坏`Vector`。但从这些方法的调用者角度来看，情况就不同了。如果线程B在一个包含10个元素的`Vector`上调用`getLast`，同时线程A在同一个`Vector`上调用`deleteLast`，这些操作在某些执行时序上将产生`ArrayIndexOutOfBoundsException`。
+
+![数组角标越界异常](_images\图5-1-数组角标越界异常.PNG)
+
+这种情况很好地遵循了`Vector`的使用规范，如果请求一个不存在的元素，那么将抛出一个异常。但这并不是方法调用者所期望的结果，除非`Vector`一开始就是空的。
+
+由于同步容器类要遵守同步策略，即支持客户端加锁，因此可能会创建一些新的操作，只要我们直到应该使用哪一个锁，那么这些新操作就与容器的其他操作一样都是原子操作。
+
