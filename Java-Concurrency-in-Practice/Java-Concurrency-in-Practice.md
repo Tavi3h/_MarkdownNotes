@@ -1916,5 +1916,56 @@ public class UnsafeVectorHelpers {
 
 这种情况很好地遵循了`Vector`的使用规范，如果请求一个不存在的元素，那么将抛出一个异常。但这并不是方法调用者所期望的结果，除非`Vector`一开始就是空的。
 
-由于同步容器类要遵守同步策略，即支持客户端加锁，因此可能会创建一些新的操作，只要我们直到应该使用哪一个锁，那么这些新操作就与容器的其他操作一样都是原子操作。
+由于同步容器类要遵守同步策略，即支持客户端加锁，因此可能会创建一些新的操作，只要我们知道应该使用哪一个锁，那么这些新操作就与容器的其他操作一样都是原子操作。
 
+通过获得容器类的锁，我们可以使`getLast`和`deleteLast`成为原子操作，如程序清单5-2所示：
+
+```java
+package pers.tavish.jcip.ch5buildingblocks;
+
+import java.util.Vector;
+
+// 程序清单5-2
+public class SafeVectorHelpers {
+
+    public static Object getLast(Vector list) {
+        synchronized (list) {
+            int lastIndex = list.size() - 1;
+            return list.get(lastIndex);
+        }
+    }
+
+    public static void deleteLast(Vector list) {
+        synchronized (list) {
+            int lastIndex = list.size() - 1;
+            list.remove(lastIndex);
+        }
+    }
+}
+```
+
+在调用`size`和`get`之间，`Vector`的长度可能发生变化，这种风险对`Vector`中的元素进行迭代时仍然会出现，如程序清单5-3所示：
+
+```java
+// 程序清单5-3
+for (int i = 0; i < vector.size(); i++) {
+    dosomething(vector.get(i));
+}
+```
+
+这种迭代操作的正确性要依赖于运气，即在两个方法调用之间没有线程会修改`Vector`。
+
+虽然程序清单5-3可能抛出异常，但并不意味着`Vector`就不是线程安全的。`Vector`的状态仍是有效的，抛出的异常也是符合规范的。
+
+我们可以通过客户端加锁来解约这个不可靠迭代的问题，但要牺牲一些伸缩性，如程序清单5-4所示：
+
+```java
+// 程序清单5-4
+synchronized(vector) {
+    for (int i = 0; i < vector.size(); i++) {
+        dosomething(vector.get(i));
+    }
+}
+```
+
+通过在迭代期间持有锁可以防止其他线程在迭代期间修改`Vector`，但这会降低并发性。
